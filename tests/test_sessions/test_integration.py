@@ -94,10 +94,10 @@ class TestSessionIntegration:
 
         
 
-    def test_file_session_integration_flow(self):
+    def test_file_session_integration_flow(self,tmp_path):
         """Test complete file-based session flow"""
-        temp_dir = tempfile.mkdtemp()
-
+        temp_dir = tmp_path / "session_data"
+        temp_dir.mkdir()
         try:
             config = MakeConfig({
                 "secret_key": "test-secret-key-file-integration",

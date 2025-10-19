@@ -23,7 +23,7 @@ class CSRFMiddleware(BaseMiddleware):
         if not self.use_csrf:
             return
         self.serializer = URLSafeSerializer(app_config.secret_key, "csrftoken")  # type:ignore
-        self.required_urls: typing.List[str] = app_config.csrf_required_urls or []
+        self.required_urls: typing.List[str] = app_config.csrf_required_urls or ["*"]
         self.exempt_urls = app_config.csrf_exempt_urls
         self.sensitive_cookies = app_config.csrf_sensitive_cookies
         self.safe_methods = set(
@@ -121,6 +121,7 @@ class CSRFMiddleware(BaseMiddleware):
         """Check if the URL requires CSRF validation."""
 
         if not self.required_urls:
+
             return False
 
         if "*" in self.required_urls:
