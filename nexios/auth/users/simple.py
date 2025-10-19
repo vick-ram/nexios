@@ -109,6 +109,9 @@ class UnauthenticatedUser(BaseUser):
             str: An empty string.
         """
         return ""
+    @property
+    def identity(self) -> str:
+        return ""
 
     def has_permission(self, permission: str) -> bool:
         return False

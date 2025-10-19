@@ -33,7 +33,6 @@ class SessionMiddleware(BaseMiddleware):
 
         self.session_cookie_name = session_cookie_name
         manager = self.get_manager()
-        request.scope["session"] = manager
         session: type[BaseSessionInterface] = manager(
             session_key=request.cookies.get(session_cookie_name)  # type:ignore
         )

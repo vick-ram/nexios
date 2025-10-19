@@ -10,7 +10,7 @@ _identifier = "id"
 def login(request: Request, user: type[BaseUser]):
     assert "session" in request.scope, "No Session Middleware Installed"
     if request.session.get(_session_key): 
-        request.session.delete_session(_session_key)
+        del request.session[_session_key]
     request.session[_session_key] = {
         _identifier: user.identity,
         "display_name": user.display_name,
@@ -19,7 +19,7 @@ def login(request: Request, user: type[BaseUser]):
 
 def logout(request: Request):
     assert "session" in request.scope, "No Session Middleware Installed"
-    request.session.delete_session(_session_key)
+    del request.session[_session_key]
 
 
 class SessionAuthBackend(AuthenticationBackend):
