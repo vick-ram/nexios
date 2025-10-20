@@ -41,7 +41,6 @@ db.sqlite3-shm
 # 🔹 Documentation & Static Files
 # ==============================
 docs/site
-static/
 
 # ==============================
 # 🔹 Node.js Related Files

@@ -107,6 +107,8 @@ class StaticFiles(BaseRouter):
 
     async def _handle(self, request: Request, response: Response):
         path = request.scope.get("path", "").lstrip("/")
+        if request.method != "GET":
+            return response.json("Method not allowed", status_code=405)
         for directory in self.directories:
             try:
                 file_path = (directory / path).resolve()
