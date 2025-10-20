@@ -285,6 +285,7 @@ class CursorPagination(BasePaginationStrategy):
     def decode_cursor(self, cursor: str) -> Dict[str, Any]:
         try:
             decoded = base64.b64decode(cursor).decode("utf-8")
+            print(decoded)
             return json.loads(decoded)
         except (json.JSONDecodeError, UnicodeDecodeError):
             raise InvalidCursorError("Invalid cursor format")
@@ -296,6 +297,13 @@ class CursorPagination(BasePaginationStrategy):
     def calculate_offset_limit(  # type:ignore
         self, cursor: Optional[str], page_size: int
     ) -> Tuple[int, int]:  # type:ignore
+        decoded_cursor = urllib.parse.unquote(cursor) if cursor else None 
+        if decoded_cursor:
+            try:
+                cursor_data = self.decode_cursor(decoded_cursor)
+            except InvalidCursorError:
+                raise InvalidCursorError("Invalid cursor format")   
+            return cursor_data[self.sort_field], page_size
         return 0, page_size
 
     def generate_metadata(
