@@ -104,12 +104,12 @@ class TestFileSessionManager:
         await session.load()
         assert session._session_cache == {}
 
-    def test_file_session_missing_file(self):
+    async def test_file_session_missing_file(self):
         """Test loading when session file doesn't exist"""
         session = FileSessionManager("nonexistent-key")
 
         # Should handle gracefully
-        session.load()
+        await session.load()
         assert session._session_cache == {}
 
     async def test_file_session_clear(self):
