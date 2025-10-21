@@ -112,7 +112,6 @@ class CORSMiddleware(BaseMiddleware):
         await call_next()
 
         if origin and self.is_allowed_origin(origin):
-
             response.set_header("Access-Control-Allow-Origin", origin, overide=True)
 
             if self.allow_credentials:

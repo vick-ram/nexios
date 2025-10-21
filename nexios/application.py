@@ -136,9 +136,7 @@ class NexiosApp(object):
         self.lifespan_context: Optional[lifespan_manager] = lifespan
         self.state: Dict[str, Any] = {}
 
-        openapi_config: Dict[str, Any] = self.config.to_dict().get(
-            "openapi", {}
-        )  # type:ignore
+        openapi_config: Dict[str, Any] = self.config.to_dict().get("openapi", {})  # type:ignore
         self.openapi_config = OpenAPIConfig(
             title=openapi_config.get("title", title or "Nexios API"),
             version=openapi_config.get("version", version or "1.0.0"),
@@ -511,9 +509,7 @@ class NexiosApp(object):
             ]
             + self.http_middleware
             + [
-                Middleware(
-                    ASGIRequestResponseBridge, dispatch=self.exceptions_handler
-                )  # type:ignore
+                Middleware(ASGIRequestResponseBridge, dispatch=self.exceptions_handler)  # type:ignore
             ]
         )
         for cls, args, kwargs in reversed(middleware):

@@ -30,7 +30,6 @@ from nexios.types import ASGIApp
 
 
 class AsyncTestClient(httpx.AsyncClient):
-
     __test__ = False
 
     def __init__(

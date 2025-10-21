@@ -80,7 +80,6 @@ class AuthenticationMiddleware(BaseMiddleware):
         # Try each backend until one successfully authenticates the user
         for backend in self.backends:
             try:
-
                 auth_result = await backend.authenticate(request, response)
 
                 if auth_result.success:

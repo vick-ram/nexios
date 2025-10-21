@@ -49,7 +49,9 @@ async def wrap_http_exceptions(
                 exc.status_code
             )  # type: ignore
             if handler:
-                return _process_response(response, await handler(request, response, exc))  # type: ignore
+                return _process_response(
+                    response, await handler(request, response, exc)
+                )  # type: ignore
 
         if handler is None:  # type: ignore
             handler = _lookup_exception_handler(exception_handlers, exc)
@@ -104,7 +106,6 @@ class ExceptionMiddleware:
     async def http_exception(
         self, request: Request, response: Response, exc: HTTPException
     ) -> typing.Any:
-
         assert isinstance(exc, HTTPException)
         if exc.status_code in {204, 304}:  # type:ignore
             return response.empty(status_code=exc.status_code, headers=exc.headers)

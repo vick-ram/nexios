@@ -213,7 +213,8 @@ class ASGIRequestResponseBridge:
                     raise app_exc
 
             response_ = response.stream(
-                iterator=body_stream(), status_code=message["status"]  # type: ignore
+                iterator=body_stream(),
+                status_code=message["status"],  # type: ignore
             )  # type: ignore
             response_._response._headers = message["headers"]  # type: ignore
 

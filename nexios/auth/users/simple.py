@@ -66,7 +66,6 @@ class SimpleUser(BaseUser):
 
     @classmethod
     async def load_user(cls, identity: str):
-
         return cls(identity, [identity])
 
     @property

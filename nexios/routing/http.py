@@ -2307,7 +2307,6 @@ class Router(BaseRouter):
 
         route_name = name_parts[-1]
         for route in current_router.routes:
-
             if getattr(route, "name", None) is None:
                 continue
             if getattr(route, "name", None) == route_name:
@@ -2346,9 +2345,7 @@ class Router(BaseRouter):
         path_matched = False
         allowed_methods_: typing.List[str] = []
         for route in self.routes:
-            match, matched_params, is_allowed = route.match(
-                url, scope["method"]
-            )  # type:ignore
+            match, matched_params, is_allowed = route.match(url, scope["method"])  # type:ignore
             if match:
                 path_matched = True
                 if is_allowed:
