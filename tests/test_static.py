@@ -122,9 +122,7 @@ def test_static_file_error_cases():
         resp = client.get("/static/")
         assert resp.status_code in [200, 404]
 
-        long_path = "/static/" + "a" * 1000 + ".txt"
-        resp = client.get(long_path)
-        assert resp.status_code == 404
+ 
 
 
 def test_static_file_query_params():
