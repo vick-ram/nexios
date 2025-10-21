@@ -112,7 +112,7 @@ class CORSMiddleware(BaseMiddleware):
         await call_next()
 
         if origin and self.is_allowed_origin(origin):
-            
+
             response.set_header("Access-Control-Allow-Origin", origin, overide=True)
 
             if self.allow_credentials:
@@ -126,6 +126,7 @@ class CORSMiddleware(BaseMiddleware):
                 ", ".join(self.expose_headers),
                 overide=True,
             )
+
     def is_allowed_origin(self, origin: Optional[str]) -> bool:
         if origin in self.blacklist_origins:
             if self.debug:
@@ -138,7 +139,7 @@ class CORSMiddleware(BaseMiddleware):
         try:
             if self.allow_origin_regex and self.allow_origin_regex.fullmatch(origin):
                 return True
-        except:
+        except re.error:
             return False
 
         if self.dynamic_origin_validator and callable(self.dynamic_origin_validator):
@@ -147,7 +148,7 @@ class CORSMiddleware(BaseMiddleware):
         return origin in self.allow_origins
 
     def is_allowed_method(self, method: Optional[str]) -> bool:
-        if not method or method.strip() == "": 
+        if not method or method.strip() == "":
             return False
         if "*" in self.allow_methods:
             return True

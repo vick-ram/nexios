@@ -8,13 +8,11 @@ from typing import Any, Optional
 
 import click
 
-from nexios.cli.utils import (
-    _echo_error, # type: ignore
-    _echo_info, # type: ignore
-    _echo_warning, # type: ignore
-    _load_app_from_path, # type: ignore
-    load_config_module, # type: ignore
-)
+from nexios.cli.utils import _echo_error  # type: ignore
+from nexios.cli.utils import _echo_info  # type: ignore
+from nexios.cli.utils import _echo_warning  # type: ignore
+from nexios.cli.utils import _load_app_from_path  # type: ignore
+from nexios.cli.utils import load_config_module  # type: ignore
 
 
 @click.command()
@@ -119,7 +117,7 @@ def _try_start_ipython_shell(shell_vars: dict[str, Any]) -> bool:
     """Try to start IPython shell."""
     try:
         import IPython  # type: ignore # noqa: F401
-        from IPython.terminal.embed import InteractiveShellEmbed # type: ignore
+        from IPython.terminal.embed import InteractiveShellEmbed  # type: ignore
 
         _echo_info("Starting IPython shell...")
         _echo_info(
@@ -149,7 +147,7 @@ Examples:
   print(app.config)
 """
 
-        shell = InteractiveShellEmbed(banner1=banner) # type: ignore
+        shell = InteractiveShellEmbed(banner1=banner)  # type: ignore
         shell(local_ns=shell_vars)
         return True
 

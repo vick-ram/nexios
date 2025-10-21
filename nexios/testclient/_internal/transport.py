@@ -139,7 +139,8 @@ class TestClientTransport(httpx.BaseTransport):
         else:
             headers = [(b"host", (f"{host}:{port}").encode())]
         headers += [
-            (key.lower().encode(), value.encode()) for key, value in request_headers.multi_items()
+            (key.lower().encode(), value.encode())
+            for key, value in request_headers.multi_items()
         ]
         return headers
 
@@ -318,7 +319,9 @@ class TestClientTransport(httpx.BaseTransport):
             body = request.read()
             if isinstance(cast(str, body), str):
                 if self.check_asgi_conformance:
-                    raise ASGISpecViolation("ASGI Spec violation: body must be a bytes string")
+                    raise ASGISpecViolation(
+                        "ASGI Spec violation: body must be a bytes string"
+                    )
                 body_bytes: bytes = body.encode("utf-8")
             elif body is None:
                 body_bytes = b""
@@ -368,23 +371,27 @@ class TestClientTransport(httpx.BaseTransport):
             nonlocal raw_kwargs, response_started, template, context
 
             if message["type"] == "http.response.start":
-                assert not response_started, 'Received multiple "http.response.start" messages.'
+                assert (
+                    not response_started
+                ), 'Received multiple "http.response.start" messages.'
                 raw_kwargs["status_code"] = message["status"]
                 raw_kwargs["headers"] = list(message.get("headers", []))
                 response_started = True
             elif message["type"] == "http.response.body":
-                assert response_started, (
-                    'Received "http.response.body" without "http.response.start".'
-                )
-                assert not response_complete.is_set(), (
-                    'Received "http.response.body" after response completed.'
-                )
+                assert (
+                    response_started
+                ), 'Received "http.response.body" without "http.response.start".'
+                assert (
+                    not response_complete.is_set()
+                ), 'Received "http.response.body" after response completed.'
                 body = message.get("body", b"")
                 # we allow here all of the types because some servers allow them too
                 if self.check_asgi_conformance and not isinstance(
                     body, (bytes, memoryview, bytearray)
                 ):
-                    raise ASGISpecViolation("ASGI Spec violation: body must be a bytes string")
+                    raise ASGISpecViolation(
+                        "ASGI Spec violation: body must be a bytes string"
+                    )
                 more_body = message.get("more_body", False)
                 if request.method != "HEAD":
                     raw_kwargs["stream"].write(body)
@@ -507,7 +514,9 @@ class AsyncTestClientTransport(httpx.AsyncBaseTransport):
             headers = [(b"host", host.encode())]
         else:
             headers = [(b"host", f"{host}:{port}".encode())]
-        headers += [(k.lower().encode(), v.encode()) for k, v in request_headers.multi_items()]
+        headers += [
+            (k.lower().encode(), v.encode()) for k, v in request_headers.multi_items()
+        ]
         return headers
 
     async def _handle_websocket_request(
@@ -601,7 +610,9 @@ class AsyncTestClientTransport(httpx.AsyncBaseTransport):
                     chunk = next(body)
                     if isinstance(chunk, str):
                         if self.check_asgi_conformance:
-                            raise ASGISpecViolation("ASGI Spec violation: chunk must be bytes")
+                            raise ASGISpecViolation(
+                                "ASGI Spec violation: chunk must be bytes"
+                            )
                         chunk = chunk.encode("utf-8")
                     return {"type": "http.request", "body": chunk, "more_body": True}
                 except StopIteration:
@@ -661,7 +672,9 @@ class AsyncTestClientTransport(httpx.AsyncBaseTransport):
         if self.check_asgi_conformance:
             for key, val in raw_kwargs["headers"]:
                 if not isinstance(key, bytes) or not isinstance(val, bytes):
-                    raise ASGISpecViolation("ASGI Spec violation: headers must be bytes")
+                    raise ASGISpecViolation(
+                        "ASGI Spec violation: headers must be bytes"
+                    )
 
         response = httpx.Response(**raw_kwargs, request=request)
         if template is not None:

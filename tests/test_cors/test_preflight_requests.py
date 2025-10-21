@@ -1,28 +1,37 @@
 """
 Tests for CORS preflight requests (OPTIONS)
 """
+
 import pytest
+
 from nexios import NexiosApp
 from nexios.config import MakeConfig, set_config
-from nexios.middleware.cors import CORSMiddleware
 from nexios.http import Request, Response
+from nexios.middleware.cors import CORSMiddleware
 from nexios.testclient import TestClient
 
 
 @pytest.fixture
 def cors_app():
     """Create a test app with CORS middleware configured"""
-    config = MakeConfig({
-        "cors": {
-            "allow_origins": ["http://example.com", "https://example.org"],
-            "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization", "X-Custom-Header", "X-Another-Header"],
-            "allow_credentials": True,
-            "expose_headers": ["X-Exposed-Header"],
-            "max_age": 3600,
-            "debug": True,
+    config = MakeConfig(
+        {
+            "cors": {
+                "allow_origins": ["http://example.com", "https://example.org"],
+                "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                "allow_headers": [
+                    "Content-Type",
+                    "Authorization",
+                    "X-Custom-Header",
+                    "X-Another-Header",
+                ],
+                "allow_credentials": True,
+                "expose_headers": ["X-Exposed-Header"],
+                "max_age": 3600,
+                "debug": True,
+            }
         }
-    })
+    )
     set_config(config)
 
     app = NexiosApp(config)
@@ -68,7 +77,10 @@ class TestPreflightRequests:
         assert response.json() == "OK"
         assert response.headers["Access-Control-Allow-Origin"] == "http://example.com"
         assert response.headers["Access-Control-Allow-Methods"] == "GET"
-        assert response.headers["Access-Control-Allow-Headers"] == "content-type, authorization"
+        assert (
+            response.headers["Access-Control-Allow-Headers"]
+            == "content-type, authorization"
+        )
         assert response.headers["Access-Control-Allow-Credentials"] == "true"
         assert response.headers["Access-Control-Max-Age"] == "3600"
 
@@ -89,14 +101,16 @@ class TestPreflightRequests:
     def test_preflight_with_wildcard_headers(self, client):
         """Test preflight with wildcard allowed headers"""
         # Create app with wildcard headers
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["http://example.com"],
-                "allow_methods": ["GET"],
-                "allow_headers": ["*"],  # Allow all headers
-                "allow_credentials": True
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["http://example.com"],
+                    "allow_methods": ["GET"],
+                    "allow_headers": ["*"],  # Allow all headers
+                    "allow_credentials": True,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -119,7 +133,10 @@ class TestPreflightRequests:
         )
 
         assert response.status_code == 201
-        assert response.headers["Access-Control-Allow-Headers"] == "x-custom-header, x-another-header, x-third-header"
+        assert (
+            response.headers["Access-Control-Allow-Headers"]
+            == "x-custom-header, x-another-header, x-third-header"
+        )
 
     def test_preflight_disallowed_origin(self, client):
         """Test OPTIONS request with disallowed origin"""
@@ -192,8 +209,6 @@ class TestPreflightRequests:
         # Should not have Access-Control-Allow-Headers if not requested
         assert "Access-Control-Allow-Headers" not in response.headers
 
-   
-
     def test_preflight_case_insensitive_headers(self, client):
         """Test preflight with case variations in headers"""
         response = client.options(
@@ -206,7 +221,10 @@ class TestPreflightRequests:
         )
 
         assert response.status_code == 201
-        assert response.headers["Access-Control-Allow-Headers"] == "content-type, x-custom-header"
+        assert (
+            response.headers["Access-Control-Allow-Headers"]
+            == "content-type, x-custom-header"
+        )
 
     def test_preflight_header_normalization(self, client):
         """Test that requested headers are normalized (lowercased)"""
@@ -221,7 +239,10 @@ class TestPreflightRequests:
 
         assert response.status_code == 201
         # Headers should be lowercased in response
-        assert response.headers["Access-Control-Allow-Headers"] == "x-custom-header, content-type, x-another-header"
+        assert (
+            response.headers["Access-Control-Allow-Headers"]
+            == "x-custom-header, content-type, x-another-header"
+        )
 
     def test_preflight_multiple_origins(self, client):
         """Test preflight requests with different allowed origins"""
@@ -242,13 +263,15 @@ class TestPreflightRequests:
     def test_preflight_with_credentials_false(self, client):
         """Test preflight when credentials are disabled"""
         # Create app without credentials
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["http://example.com"],
-                "allow_methods": ["GET"],
-                "allow_credentials": False
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["http://example.com"],
+                    "allow_methods": ["GET"],
+                    "allow_credentials": False,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -277,13 +300,15 @@ class TestPreflightRequests:
     def test_preflight_max_age_configuration(self, client):
         """Test preflight max-age configuration"""
         # Create app with different max_age
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["http://example.com"],
-                "allow_methods": ["GET"],
-                "max_age": 86400  # 24 hours
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["http://example.com"],
+                    "allow_methods": ["GET"],
+                    "max_age": 86400,  # 24 hours
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -310,14 +335,16 @@ class TestPreflightRequests:
     def test_preflight_blacklisted_origin(self, client):
         """Test preflight with blacklisted origin"""
         # Create app with blacklisted origin
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["*"],
-                "blacklist_origins": ["http://evil.com"],
-                "allow_methods": ["GET"],
-                "allow_credentials": True
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["*"],
+                    "blacklist_origins": ["http://evil.com"],
+                    "allow_methods": ["GET"],
+                    "allow_credentials": True,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -371,4 +398,7 @@ class TestPreflightRequests:
 
         assert response.status_code == 201
         # Headers should be trimmed and lowercased
-        assert response.headers["Access-Control-Allow-Headers"] == "content-type, x-custom-header, authorization"
+        assert (
+            response.headers["Access-Control-Allow-Headers"]
+            == "content-type, x-custom-header, authorization"
+        )

@@ -1,13 +1,16 @@
 """
 Tests for file-based session manager
 """
-import pytest
+
+import asyncio
+import json
 import os
 import tempfile
-import json
-import asyncio
-from nexios.session.file import FileSessionManager
+
+import pytest
+
 from nexios.config import MakeConfig, set_config
+from nexios.session.file import FileSessionManager
 
 
 class TestFileSessionManager:
@@ -16,22 +19,25 @@ class TestFileSessionManager:
     def setup_method(self):
         """Set up test configuration with temporary directory"""
         self.temp_dir = tempfile.mkdtemp()
-        config = MakeConfig({
-            "secret_key": "test-secret-key-for-file-sessions",
-            "session": {
-                "session_cookie_name": "test_session",
-                "session_expiration_time": 3600,
-                "session_permanent": False,
-                "session_refresh_each_request": False,
-                "session_file_storage_path": self.temp_dir,
-                "session_file_name": "test_sessions"
+        config = MakeConfig(
+            {
+                "secret_key": "test-secret-key-for-file-sessions",
+                "session": {
+                    "session_cookie_name": "test_session",
+                    "session_expiration_time": 3600,
+                    "session_permanent": False,
+                    "session_refresh_each_request": False,
+                    "session_file_storage_path": self.temp_dir,
+                    "session_file_name": "test_sessions",
+                },
             }
-        })
+        )
         set_config(config)
 
     def teardown_method(self):
         """Clean up temporary directory"""
         import shutil
+
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
@@ -97,7 +103,7 @@ class TestFileSessionManager:
         session = FileSessionManager("corrupted-key")
 
         # Create corrupted JSON file
-        with open(session._get_storage_path(), 'w') as f:
+        with open(session._get_storage_path(), "w") as f:
             f.write("invalid json content")
 
         # Should handle gracefully
@@ -199,5 +205,3 @@ class TestFileSessionManager:
 
         assert session.session_key is not None
         assert isinstance(session.session_key, str)
-
-   

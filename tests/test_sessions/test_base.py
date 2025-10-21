@@ -1,11 +1,14 @@
 """
 Tests for base session interface functionality
 """
-import pytest
+
 import asyncio
-from datetime import datetime, timezone, timedelta
-from nexios.session.base import BaseSessionInterface
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
 from nexios.config import MakeConfig, set_config
+from nexios.session.base import BaseSessionInterface
 
 
 class MockSessionManager(BaseSessionInterface):
@@ -29,15 +32,17 @@ class TestBaseSessionInterface:
 
     def setup_method(self):
         """Set up test configuration"""
-        config = MakeConfig({
-            "secret_key": "test-secret-key",
-            "session": {
-                "session_cookie_name": "test_session",
-                "session_expiration_time": 3600,
-                "session_permanent": False,
-                "session_refresh_each_request": False
+        config = MakeConfig(
+            {
+                "secret_key": "test-secret-key",
+                "session": {
+                    "session_cookie_name": "test_session",
+                    "session_expiration_time": 3600,
+                    "session_permanent": False,
+                    "session_refresh_each_request": False,
+                },
             }
-        })
+        )
         set_config(config)
 
     def test_session_initialization(self):

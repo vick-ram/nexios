@@ -1,17 +1,17 @@
 import pytest
 
 from nexios.pagination import (
-    PageNumberPagination,
-    LimitOffsetPagination,
-    CursorPagination,
-    SyncPaginator,
-    AsyncPaginator,
-    SyncListDataHandler,
     AsyncListDataHandler,
-    PaginationError,
+    AsyncPaginator,
+    CursorPagination,
+    InvalidCursorError,
     InvalidPageError,
     InvalidPageSizeError,
-    InvalidCursorError,
+    LimitOffsetPagination,
+    PageNumberPagination,
+    PaginationError,
+    SyncListDataHandler,
+    SyncPaginator,
 )
 
 
@@ -68,8 +68,6 @@ class TestPaginationErrorHandling:
 
         assert "Offset cannot be negative" in str(exc_info.value)
 
-
-
     def test_cursor_pagination_invalid_json_cursor(self):
         """Test cursor pagination with invalid JSON in cursor"""
         import base64
@@ -83,7 +81,6 @@ class TestPaginationErrorHandling:
 
         assert "Invalid cursor format" in str(exc_info.value)
 
-
     def test_sync_paginator_invalid_offset_exceeds_total(self):
         """Test sync paginator with offset exceeding total items and validation enabled"""
         data = [{"id": 1}, {"id": 2}]
@@ -93,11 +90,7 @@ class TestPaginationErrorHandling:
         request_params = {"limit": "10", "offset": "10"}
 
         paginator = SyncPaginator(
-            handler,
-            pagination,
-            base_url,
-            request_params,
-            validate_total_items=True
+            handler, pagination, base_url, request_params, validate_total_items=True
         )
 
         with pytest.raises(InvalidPageError) as exc_info:
@@ -117,11 +110,7 @@ class TestPaginationErrorHandling:
 
         async def run_test():
             paginator = AsyncPaginator(
-                handler,
-                pagination,
-                base_url,
-                request_params,
-                validate_total_items=True
+                handler, pagination, base_url, request_params, validate_total_items=True
             )
 
             with pytest.raises(InvalidPageError) as exc_info:
@@ -140,11 +129,7 @@ class TestPaginationErrorHandling:
         request_params = {"limit": "10", "offset": "10"}
 
         paginator = SyncPaginator(
-            handler,
-            pagination,
-            base_url,
-            request_params,
-            validate_total_items=False
+            handler, pagination, base_url, request_params, validate_total_items=False
         )
 
         # Should not raise error when validation is disabled
@@ -168,7 +153,7 @@ class TestPaginationErrorHandling:
                 pagination,
                 base_url,
                 request_params,
-                validate_total_items=False
+                validate_total_items=False,
             )
 
             # Should not raise error when validation is disabled
@@ -271,6 +256,7 @@ class TestErrorPropagation:
 
     def test_error_in_handler_propagates_to_paginator(self):
         """Test that errors in data handler are properly propagated"""
+
         class ErrorHandler(SyncListDataHandler):
             def get_total_items(self):
                 raise RuntimeError("Database connection failed")
@@ -291,6 +277,7 @@ class TestErrorPropagation:
 
     def test_async_error_propagation(self):
         """Test error propagation in async context"""
+
         class ErrorAsyncHandler(AsyncListDataHandler):
             async def get_total_items(self):
                 raise RuntimeError("Async database connection failed")

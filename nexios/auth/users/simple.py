@@ -1,6 +1,8 @@
+from typing_extensions import Annotated, Doc
 
 from .base import BaseUser
-from typing_extensions import Annotated, Doc
+
+
 class SimpleUser(BaseUser):
     """
     A basic implementation of an authenticated user.
@@ -11,7 +13,7 @@ class SimpleUser(BaseUser):
     def __init__(
         self,
         username: Annotated[str, Doc("The username of the authenticated user.")],
-        permissions:Annotated[list[str], Doc("Array of user User Permissions")] = [],
+        permissions: Annotated[list[str], Doc("Array of user User Permissions")] = [],
     ) -> None:
         """
         Initializes a simple authenticated user.
@@ -59,16 +61,19 @@ class SimpleUser(BaseUser):
             bool: True if the user has the specified permission, False otherwise.
         """
         if permission in self.permissions:
-                return True
-        return False 
+            return True
+        return False
+
     @classmethod
     async def load_user(cls, identity: str):
-        
+
         return cls(identity, [identity])
+
     @property
     def identity(self) -> str:
         return self.username
-  
+
+
 class UnauthenticatedUser(BaseUser):
     """
     Represents an unauthenticated user.
@@ -109,6 +114,7 @@ class UnauthenticatedUser(BaseUser):
             str: An empty string.
         """
         return ""
+
     @property
     def identity(self) -> str:
         return ""

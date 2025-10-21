@@ -9,11 +9,10 @@ from .base import BaseSessionInterface
 class FileSessionManager(BaseSessionInterface):
     def __init__(self, session_key: Optional[str] = None) -> None:
         super().__init__(session_key)
-        self.session_key = session_key 
-       
+        self.session_key = session_key
 
     def _get_storage_path(self):
-        path =os.path.join(
+        path = os.path.join(
             self.session_config.session_file_storage_path or "sessions",
             f"{self.session_key}.json",
         )
@@ -80,7 +79,9 @@ class FileSessionManager(BaseSessionInterface):
     def has_expired(self) -> bool:
         """Returns True if the session has expired."""
         expiration_time = self.get_expiration_time()
-        if expiration_time and datetime.now(timezone.utc) > expiration_time:  # type:ignore
+        if (
+            expiration_time and datetime.now(timezone.utc) > expiration_time
+        ):  # type:ignore
             return True
         return False
 
@@ -95,7 +96,7 @@ class FileSessionManager(BaseSessionInterface):
 
     def clear(self):
         """Clear the session data."""
-        self.modified= True
+        self.modified = True
         self._session_cache.clear()
         if os.path.exists(self._get_storage_path()):
             os.remove(self._get_storage_path())

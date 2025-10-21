@@ -1,6 +1,6 @@
 import pytest
 
-from nexios.pagination import PaginatedResponse, AsyncPaginatedResponse
+from nexios.pagination import AsyncPaginatedResponse, PaginatedResponse
 
 
 class TestPaginatedResponse:
@@ -14,8 +14,8 @@ class TestPaginatedResponse:
                 "total_items": 100,
                 "page": 1,
                 "page_size": 10,
-                "links": {"next": "http://example.com?page=2"}
-            }
+                "links": {"next": "http://example.com?page=2"},
+            },
         }
 
         response = PaginatedResponse(data)
@@ -27,8 +27,8 @@ class TestPaginatedResponse:
                 "total_items": 100,
                 "page": 1,
                 "page_size": 10,
-                "links": {"next": "http://example.com?page=2"}
-            }
+                "links": {"next": "http://example.com?page=2"},
+            },
         }
 
         assert result == expected
@@ -37,12 +37,7 @@ class TestPaginatedResponse:
         """Test to_dict conversion with empty items"""
         data = {
             "items": [],
-            "pagination": {
-                "total_items": 0,
-                "page": 1,
-                "page_size": 10,
-                "links": {}
-            }
+            "pagination": {"total_items": 0, "page": 1, "page_size": 10, "links": {}},
         }
 
         response = PaginatedResponse(data)
@@ -50,12 +45,7 @@ class TestPaginatedResponse:
 
         expected = {
             "data": [],
-            "pagination": {
-                "total_items": 0,
-                "page": 1,
-                "page_size": 10,
-                "links": {}
-            }
+            "pagination": {"total_items": 0, "page": 1, "page_size": 10, "links": {}},
         }
 
         assert result == expected
@@ -73,9 +63,9 @@ class TestPaginatedResponse:
                     "first": "http://example.com?page=1",
                     "prev": "http://example.com?page=4",
                     "next": "http://example.com?page=6",
-                    "last": "http://example.com?page=100"
-                }
-            }
+                    "last": "http://example.com?page=100",
+                },
+            },
         }
 
         response = PaginatedResponse(data)
@@ -92,19 +82,16 @@ class TestPaginatedResponse:
                     "first": "http://example.com?page=1",
                     "prev": "http://example.com?page=4",
                     "next": "http://example.com?page=6",
-                    "last": "http://example.com?page=100"
-                }
-            }
+                    "last": "http://example.com?page=100",
+                },
+            },
         }
 
         assert result == expected
 
     def test_items_property(self):
         """Test items property access"""
-        data = {
-            "items": [{"id": 1}, {"id": 2}],
-            "pagination": {"total_items": 100}
-        }
+        data = {"items": [{"id": 1}, {"id": 2}], "pagination": {"total_items": 100}}
 
         response = PaginatedResponse(data)
 
@@ -112,10 +99,7 @@ class TestPaginatedResponse:
 
     def test_metadata_property(self):
         """Test metadata property access"""
-        data = {
-            "items": [{"id": 1}],
-            "pagination": {"total_items": 100, "page": 1}
-        }
+        data = {"items": [{"id": 1}], "pagination": {"total_items": 100, "page": 1}}
 
         response = PaginatedResponse(data)
 
@@ -131,8 +115,8 @@ class TestPaginatedResponse:
                 "total_items": 50000,
                 "page": 1,
                 "page_size": 1000,
-                "links": {"next": "http://example.com?page=2"}
-            }
+                "links": {"next": "http://example.com?page=2"},
+            },
         }
 
         response = PaginatedResponse(data)
@@ -153,8 +137,8 @@ class TestAsyncPaginatedResponse:
                 "total_items": 100,
                 "page": 1,
                 "page_size": 10,
-                "links": {"next": "http://example.com?page=2"}
-            }
+                "links": {"next": "http://example.com?page=2"},
+            },
         }
 
         response = AsyncPaginatedResponse(data)
@@ -166,8 +150,8 @@ class TestAsyncPaginatedResponse:
                 "total_items": 100,
                 "page": 1,
                 "page_size": 10,
-                "links": {"next": "http://example.com?page=2"}
-            }
+                "links": {"next": "http://example.com?page=2"},
+            },
         }
 
         assert result == expected
@@ -176,12 +160,7 @@ class TestAsyncPaginatedResponse:
         """Test async to_dict conversion with empty items"""
         data = {
             "items": [],
-            "pagination": {
-                "total_items": 0,
-                "page": 1,
-                "page_size": 10,
-                "links": {}
-            }
+            "pagination": {"total_items": 0, "page": 1, "page_size": 10, "links": {}},
         }
 
         response = AsyncPaginatedResponse(data)
@@ -189,12 +168,7 @@ class TestAsyncPaginatedResponse:
 
         expected = {
             "data": [],
-            "pagination": {
-                "total_items": 0,
-                "page": 1,
-                "page_size": 10,
-                "links": {}
-            }
+            "pagination": {"total_items": 0, "page": 1, "page_size": 10, "links": {}},
         }
 
         assert result == expected
@@ -212,9 +186,9 @@ class TestAsyncPaginatedResponse:
                     "first": "http://example.com?page=1",
                     "prev": "http://example.com?page=4",
                     "next": "http://example.com?page=6",
-                    "last": "http://example.com?page=100"
-                }
-            }
+                    "last": "http://example.com?page=100",
+                },
+            },
         }
 
         response = AsyncPaginatedResponse(data)
@@ -231,19 +205,16 @@ class TestAsyncPaginatedResponse:
                     "first": "http://example.com?page=1",
                     "prev": "http://example.com?page=4",
                     "next": "http://example.com?page=6",
-                    "last": "http://example.com?page=100"
-                }
-            }
+                    "last": "http://example.com?page=100",
+                },
+            },
         }
 
         assert result == expected
 
     def test_items_property(self):
         """Test async items property access"""
-        data = {
-            "items": [{"id": 1}, {"id": 2}],
-            "pagination": {"total_items": 100}
-        }
+        data = {"items": [{"id": 1}, {"id": 2}], "pagination": {"total_items": 100}}
 
         response = AsyncPaginatedResponse(data)
 
@@ -251,10 +222,7 @@ class TestAsyncPaginatedResponse:
 
     def test_metadata_property(self):
         """Test async metadata property access"""
-        data = {
-            "items": [{"id": 1}],
-            "pagination": {"total_items": 100, "page": 1}
-        }
+        data = {"items": [{"id": 1}], "pagination": {"total_items": 100, "page": 1}}
 
         response = AsyncPaginatedResponse(data)
 
@@ -270,8 +238,8 @@ class TestAsyncPaginatedResponse:
                 "total_items": 50000,
                 "page": 1,
                 "page_size": 1000,
-                "links": {"next": "http://example.com?page=2"}
-            }
+                "links": {"next": "http://example.com?page=2"},
+            },
         }
 
         response = AsyncPaginatedResponse(data)
@@ -294,9 +262,9 @@ class TestResponseConsistency:
                 "page_size": 10,
                 "links": {
                     "next": "http://example.com?page=2",
-                    "last": "http://example.com?page=10"
-                }
-            }
+                    "last": "http://example.com?page=10",
+                },
+            },
         }
 
         sync_response = PaginatedResponse(data)
@@ -316,12 +284,7 @@ class TestResponseConsistency:
         """Test consistency with empty data"""
         data = {
             "items": [],
-            "pagination": {
-                "total_items": 0,
-                "page": 1,
-                "page_size": 10,
-                "links": {}
-            }
+            "pagination": {"total_items": 0, "page": 1, "page_size": 10, "links": {}},
         }
 
         sync_response = PaginatedResponse(data)

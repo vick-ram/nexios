@@ -1,6 +1,5 @@
 from __future__ import annotations
-from nexios.openapi.models import Parameter, Path, Schema
-from nexios.openapi._builder import get_instance
+
 import copy
 import inspect
 import re
@@ -12,12 +11,12 @@ from typing import (
     Callable,
     Dict,
     List,
+    Literal,
     Optional,
     Pattern,
     Sequence,
     Type,
     Union,
-    Literal,
     cast,
 )
 
@@ -33,11 +32,13 @@ from nexios._internals._middleware import (
 )
 from nexios._internals._response_transformer import request_response
 from nexios._internals._route_builder import RouteBuilder
-from nexios.dependencies import inject_dependencies,  Depend
+from nexios.dependencies import Depend, inject_dependencies
 from nexios.events import AsyncEventEmitter
 from nexios.exceptions import NotFoundException
 from nexios.http import Request, Response
 from nexios.http.response import JSONResponse
+from nexios.openapi._builder import get_instance
+from nexios.openapi.models import Parameter, Path, Schema
 from nexios.structs import RouteParam, URLPath
 from nexios.types import ASGIApp, HandlerType, MiddlewareType, Receive, Scope, Send
 
@@ -143,7 +144,11 @@ class Routes(BaseRoute):
             ),
         ] = None,
         request_content_type: Annotated[
-            Literal["application/json", "multipart/form-data", "application/x-www-form-urlencoded"],
+            Literal[
+                "application/json",
+                "multipart/form-data",
+                "application/x-www-form-urlencoded",
+            ],
             Doc(
                 "Content type for the request body in OpenAPI docs. Defaults to 'application/json'."
             ),
@@ -309,7 +314,7 @@ class Router(BaseRouter):
     ):
         self.prefix = prefix or ""
         self.prefix.rstrip("/")
-        self.routes  = list(routes or [])
+        self.routes = list(routes or [])
         self.middleware: typing.List[Middleware] = []
         self.sub_routers: Dict[str, Union[Router, ASGIApp]] = {}
         self.route_class = Routes
@@ -319,7 +324,6 @@ class Router(BaseRouter):
         self.event = AsyncEventEmitter()
         self.dependencies = dependencies or []
         self.root_path = ""
-
 
         if self.prefix and not self.prefix.startswith("/"):
             warnings.warn("Router prefix should start with '/'")
@@ -339,10 +343,11 @@ class Router(BaseRouter):
         Returns:
             ASGIApp: The application wrapped with all middleware.
         """
-       
+
         for cls, args, kwargs in reversed(self.middleware):
             app = cls(app, *args, **kwargs)
         return app
+
     def add_route(
         self,
         route: Annotated[
@@ -431,8 +436,14 @@ class Router(BaseRouter):
             ),
         ] = None,
         request_content_type: Annotated[
-            Literal["application/json", "multipart/form-data", "application/x-www-form-urlencoded"],
-            Doc("Content type for the request body in OpenAPI docs. Defaults to 'application/json'."),
+            Literal[
+                "application/json",
+                "multipart/form-data",
+                "application/x-www-form-urlencoded",
+            ],
+            Doc(
+                "Content type for the request body in OpenAPI docs. Defaults to 'application/json'."
+            ),
         ] = "application/json",
         middleware: Annotated[
             List[Any],
@@ -588,23 +599,28 @@ class Router(BaseRouter):
             ]
             parameters.extend(route.parameters)  #  type: ignore
             # Construct full path including router prefix and root_path
-            full_path = self.prefix + self.root_path + re.sub(r"\{(\w+):\w+\}", r"{\1}", route.raw_path)
+            full_path = (
+                self.prefix
+                + self.root_path
+                + re.sub(r"\{(\w+):\w+\}", r"{\1}", route.raw_path)
+            )
             docs.document_endpoint(
                 path=full_path,
                 method=method,
-                tags=route.tags, #  type: ignore
+                tags=route.tags,  #  type: ignore
                 security=route.security,
                 summary=route.summary or "",
                 description=route.description,
                 request_body=route.request_model,
-                request_content_type=getattr(route, "request_content_type", "application/json"),
+                request_content_type=getattr(
+                    route, "request_content_type", "application/json"
+                ),
                 parameters=parameters,  # type:ignore
                 deprecated=route.deprecated,
                 operation_id=route.operation_id,
                 responses=route.responses,
             )(route.handler)
-    
-            
+
     def add_middleware(self, middleware: MiddlewareType) -> None:
         """Add middleware to the router"""
         if callable(middleware):
@@ -907,8 +923,14 @@ class Router(BaseRouter):
             ),
         ] = None,
         request_content_type: Annotated[
-            Literal["application/json", "multipart/form-data", "application/x-www-form-urlencoded"],
-            Doc("Content type for the request body in OpenAPI docs. Defaults to 'application/json'."),
+            Literal[
+                "application/json",
+                "multipart/form-data",
+                "application/x-www-form-urlencoded",
+            ],
+            Doc(
+                "Content type for the request body in OpenAPI docs. Defaults to 'application/json'."
+            ),
         ] = "application/json",
         middleware: Annotated[
             List[Any],
@@ -1371,7 +1393,11 @@ class Router(BaseRouter):
             ),
         ] = False,
         request_content_type: Annotated[
-            Literal["application/json", "application/x-www-form-urlencoded", "multipart/form-data"],
+            Literal[
+                "application/json",
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ],
             Doc(
                 """
                 Request content type.
@@ -1583,7 +1609,11 @@ class Router(BaseRouter):
             ),
         ] = False,
         request_content_type: Annotated[
-            Literal["application/json", "application/x-www-form-urlencoded", "multipart/form-data"],
+            Literal[
+                "application/json",
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ],
             Doc(
                 """
                 Request content type.
@@ -2107,8 +2137,14 @@ class Router(BaseRouter):
             Doc("Pydantic model for request body validation and OpenAPI docs"),
         ] = None,
         request_content_type: Annotated[
-            Literal["application/json", "multipart/form-data", "application/x-www-form-urlencoded"],
-            Doc("Content type for the request body in OpenAPI docs. Defaults to 'application/json'."),
+            Literal[
+                "application/json",
+                "multipart/form-data",
+                "application/x-www-form-urlencoded",
+            ],
+            Doc(
+                "Content type for the request body in OpenAPI docs. Defaults to 'application/json'."
+            ),
         ] = "application/json",
         middleware: Annotated[
             List[MiddlewareType],
@@ -2224,7 +2260,6 @@ class Router(BaseRouter):
                 responses=responses,
                 request_model=request_model,
                 request_content_type=request_content_type,
-                
                 middleware=middleware,
                 tags=tags,
                 security=security,
@@ -2253,8 +2288,8 @@ class Router(BaseRouter):
             URLPath: Complete path including all router prefixes
         """
         name_parts = _name.split(".")
-        current_router  = cast(Router, self)
-        path_segments :List[str] = []
+        current_router = cast(Router, self)
+        path_segments: List[str] = []
 
         # First collect all router prefixes
         for part in name_parts[:-1]:
@@ -2262,7 +2297,7 @@ class Router(BaseRouter):
             for mount_path, sub_router in current_router.sub_routers.items():
                 if mount_path.strip("/") == part:
                     path_segments.append(mount_path.strip("/"))
-                    current_router =  cast(Router, sub_router)
+                    current_router = cast(Router, sub_router)
                     found = True
                     break
             if not found:
@@ -2272,8 +2307,8 @@ class Router(BaseRouter):
 
         route_name = name_parts[-1]
         for route in current_router.routes:
-           
-            if  getattr(route, "name", None) is None:
+
+            if getattr(route, "name", None) is None:
                 continue
             if getattr(route, "name", None) == route_name:
                 route_path = route.url_path_for(_name=route_name, **path_params)
@@ -2311,15 +2346,17 @@ class Router(BaseRouter):
         path_matched = False
         allowed_methods_: typing.List[str] = []
         for route in self.routes:
-            match, matched_params, is_allowed = route.match(url, scope["method"]) #type:ignore
+            match, matched_params, is_allowed = route.match(
+                url, scope["method"]
+            )  # type:ignore
             if match:
                 path_matched = True
                 if is_allowed:
                     scope["route_params"] = RouteParam(matched_params)
-                    await route.handle(scope, receive, send) #type:ignore
+                    await route.handle(scope, receive, send)  # type:ignore
                     return
                 else:
-                    allowed_methods_.extend(route.methods) #type:ignore
+                    allowed_methods_.extend(route.methods)  # type:ignore
         if path_matched:
             response = JSONResponse(
                 content="Method not allowed",

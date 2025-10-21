@@ -1,11 +1,12 @@
+from typing import Any, List
+
 import pytest
-from typing import List, Any
 
 from nexios.pagination import (
-    SyncListDataHandler,
+    AsyncDataHandler,
     AsyncListDataHandler,
     SyncDataHandler,
-    AsyncDataHandler,
+    SyncListDataHandler,
 )
 
 
@@ -134,7 +135,9 @@ class TestAsyncListDataHandler:
         import asyncio
 
         async def run_test():
-            items = await handler.get_items(2, 5)  # offset 2, limit 5 (only 1 item available)
+            items = await handler.get_items(
+                2, 5
+            )  # offset 2, limit 5 (only 1 item available)
 
             assert len(items) == 1
             assert items[0]["id"] == 3
@@ -149,7 +152,9 @@ class TestAsyncListDataHandler:
         import asyncio
 
         async def run_test():
-            items = await handler.get_items(10, 5)  # offset 10, limit 5 (no items available)
+            items = await handler.get_items(
+                10, 5
+            )  # offset 10, limit 5 (no items available)
 
             assert len(items) == 0
 
@@ -191,6 +196,7 @@ class TestCustomDataHandlers:
 
     def test_sync_custom_handler(self):
         """Test custom sync data handler implementation"""
+
         class CustomSyncHandler(SyncDataHandler):
             def __init__(self, data):
                 self.data = data
@@ -217,6 +223,7 @@ class TestCustomDataHandlers:
 
     def test_async_custom_handler(self):
         """Test custom async data handler implementation"""
+
         class CustomAsyncHandler(AsyncDataHandler):
             def __init__(self, data):
                 self.data = data

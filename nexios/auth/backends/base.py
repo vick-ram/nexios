@@ -1,11 +1,9 @@
 from __future__ import annotations
+
 from typing_extensions import Annotated, Doc
-from nexios.http import Request, Response
+
 from nexios.auth.model import AuthResult
-
-
-
-
+from nexios.http import Request, Response
 
 
 class AuthenticationBackend:
@@ -48,11 +46,3 @@ class AuthenticationBackend:
             AuthenticationError: If authentication fails.
         """
         raise NotImplementedError()
-
-
-
-
-
-
-
-

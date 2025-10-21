@@ -1,7 +1,10 @@
-from nexios.config import set_config
-import pytest
 import functools
+
+import pytest
+
+from nexios.config import set_config
 from nexios.testclient import TestClient
+
 
 @pytest.fixture
 def test_client_factory():
@@ -10,9 +13,9 @@ def test_client_factory():
 
     return functools.partial(
         TestClient,
-        
-        
     )
+
+
 @pytest.fixture(autouse=True)
 def reset_config():
     yield

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import inspect
 from typing import Any, TypedDict
+
 from typing_extensions import TypeGuard
 
-from nexios.utils.async_helpers import is_async_callable
 from nexios.testclient._internal.types import ASGI2App, ASGI3App
 from nexios.types import Receive, Scope, Send
+from nexios.utils.async_helpers import is_async_callable
 
 
 def is_asgi3(app: ASGI2App | ASGI3App) -> TypeGuard[ASGI3App]:

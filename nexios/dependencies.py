@@ -38,7 +38,9 @@ class Context:
             setattr(self, k, v)
 
 
-current_context: contextvars.ContextVar[Context] = contextvars.ContextVar("current_context")
+current_context: contextvars.ContextVar[Context] = contextvars.ContextVar(
+    "current_context"
+)
 
 
 async def resolve_dependency(
@@ -56,8 +58,12 @@ async def resolve_dependency(
         if param.default != Parameter.empty and isinstance(param.default, Depend):
             nested_func = param.default.dependency
             if nested_func is None:
-                raise ValueError(f"Dependency for parameter '{param.name}' has no provider")
-            dep_kwargs[param.name] = await resolve_dependency(nested_func, ctx, cleanup_callbacks)
+                raise ValueError(
+                    f"Dependency for parameter '{param.name}' has no provider"
+                )
+            dep_kwargs[param.name] = await resolve_dependency(
+                nested_func, ctx, cleanup_callbacks
+            )
         elif param.default != Parameter.empty and isinstance(param.default, Context):
             dep_kwargs[param.name] = ctx
 
@@ -114,7 +120,9 @@ def inject_dependencies(handler: Callable[..., Any]) -> Callable[..., Any]:
                 depend = param.default
                 dependency_func = depend.dependency
                 if dependency_func is None:
-                    raise ValueError(f"Dependency for parameter '{param.name}' has no provider")
+                    raise ValueError(
+                        f"Dependency for parameter '{param.name}' has no provider"
+                    )
 
                 bound_args.arguments[param.name] = await resolve_dependency(
                     dependency_func, ctx, cleanup_callbacks
@@ -132,7 +140,6 @@ def inject_dependencies(handler: Callable[..., Any]) -> Callable[..., Any]:
                     await result
 
     return wrapped
-
 
 
 def get_app_dependencies(router: "Router") -> List[Depend]:

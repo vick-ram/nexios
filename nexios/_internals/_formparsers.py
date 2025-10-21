@@ -59,9 +59,9 @@ class FormParser:
     def __init__(
         self, headers: Headers, stream: typing.AsyncGenerator[bytes, None]
     ) -> None:
-        assert multipart is not None, (
-            "The `python-multipart` library must be installed to use form parsing."
-        )
+        assert (
+            multipart is not None
+        ), "The `python-multipart` library must be installed to use form parsing."
         self.headers = headers
         self.stream = stream
         self.messages: list[tuple[FormMessage, bytes]] = []
@@ -149,9 +149,9 @@ class MultiPartParser:
         max_fields: typing.Optional[int] = None,
         max_files: typing.Optional[int] = None,
     ) -> None:
-        assert multipart is not None, (
-            "The `python-multipart` library must be installed to use form parsing."
-        )
+        assert (
+            multipart is not None
+        ), "The `python-multipart` library must be installed to use form parsing."
         self.headers = headers
         self.stream = stream
         self.max_files = max_files if max_files is not None else self.max_files
@@ -181,11 +181,11 @@ class MultiPartParser:
         else:
             # Check file size limit when writing file parts
             # if self._current_part.file and self._current_part.file.size is not None:
-                # new_size = self._current_part.file.size + len(message_bytes)
-                # if new_size > self.max_file_size:
-                #     raise MultiPartException(
-                #         f"File too large. Maximum size is {self.max_file_size} bytes"
-                #     ) might reimplemented in further versions
+            # new_size = self._current_part.file.size + len(message_bytes)
+            # if new_size > self.max_file_size:
+            #     raise MultiPartException(
+            #         f"File too large. Maximum size is {self.max_file_size} bytes"
+            #     ) might reimplemented in further versions
             self._file_parts_to_write.append((self._current_part, message_bytes))
 
     def on_part_end(self) -> None:

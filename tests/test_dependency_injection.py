@@ -2,18 +2,23 @@
 Comprehensive tests for dependency injection in Nexios.
 Tests basic, nested, deeply nested dependencies, with context, app-level, router-level, and nested router-level dependencies.
 """
-import pytest
+
 from typing import Callable
+
+import pytest
+
 from nexios import NexiosApp
+from nexios.dependencies import Context, Depend
 from nexios.http import Request, Response
 from nexios.routing import Router
-from nexios.dependencies import Context, Depend
 from nexios.testclient import TestClient
-
 
 # ========== Basic Dependency Tests ==========
 
-def test_basic_dependency_injection(test_client_factory: Callable[[NexiosApp], TestClient]):
+
+def test_basic_dependency_injection(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test basic dependency injection with a simple function"""
     app = NexiosApp()
 
@@ -21,7 +26,9 @@ def test_basic_dependency_injection(test_client_factory: Callable[[NexiosApp], T
         return "user_123"
 
     @app.get("/user")
-    async def get_user(request: Request, response: Response, user_id: str = Depend(get_user_id)):
+    async def get_user(
+        request: Request, response: Response, user_id: str = Depend(get_user_id)
+    ):
         return response.json({"user_id": user_id})
 
     with test_client_factory(app) as client:
@@ -30,7 +37,9 @@ def test_basic_dependency_injection(test_client_factory: Callable[[NexiosApp], T
         assert resp.json()["user_id"] == "user_123"
 
 
-def test_async_dependency_injection(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_async_dependency_injection(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test async dependency injection"""
     app = NexiosApp()
 
@@ -38,7 +47,9 @@ def test_async_dependency_injection(test_client_factory: Callable[[NexiosApp], T
         return "async_user_456"
 
     @app.get("/async-user")
-    async def get_async_user(request: Request, response: Response, user_id: str = Depend(async_get_user_id)):
+    async def get_async_user(
+        request: Request, response: Response, user_id: str = Depend(async_get_user_id)
+    ):
         return response.json({"user_id": user_id})
 
     with test_client_factory(app) as client:
@@ -48,6 +59,7 @@ def test_async_dependency_injection(test_client_factory: Callable[[NexiosApp], T
 
 
 # ========== Nested Dependency Tests ==========
+
 
 def test_nested_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
     """Test nested dependencies where one dependency depends on another"""
@@ -60,7 +72,11 @@ def test_nested_dependencies(test_client_factory: Callable[[NexiosApp], TestClie
         return {"user_id": user_id, "context": "test_context"}
 
     @app.get("/nested-user")
-    async def get_nested_user(request: Request, response: Response, user_context: dict = Depend(get_user_context)):
+    async def get_nested_user(
+        request: Request,
+        response: Response,
+        user_context: dict = Depend(get_user_context),
+    ):
         return response.json({"user_context": user_context})
 
     with test_client_factory(app) as client:
@@ -70,7 +86,9 @@ def test_nested_dependencies(test_client_factory: Callable[[NexiosApp], TestClie
         assert resp.json()["user_context"]["context"] == "test_context"
 
 
-def test_async_nested_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_async_nested_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test nested dependencies with async functions"""
     app = NexiosApp()
 
@@ -81,7 +99,11 @@ def test_async_nested_dependencies(test_client_factory: Callable[[NexiosApp], Te
         return {"user_id": user_id, "context": "async_context"}
 
     @app.get("/async-nested-user")
-    async def get_async_nested_user(request: Request, response: Response, user_context: dict = Depend(get_user_context)):
+    async def get_async_nested_user(
+        request: Request,
+        response: Response,
+        user_context: dict = Depend(get_user_context),
+    ):
         return response.json({"user_context": user_context})
 
     with test_client_factory(app) as client:
@@ -93,7 +115,10 @@ def test_async_nested_dependencies(test_client_factory: Callable[[NexiosApp], Te
 
 # ========== Deeply Nested Dependency Tests ==========
 
-def test_deeply_nested_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+
+def test_deeply_nested_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test deeply nested dependencies (3+ levels)"""
     app = NexiosApp()
 
@@ -107,7 +132,11 @@ def test_deeply_nested_dependencies(test_client_factory: Callable[[NexiosApp], T
         return {"user_id": "deep_user", "context": middle, "level": "deep"}
 
     @app.get("/deep-nested")
-    async def get_deep_nested(request: Request, response: Response, user_context: dict = Depend(get_user_context)):
+    async def get_deep_nested(
+        request: Request,
+        response: Response,
+        user_context: dict = Depend(get_user_context),
+    ):
         return response.json({"user_context": user_context})
 
     with test_client_factory(app) as client:
@@ -120,7 +149,9 @@ def test_deeply_nested_dependencies(test_client_factory: Callable[[NexiosApp], T
         assert data["level"] == "deep"
 
 
-def test_async_deeply_nested_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_async_deeply_nested_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test deeply nested dependencies with mixed sync/async functions"""
     app = NexiosApp()
 
@@ -134,7 +165,11 @@ def test_async_deeply_nested_dependencies(test_client_factory: Callable[[NexiosA
         return {"user_id": "async_deep_user", "context": middle, "level": "async_deep"}
 
     @app.get("/async-deep-nested")
-    async def get_async_deep_nested(request: Request, response: Response, user_context: dict = Depend(async_get_user_context)):
+    async def get_async_deep_nested(
+        request: Request,
+        response: Response,
+        user_context: dict = Depend(async_get_user_context),
+    ):
         return response.json({"user_context": user_context})
 
     with test_client_factory(app) as client:
@@ -149,15 +184,25 @@ def test_async_deeply_nested_dependencies(test_client_factory: Callable[[NexiosA
 
 # ========== Dependencies with Context Tests ==========
 
-def test_dependency_with_context(test_client_factory: Callable[[NexiosApp], TestClient]):
+
+def test_dependency_with_context(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test dependency that uses Context object"""
     app = NexiosApp()
 
     def get_user_from_context(ctx: Context = Context()):
-        return {"user_id": "context_user", "request_path": ctx.request.url.path if ctx.request else None}
+        return {
+            "user_id": "context_user",
+            "request_path": ctx.request.url.path if ctx.request else None,
+        }
 
     @app.get("/context-user")
-    async def get_context_user(request: Request, response: Response, user_data: dict = Depend(get_user_from_context)):
+    async def get_context_user(
+        request: Request,
+        response: Response,
+        user_data: dict = Depend(get_user_from_context),
+    ):
         return response.json({"user_data": user_data})
 
     with test_client_factory(app) as client:
@@ -168,22 +213,30 @@ def test_dependency_with_context(test_client_factory: Callable[[NexiosApp], Test
         assert data["request_path"] == "/context-user"
 
 
-def test_dependency_with_mixed_context_and_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_dependency_with_mixed_context_and_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test dependency that uses both Context and other dependencies"""
     app = NexiosApp()
 
     def get_user_id():
         return "mixed_user_123"
 
-    def get_user_with_context(ctx: Context = Context(), user_id: str = Depend(get_user_id)):
+    def get_user_with_context(
+        ctx: Context = Context(), user_id: str = Depend(get_user_id)
+    ):
         return {
             "user_id": user_id,
             "request_method": ctx.request.method if ctx.request else None,
-            "context_available": ctx is not None
+            "context_available": ctx is not None,
         }
 
     @app.post("/mixed-context")
-    async def get_mixed_context(request: Request, response: Response, user_data: dict = Depend(get_user_with_context)):
+    async def get_mixed_context(
+        request: Request,
+        response: Response,
+        user_data: dict = Depend(get_user_with_context),
+    ):
         return response.json({"user_data": user_data})
 
     with test_client_factory(app) as client:
@@ -197,15 +250,19 @@ def test_dependency_with_mixed_context_and_dependencies(test_client_factory: Cal
 
 # ========== App-Level Dependency Tests ==========
 
+
 def test_app_level_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
     """Test dependencies defined at the app level"""
+
     def get_app_config():
         return {"app_name": "test_app", "version": "1.0"}
 
     app = NexiosApp(dependencies=[Depend(get_app_config)])
 
     @app.get("/app-config")
-    async def get_app_config_endpoint(request: Request, response: Response, config: dict = Depend(get_app_config)):
+    async def get_app_config_endpoint(
+        request: Request, response: Response, config: dict = Depend(get_app_config)
+    ):
         return response.json({"config": config})
 
     with test_client_factory(app) as client:
@@ -215,15 +272,22 @@ def test_app_level_dependencies(test_client_factory: Callable[[NexiosApp], TestC
         assert resp.json()["config"]["version"] == "1.0"
 
 
-def test_app_level_async_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_app_level_async_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test async dependencies at the app level"""
+
     async def async_get_app_config():
         return {"app_name": "async_app", "version": "2.0", "async": True}
 
     app = NexiosApp(dependencies=[Depend(async_get_app_config)])
 
     @app.get("/async-app-config")
-    async def get_async_app_config(request: Request, response: Response, config: dict = Depend(async_get_app_config)):
+    async def get_async_app_config(
+        request: Request,
+        response: Response,
+        config: dict = Depend(async_get_app_config),
+    ):
         return response.json({"config": config})
 
     with test_client_factory(app) as client:
@@ -237,7 +301,10 @@ def test_app_level_async_dependencies(test_client_factory: Callable[[NexiosApp],
 
 # ========== Router-Level Dependency Tests ==========
 
-def test_router_level_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+
+def test_router_level_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test dependencies defined at the router level"""
     app = NexiosApp()
 
@@ -247,7 +314,9 @@ def test_router_level_dependencies(test_client_factory: Callable[[NexiosApp], Te
     router = Router(prefix="/api", dependencies=[Depend(get_router_config)])
 
     @router.get("/router-config")
-    async def get_router_config_endpoint(request: Request, response: Response, config: dict = Depend(get_router_config)):
+    async def get_router_config_endpoint(
+        request: Request, response: Response, config: dict = Depend(get_router_config)
+    ):
         return response.json({"config": config})
 
     app.mount_router(router)
@@ -259,22 +328,30 @@ def test_router_level_dependencies(test_client_factory: Callable[[NexiosApp], Te
         assert resp.json()["config"]["prefix"] == "/api"
 
 
-def test_router_level_dependencies_with_app_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_router_level_dependencies_with_app_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test router-level dependencies combined with app-level dependencies"""
+
     def get_app_config():
         return {"app_name": "main_app"}
 
     def get_router_config():
         return {"router_name": "api_router"}
 
-    def get_combined_config(app_config: dict = Depend(get_app_config), router_config: dict = Depend(get_router_config)):
+    def get_combined_config(
+        app_config: dict = Depend(get_app_config),
+        router_config: dict = Depend(get_router_config),
+    ):
         return {**app_config, **router_config, "combined": True}
 
     app = NexiosApp(dependencies=[Depend(get_app_config)])
     router = Router(prefix="/api", dependencies=[Depend(get_router_config)])
 
     @router.get("/combined-config")
-    async def get_combined_config_endpoint(request: Request, response: Response, config: dict = Depend(get_combined_config)):
+    async def get_combined_config_endpoint(
+        request: Request, response: Response, config: dict = Depend(get_combined_config)
+    ):
         return response.json({"config": config})
 
     app.mount_router(router)
@@ -290,7 +367,10 @@ def test_router_level_dependencies_with_app_dependencies(test_client_factory: Ca
 
 # ========== Nested Router-Level Dependency Tests ==========
 
-def test_nested_router_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+
+def test_nested_router_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test dependencies in nested routers"""
     app = NexiosApp()
 
@@ -300,7 +380,10 @@ def test_nested_router_dependencies(test_client_factory: Callable[[NexiosApp], T
     def get_users_config():
         return {"users_module": "active"}
 
-    def get_combined_nested_config(api_config: dict = Depend(get_api_config), users_config: dict = Depend(get_users_config)):
+    def get_combined_nested_config(
+        api_config: dict = Depend(get_api_config),
+        users_config: dict = Depend(get_users_config),
+    ):
         return {**api_config, **users_config, "nested": True}
 
     # Main API router
@@ -310,7 +393,11 @@ def test_nested_router_dependencies(test_client_factory: Callable[[NexiosApp], T
     users_router = Router(prefix="/users", dependencies=[Depend(get_users_config)])
 
     @users_router.get("/config")
-    async def get_nested_config(request: Request, response: Response, config: dict = Depend(get_combined_nested_config)):
+    async def get_nested_config(
+        request: Request,
+        response: Response,
+        config: dict = Depend(get_combined_nested_config),
+    ):
         return response.json({"config": config})
 
     api_router.mount_router(users_router)
@@ -325,7 +412,9 @@ def test_nested_router_dependencies(test_client_factory: Callable[[NexiosApp], T
         assert data["nested"] is True
 
 
-def test_deeply_nested_router_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_deeply_nested_router_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test dependencies in deeply nested routers (3+ levels)"""
     app = NexiosApp()
 
@@ -349,7 +438,7 @@ def test_deeply_nested_router_dependencies(test_client_factory: Callable[[Nexios
         api_config: dict = Depend(get_api_config),
         v1_config: dict = Depend(get_v1_config),
         users_config: dict = Depend(get_users_config),
-        profiles_config: dict = Depend(get_profiles_config)
+        profiles_config: dict = Depend(get_profiles_config),
     ):
         return {
             **app_config,
@@ -357,7 +446,7 @@ def test_deeply_nested_router_dependencies(test_client_factory: Callable[[Nexios
             **v1_config,
             **users_config,
             **profiles_config,
-            "depth": "deep"
+            "depth": "deep",
         }
 
     # App level
@@ -373,10 +462,16 @@ def test_deeply_nested_router_dependencies(test_client_factory: Callable[[Nexios
     users_router = Router(prefix="/users", dependencies=[Depend(get_users_config)])
 
     # Profiles router (deepest level)
-    profiles_router = Router(prefix="/profiles", dependencies=[Depend(get_profiles_config)])
+    profiles_router = Router(
+        prefix="/profiles", dependencies=[Depend(get_profiles_config)]
+    )
 
     @profiles_router.get("/deep-config")
-    async def get_deep_config(request: Request, response: Response, config: dict = Depend(get_combined_deep_config)):
+    async def get_deep_config(
+        request: Request,
+        response: Response,
+        config: dict = Depend(get_combined_deep_config),
+    ):
         return response.json({"config": config})
 
     users_router.mount_router(profiles_router)
@@ -398,7 +493,10 @@ def test_deeply_nested_router_dependencies(test_client_factory: Callable[[Nexios
 
 # ========== Complex Mixed Scenario Tests ==========
 
-def test_mixed_app_router_nested_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+
+def test_mixed_app_router_nested_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test complex scenario with app, router, and nested dependencies"""
     app = NexiosApp()
 
@@ -411,10 +509,15 @@ def test_mixed_app_router_nested_dependencies(test_client_factory: Callable[[Nex
     def get_auth_service():
         return {"auth": "enabled", "method": "jwt"}
 
-    def get_api_config(db: dict = Depend(get_database_connection), user_service: dict = Depend(get_user_service)):
+    def get_api_config(
+        db: dict = Depend(get_database_connection),
+        user_service: dict = Depend(get_user_service),
+    ):
         return {"api": "v1", "db": db, "user_service": user_service}
 
-    def get_user_handler_config(auth: dict = Depend(get_auth_service), api: dict = Depend(get_api_config)):
+    def get_user_handler_config(
+        auth: dict = Depend(get_auth_service), api: dict = Depend(get_api_config)
+    ):
         return {"handler": "user_handler", "auth": auth, "api": api}
 
     # App-level dependencies
@@ -430,7 +533,11 @@ def test_mixed_app_router_nested_dependencies(test_client_factory: Callable[[Nex
     users_router = Router(prefix="/users", dependencies=[Depend(get_user_service)])
 
     @users_router.get("/profile")
-    async def get_user_profile(request: Request, response: Response, config: dict = Depend(get_user_handler_config)):
+    async def get_user_profile(
+        request: Request,
+        response: Response,
+        config: dict = Depend(get_user_handler_config),
+    ):
         return response.json({"config": config})
 
     auth_router.mount_router(users_router)
@@ -461,7 +568,9 @@ def test_generator_dependencies(test_client_factory: Callable[[NexiosApp], TestC
             db_pool["connections"].pop()
 
     @app.get("/generator-test")
-    async def test_generator(request: Request, response: Response, db: dict = Depend(get_database_connection)):
+    async def test_generator(
+        request: Request, response: Response, db: dict = Depend(get_database_connection)
+    ):
         return response.json({"db": db})
 
     with test_client_factory(app) as client:
@@ -472,7 +581,9 @@ def test_generator_dependencies(test_client_factory: Callable[[NexiosApp], TestC
         assert len(data["pool"]["connections"]) == 1
 
 
-def test_async_generator_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_async_generator_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test async generator-based dependencies"""
     app = NexiosApp()
 
@@ -487,7 +598,11 @@ def test_async_generator_dependencies(test_client_factory: Callable[[NexiosApp],
             db_pool["connections"].pop()
 
     @app.get("/async-generator-test")
-    async def test_async_generator(request: Request, response: Response, db: dict = Depend(async_get_database_connection)):
+    async def test_async_generator(
+        request: Request,
+        response: Response,
+        db: dict = Depend(async_get_database_connection),
+    ):
         return response.json({"db": db})
 
     with test_client_factory(app) as client:
@@ -497,7 +612,10 @@ def test_async_generator_dependencies(test_client_factory: Callable[[NexiosApp],
         assert data["db"] == "async_connected"
         assert len(data["pool"]["connections"]) == 1
 
-def test_generator_dependency_cleanup(test_client_factory: Callable[[NexiosApp], TestClient]):
+
+def test_generator_dependency_cleanup(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Ensure generator dependencies run cleanup after request."""
     app = NexiosApp()
     cleanup_state = {"closed": False}
@@ -510,7 +628,9 @@ def test_generator_dependency_cleanup(test_client_factory: Callable[[NexiosApp],
             cleanup_state["closed"] = True
 
     @app.get("/yield-cleanup")
-    async def yield_cleanup(request: Request, response: Response, res: dict = Depend(get_resource)):
+    async def yield_cleanup(
+        request: Request, response: Response, res: dict = Depend(get_resource)
+    ):
         assert res["conn"] == "open"
         return response.json({"ok": True})
 
@@ -520,7 +640,9 @@ def test_generator_dependency_cleanup(test_client_factory: Callable[[NexiosApp],
         assert cleanup_state["closed"] is True
 
 
-def test_nested_yield_dependencies(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_nested_yield_dependencies(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test nested dependencies that both use yield."""
     app = NexiosApp()
     flags = {"inner_closed": False, "outer_closed": False}
@@ -538,7 +660,9 @@ def test_nested_yield_dependencies(test_client_factory: Callable[[NexiosApp], Te
             flags["inner_closed"] = True
 
     @app.get("/nested-yield")
-    async def nested_yield(request: Request, response: Response, inner=Depend(inner_dep)):
+    async def nested_yield(
+        request: Request, response: Response, inner=Depend(inner_dep)
+    ):
         return response.json({"inner": inner})
 
     with test_client_factory(app) as client:
@@ -551,7 +675,9 @@ def test_nested_yield_dependencies(test_client_factory: Callable[[NexiosApp], Te
         assert flags["outer_closed"] is True
 
 
-def test_async_yield_dependencies_cleanup(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_async_yield_dependencies_cleanup(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Ensure async generator dependencies properly cleanup."""
     app = NexiosApp()
     state = {"closed": False}
@@ -563,7 +689,9 @@ def test_async_yield_dependencies_cleanup(test_client_factory: Callable[[NexiosA
             state["closed"] = True
 
     @app.get("/async-yield-cleanup")
-    async def async_yield_endpoint(request: Request, response: Response, data=Depend(async_dep)):
+    async def async_yield_endpoint(
+        request: Request, response: Response, data=Depend(async_dep)
+    ):
         return response.json(data)
 
     with test_client_factory(app) as client:
@@ -573,7 +701,9 @@ def test_async_yield_dependencies_cleanup(test_client_factory: Callable[[NexiosA
         assert state["closed"] is True
 
 
-def test_deep_yield_dependency_chain(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_deep_yield_dependency_chain(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Deep chain of async+sync yield dependencies ensuring teardown order."""
     app = NexiosApp()
     order = []
@@ -600,7 +730,9 @@ def test_deep_yield_dependency_chain(test_client_factory: Callable[[NexiosApp], 
             order.append("cleanup_c")
 
     @app.get("/deep-yield")
-    async def deep_yield_endpoint(request: Request, response: Response, c=Depend(dep_c)):
+    async def deep_yield_endpoint(
+        request: Request, response: Response, c=Depend(dep_c)
+    ):
         return response.json({"result": c})
 
     with test_client_factory(app) as client:

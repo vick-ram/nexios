@@ -5,6 +5,8 @@ import typing
 from typing_extensions import Annotated, Doc
 
 from nexios.http import Request, Response
+
+
 class AuthenticationBackend:
     """
     Base class for authentication backends in Nexios.
@@ -45,11 +47,3 @@ class AuthenticationBackend:
             AuthenticationError: If authentication fails.
         """
         raise NotImplementedError()
-
-
-
-
-
-
-
-

@@ -1,14 +1,16 @@
 """
 Tests for session middleware integration
 """
+
 import pytest
+
 from nexios import NexiosApp
+from nexios.config import MakeConfig, set_config
+from nexios.http import Request, Response
+from nexios.session.file import FileSessionManager
 from nexios.session.middleware import SessionMiddleware
 from nexios.session.signed_cookies import SignedSessionManager
-from nexios.session.file import FileSessionManager
-from nexios.http import Request, Response
 from nexios.testclient import TestClient
-from nexios.config import MakeConfig, set_config
 
 
 class TestSessionMiddleware:
@@ -16,18 +18,20 @@ class TestSessionMiddleware:
 
     def setup_method(self):
         """Set up test configuration"""
-        config = MakeConfig({
-            "secret_key": "test-secret-key-for-middleware",
-            "session": {
-                "session_cookie_name": "test_session",
-                "session_expiration_time": 3600,
-                "session_permanent": False,
-                "session_refresh_each_request": False,
-                "session_cookie_secure": False,
-                "session_cookie_httponly": True,
-                "session_cookie_samesite": "lax"
+        config = MakeConfig(
+            {
+                "secret_key": "test-secret-key-for-middleware",
+                "session": {
+                    "session_cookie_name": "test_session",
+                    "session_expiration_time": 3600,
+                    "session_permanent": False,
+                    "session_refresh_each_request": False,
+                    "session_cookie_secure": False,
+                    "session_cookie_httponly": True,
+                    "session_cookie_samesite": "lax",
+                },
             }
-        })
+        )
         set_config(config)
 
     def test_middleware_initialization(self):
@@ -69,20 +73,22 @@ class TestSessionMiddleware:
 
     def test_file_session_middleware(self):
         """Test session middleware with file backend"""
-        import tempfile
         import os
+        import tempfile
 
         temp_dir = tempfile.mkdtemp()
 
         try:
-            config = MakeConfig({
-                "secret_key": "test-secret-key-for-file-middleware",
-                "session": {
-                    "session_cookie_name": "file_session",
-                    "session_file_storage_path": temp_dir,
-                    "manager": FileSessionManager
+            config = MakeConfig(
+                {
+                    "secret_key": "test-secret-key-for-file-middleware",
+                    "session": {
+                        "session_cookie_name": "file_session",
+                        "session_file_storage_path": temp_dir,
+                        "manager": FileSessionManager,
+                    },
                 }
-            })
+            )
             set_config(config)
 
             app = NexiosApp()
@@ -112,15 +118,13 @@ class TestSessionMiddleware:
         finally:
             # Clean up
             import shutil
+
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
 
     def test_session_middleware_without_secret_key(self):
         """Test middleware behavior without secret key"""
-        config = MakeConfig({
-            "secret_key": None,  # No secret key
-            "session": {}
-        })
+        config = MakeConfig({"secret_key": None, "session": {}})  # No secret key
         set_config(config)
 
         app = NexiosApp()
@@ -159,8 +163,9 @@ class TestSessionMiddleware:
         assert cookie is not None
 
         # Second request with existing cookie
-        response2 = client.get("/existing-cookie-test",
-                              cookies={"test_session": cookie})
+        response2 = client.get(
+            "/existing-cookie-test", cookies={"test_session": cookie}
+        )
         assert response2.status_code == 200
         data2 = response2.json()
         assert data2["existing"] == "data"
@@ -194,20 +199,21 @@ class TestSessionMiddleware:
         data2 = response2.json()
         assert data2["cleared"] is True
 
-
     def test_session_middleware_configuration_options(self):
         """Test session middleware with various configuration options"""
-        config = MakeConfig({
-            "secret_key": "test-secret-key-config",
-            "session": {
-                "session_cookie_name": "custom_session",
-                "session_cookie_path": "/api",
-                "session_cookie_domain": "example.com",
-                "session_cookie_secure": True,
-                "session_cookie_httponly": True,
-                "session_cookie_samesite": "strict"
+        config = MakeConfig(
+            {
+                "secret_key": "test-secret-key-config",
+                "session": {
+                    "session_cookie_name": "custom_session",
+                    "session_cookie_path": "/api",
+                    "session_cookie_domain": "example.com",
+                    "session_cookie_secure": True,
+                    "session_cookie_httponly": True,
+                    "session_cookie_samesite": "strict",
+                },
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp()

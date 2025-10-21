@@ -7,19 +7,22 @@ This module tests authentication utility functions including:
 - Session login/logout utilities
 """
 
-import pytest
 import time
 from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from nexios.application import NexiosApp
 from nexios.auth import create_jwt, decode_jwt
 from nexios.auth.backends.apikey import create_api_key, verify_key
 from nexios.auth.backends.session import login, logout
 from nexios.auth.users.simple import SimpleUser
-from nexios.application import NexiosApp
+from nexios.config import MakeConfig, set_config
 from nexios.session.middleware import SessionMiddleware
-from nexios.config import MakeConfig,set_config
 
 config = MakeConfig(secret_key="secret")
 set_config(config)
+
 
 def test_create_jwt_basic():
     """Test basic JWT creation."""
@@ -187,12 +190,10 @@ def test_session_logout_without_session_middleware():
 def test_create_jwt_with_payload_modification():
     """Test JWT creation preserves payload integrity."""
     original_payload = {"user_id": 123, "role": "admin", "active": True}
-    token = create_jwt(original_payload, "secret",expires_in=timedelta(minutes=10))
+    token = create_jwt(original_payload, "secret", expires_in=timedelta(minutes=10))
 
     decoded = decode_jwt(token, "secret")
     assert decoded["user_id"] == 123
     assert decoded["role"] == "admin"
     assert decoded["active"] is True
     assert "exp" in decoded  # Should have expiration added
-
-

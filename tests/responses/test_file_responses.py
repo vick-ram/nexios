@@ -1,32 +1,36 @@
 """
 Tests for file and download responses
 """
-from typing import Callable
-import tempfile
+
 import os
+import tempfile
 from pathlib import Path
+from typing import Callable
+
 import pytest
+
 from nexios import NexiosApp
 from nexios.http import Request, Response
 from nexios.testclient import TestClient
 
-
 # ========== File Response Tests ==========
+
 
 def test_file_response(test_client_factory: Callable[[NexiosApp], TestClient]):
     """Test serving a file"""
     app = NexiosApp()
-    
+
     # Create a temporary file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("Test file content")
         temp_path = f.name
-    
+
     try:
+
         @app.get("/file")
         async def serve_file(request: Request, response: Response):
             return response.file(temp_path)
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/file")
             assert resp.status_code == 200
@@ -35,19 +39,22 @@ def test_file_response(test_client_factory: Callable[[NexiosApp], TestClient]):
         os.unlink(temp_path)
 
 
-def test_file_response_with_custom_filename(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_file_response_with_custom_filename(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test serving a file with custom filename"""
     app = NexiosApp()
-    
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("Custom filename test")
         temp_path = f.name
-    
+
     try:
+
         @app.get("/custom-file")
         async def serve_custom_file(request: Request, response: Response):
             return response.file(temp_path, filename="custom_name.txt")
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/custom-file")
             assert resp.status_code == 200
@@ -57,42 +64,50 @@ def test_file_response_with_custom_filename(test_client_factory: Callable[[Nexio
         os.unlink(temp_path)
 
 
-def test_file_response_content_type(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_file_response_content_type(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test file response content type detection"""
     app = NexiosApp()
-    
+
     # Create a JSON file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
         f.write('{"test": "data"}')
         temp_path = f.name
-    
+
     try:
+
         @app.get("/json-file")
         async def serve_json_file(request: Request, response: Response):
             return response.file(temp_path)
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/json-file")
             assert resp.status_code == 200
             content_type = resp.headers.get("content-type", "")
-            assert "json" in content_type.lower() or "application" in content_type.lower()
+            assert (
+                "json" in content_type.lower() or "application" in content_type.lower()
+            )
     finally:
         os.unlink(temp_path)
 
 
-def test_file_response_inline_disposition(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_file_response_inline_disposition(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test file response with inline disposition"""
     app = NexiosApp()
-    
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("Inline content")
         temp_path = f.name
-    
+
     try:
+
         @app.get("/inline")
         async def serve_inline(request: Request, response: Response):
             return response.file(temp_path, content_disposition_type="inline")
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/inline")
             assert resp.status_code == 200
@@ -104,19 +119,21 @@ def test_file_response_inline_disposition(test_client_factory: Callable[[NexiosA
 
 # ========== Download Response Tests ==========
 
+
 def test_download_response(test_client_factory: Callable[[NexiosApp], TestClient]):
     """Test forcing file download"""
     app = NexiosApp()
-    
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pdf') as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".pdf") as f:
         f.write("PDF content")
         temp_path = f.name
-    
+
     try:
+
         @app.get("/download")
         async def download_file(request: Request, response: Response):
             return response.download(temp_path)
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/download")
             assert resp.status_code == 200
@@ -126,19 +143,22 @@ def test_download_response(test_client_factory: Callable[[NexiosApp], TestClient
         os.unlink(temp_path)
 
 
-def test_download_with_custom_filename(test_client_factory: Callable[[NexiosApp], TestClient]):
+def test_download_with_custom_filename(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test download with custom filename"""
     app = NexiosApp()
-    
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv') as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv") as f:
         f.write("col1,col2\nval1,val2")
         temp_path = f.name
-    
+
     try:
+
         @app.get("/download-csv")
         async def download_csv(request: Request, response: Response):
             return response.download(temp_path, filename="data.csv")
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/download-csv")
             assert resp.status_code == 200
@@ -151,21 +171,23 @@ def test_download_with_custom_filename(test_client_factory: Callable[[NexiosApp]
 
 # ========== Large File Tests ==========
 
+
 def test_large_file_response(test_client_factory: Callable[[NexiosApp], TestClient]):
     """Test serving a larger file"""
     app = NexiosApp()
-    
+
     # Create a larger temporary file (1MB)
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         content = "x" * (1024 * 1024)  # 1MB of 'x' characters
         f.write(content)
         temp_path = f.name
-    
+
     try:
+
         @app.get("/large-file")
         async def serve_large_file(request: Request, response: Response):
             return response.file(temp_path)
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/large-file")
             assert resp.status_code == 200
@@ -176,21 +198,23 @@ def test_large_file_response(test_client_factory: Callable[[NexiosApp], TestClie
 
 # ========== Binary File Tests ==========
 
+
 def test_binary_file_response(test_client_factory: Callable[[NexiosApp], TestClient]):
     """Test serving a binary file"""
     app = NexiosApp()
-    
+
     # Create a binary file
-    with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.bin') as f:
+    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".bin") as f:
         binary_data = bytes([i % 256 for i in range(1000)])
         f.write(binary_data)
         temp_path = f.name
-    
+
     try:
+
         @app.get("/binary")
         async def serve_binary(request: Request, response: Response):
             return response.file(temp_path)
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/binary")
             assert resp.status_code == 200
@@ -201,14 +225,15 @@ def test_binary_file_response(test_client_factory: Callable[[NexiosApp], TestCli
 
 # ========== File Not Found Tests ==========
 
+
 def test_file_not_found(test_client_factory: Callable[[NexiosApp], TestClient]):
     """Test handling of non-existent file"""
     app = NexiosApp()
-    
+
     @app.get("/missing-file")
     async def serve_missing_file(request: Request, response: Response):
         return response.file("/nonexistent/path/file.txt")
-    
+
     with test_client_factory(app) as client:
         # This should raise an error or return 404
         try:
@@ -222,20 +247,24 @@ def test_file_not_found(test_client_factory: Callable[[NexiosApp], TestClient]):
 
 # ========== Content Length Tests ==========
 
-def test_file_content_length_header(test_client_factory: Callable[[NexiosApp], TestClient]):
+
+def test_file_content_length_header(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test that content-length header is set correctly for files"""
     app = NexiosApp()
-    
+
     content = "Test content for length check"
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write(content)
         temp_path = f.name
-    
+
     try:
+
         @app.get("/file-length")
         async def serve_file_length(request: Request, response: Response):
             return response.file(temp_path)
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/file-length")
             assert resp.status_code == 200
@@ -248,19 +277,23 @@ def test_file_content_length_header(test_client_factory: Callable[[NexiosApp], T
 
 # ========== Accept-Ranges Tests ==========
 
-def test_file_accept_ranges_header(test_client_factory: Callable[[NexiosApp], TestClient]):
+
+def test_file_accept_ranges_header(
+    test_client_factory: Callable[[NexiosApp], TestClient],
+):
     """Test that accept-ranges header is set for file responses"""
     app = NexiosApp()
-    
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write("Range test content")
         temp_path = f.name
-    
+
     try:
+
         @app.get("/ranges")
         async def serve_with_ranges(request: Request, response: Response):
             return response.file(temp_path)
-        
+
         with test_client_factory(app) as client:
             resp = client.get("/ranges")
             assert resp.status_code == 200

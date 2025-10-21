@@ -1,11 +1,13 @@
 """
 Integration tests for CORS middleware with realistic scenarios
 """
+
 import pytest
+
 from nexios import NexiosApp
 from nexios.config import MakeConfig, set_config
-from nexios.middleware.cors import CORSMiddleware
 from nexios.http import Request, Response
+from nexios.middleware.cors import CORSMiddleware
 from nexios.testclient import TestClient
 
 
@@ -14,27 +16,29 @@ class TestCORSIntegration:
 
     def test_real_world_web_app_scenario(self):
         """Test CORS in a realistic web application scenario"""
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": [
-                    "https://myapp.com",
-                    "https://admin.myapp.com",
-                    "http://localhost:3000",
-                    "http://localhost:8080"
-                ],
-                "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allow_headers": [
-                    "Content-Type",
-                    "Authorization",
-                    "X-Requested-With",
-                    "X-CSRF-Token",
-                    "X-Custom-App-Header"
-                ],
-                "allow_credentials": True,
-                "expose_headers": ["X-Request-ID", "X-Response-Time"],
-                "max_age": 86400,  # 24 hours
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": [
+                        "https://myapp.com",
+                        "https://admin.myapp.com",
+                        "http://localhost:3000",
+                        "http://localhost:8080",
+                    ],
+                    "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                    "allow_headers": [
+                        "Content-Type",
+                        "Authorization",
+                        "X-Requested-With",
+                        "X-CSRF-Token",
+                        "X-Custom-App-Header",
+                    ],
+                    "allow_credentials": True,
+                    "expose_headers": ["X-Request-ID", "X-Response-Time"],
+                    "max_age": 86400,  # 24 hours
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -78,11 +82,9 @@ class TestCORSIntegration:
             # GET requests from main app
             ("GET", "/api/users", "https://myapp.com"),
             ("GET", "/api/posts", "https://myapp.com"),
-
             # Admin panel requests
             ("GET", "/api/users/123", "https://admin.myapp.com"),
             ("PUT", "/api/users/123", "https://admin.myapp.com"),
-
             # Development environment
             ("POST", "/api/users", "http://localhost:3000"),
             ("DELETE", "/api/users/456", "http://localhost:8080"),
@@ -94,17 +96,22 @@ class TestCORSIntegration:
             assert response.status_code == 200
             assert response.headers["Access-Control-Allow-Origin"] == origin
             assert response.headers["Access-Control-Allow-Credentials"] == "true"
-            assert response.headers["Access-Control-Expose-Headers"] == "X-Request-ID, X-Response-Time"
+            assert (
+                response.headers["Access-Control-Expose-Headers"]
+                == "X-Request-ID, X-Response-Time"
+            )
 
     def test_cors_with_multiple_middleware_layers(self):
         """Test CORS with other middleware layers"""
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["http://example.com"],
-                "allow_methods": ["GET", "POST"],
-                "allow_credentials": True
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["http://example.com"],
+                    "allow_methods": ["GET", "POST"],
+                    "allow_credentials": True,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -144,7 +151,9 @@ class TestCORSIntegration:
 
         client = TestClient(app)
 
-        response = client.get("/multi-middleware", headers={"Origin": "http://example.com"})
+        response = client.get(
+            "/multi-middleware", headers={"Origin": "http://example.com"}
+        )
 
         assert response.status_code == 200
         assert response.json() == {"message": "OK"}
@@ -160,15 +169,22 @@ class TestCORSIntegration:
 
     def test_cors_with_file_uploads(self):
         """Test CORS with file upload scenarios"""
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["https://files.myapp.com"],
-                "allow_methods": ["POST", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization", "X-File-Name", "X-File-Size"],
-                "allow_credentials": True,
-                "max_age": 3600
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["https://files.myapp.com"],
+                    "allow_methods": ["POST", "OPTIONS"],
+                    "allow_headers": [
+                        "Content-Type",
+                        "Authorization",
+                        "X-File-Name",
+                        "X-File-Size",
+                    ],
+                    "allow_credentials": True,
+                    "max_age": 3600,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -192,30 +208,39 @@ class TestCORSIntegration:
         )
 
         assert response.status_code == 201
-        assert response.headers["Access-Control-Allow-Origin"] == "https://files.myapp.com"
+        assert (
+            response.headers["Access-Control-Allow-Origin"] == "https://files.myapp.com"
+        )
         assert response.headers["Access-Control-Allow-Methods"] == "POST"
-        assert response.headers["Access-Control-Allow-Headers"] == "content-type, x-file-name, x-file-size"
+        assert (
+            response.headers["Access-Control-Allow-Headers"]
+            == "content-type, x-file-name, x-file-size"
+        )
 
         # Test actual upload
         upload_response = client.post(
-            "/api/upload",
-            headers={"Origin": "https://files.myapp.com"}
+            "/api/upload", headers={"Origin": "https://files.myapp.com"}
         )
 
         assert upload_response.status_code == 200
-        assert upload_response.headers["Access-Control-Allow-Origin"] == "https://files.myapp.com"
+        assert (
+            upload_response.headers["Access-Control-Allow-Origin"]
+            == "https://files.myapp.com"
+        )
         assert upload_response.headers["Access-Control-Allow-Credentials"] == "true"
 
     def test_cors_with_pagination_api(self):
         """Test CORS with paginated API endpoints"""
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["https://api-client.com"],
-                "allow_methods": ["GET"],
-                "allow_credentials": True,
-                "expose_headers": ["X-Total-Count", "X-Page-Count", "X-Per-Page"]
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["https://api-client.com"],
+                    "allow_methods": ["GET"],
+                    "allow_credentials": True,
+                    "expose_headers": ["X-Total-Count", "X-Page-Count", "X-Per-Page"],
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -230,11 +255,13 @@ class TestCORSIntegration:
             response.set_header("X-Page-Count", "10")
             response.set_header("X-Per-Page", str(per_page))
 
-            return response.json({
-                "items": [f"item_{i}" for i in range(int(per_page))],
-                "page": page,
-                "total": 100
-            })
+            return response.json(
+                {
+                    "items": [f"item_{i}" for i in range(int(per_page))],
+                    "page": page,
+                    "total": 100,
+                }
+            )
 
         app.add_middleware(CORSMiddleware())
 
@@ -243,13 +270,18 @@ class TestCORSIntegration:
         # Test paginated request
         response = client.get(
             "/api/items?page=2&per_page=20",
-            headers={"Origin": "https://api-client.com"}
+            headers={"Origin": "https://api-client.com"},
         )
 
         assert response.status_code == 200
-        assert response.headers["Access-Control-Allow-Origin"] == "https://api-client.com"
+        assert (
+            response.headers["Access-Control-Allow-Origin"] == "https://api-client.com"
+        )
         assert response.headers["Access-Control-Allow-Credentials"] == "true"
-        assert response.headers["Access-Control-Expose-Headers"] == "X-Total-Count, X-Page-Count, X-Per-Page"
+        assert (
+            response.headers["Access-Control-Expose-Headers"]
+            == "X-Total-Count, X-Page-Count, X-Per-Page"
+        )
 
         # Verify exposed headers are accessible to client
         assert response.headers["X-Total-Count"] == "100"
@@ -258,14 +290,16 @@ class TestCORSIntegration:
 
     def test_cors_with_authentication_flow(self):
         """Test CORS with authentication-protected endpoints"""
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["https://dashboard.myapp.com"],
-                "allow_methods": ["GET", "POST", "DELETE"],
-                "allow_headers": ["Authorization", "Content-Type"],
-                "allow_credentials": True
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["https://dashboard.myapp.com"],
+                    "allow_methods": ["GET", "POST", "DELETE"],
+                    "allow_headers": ["Authorization", "Content-Type"],
+                    "allow_credentials": True,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -298,22 +332,27 @@ class TestCORSIntegration:
 
         # Test login (public endpoint)
         login_response = client.post(
-            "/api/login",
-            headers={"Origin": "https://dashboard.myapp.com"}
+            "/api/login", headers={"Origin": "https://dashboard.myapp.com"}
         )
         assert login_response.status_code == 200
-        assert login_response.headers["Access-Control-Allow-Origin"] == "https://dashboard.myapp.com"
+        assert (
+            login_response.headers["Access-Control-Allow-Origin"]
+            == "https://dashboard.myapp.com"
+        )
 
         # Test authenticated request
         profile_response = client.get(
             "/api/profile",
             headers={
                 "Origin": "https://dashboard.myapp.com",
-                "Authorization": "Bearer token123"
-            }
+                "Authorization": "Bearer token123",
+            },
         )
         assert profile_response.status_code == 200
-        assert profile_response.headers["Access-Control-Allow-Origin"] == "https://dashboard.myapp.com"
+        assert (
+            profile_response.headers["Access-Control-Allow-Origin"]
+            == "https://dashboard.myapp.com"
+        )
 
         # Test preflight for delete operation
         delete_preflight = client.options(
@@ -321,22 +360,24 @@ class TestCORSIntegration:
             headers={
                 "Origin": "https://dashboard.myapp.com",
                 "Access-Control-Request-Method": "DELETE",
-                "Authorization": "Bearer token123"
-            }
+                "Authorization": "Bearer token123",
+            },
         )
         assert delete_preflight.status_code == 201
         assert delete_preflight.headers["Access-Control-Allow-Methods"] == "DELETE"
 
     def test_cors_with_different_content_types(self):
         """Test CORS with various content types"""
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["https://api-client.com"],
-                "allow_methods": ["POST", "PUT"],
-                "allow_headers": ["Content-Type", "Authorization"],
-                "allow_credentials": True
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["https://api-client.com"],
+                    "allow_methods": ["POST", "PUT"],
+                    "allow_headers": ["Content-Type", "Authorization"],
+                    "allow_credentials": True,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -349,7 +390,6 @@ class TestCORSIntegration:
         async def text_endpoint(request: Request, response: Response):
             return response.text("text response")
 
-     
         app.add_middleware(CORSMiddleware())
 
         client = TestClient(app)
@@ -359,34 +399,43 @@ class TestCORSIntegration:
             "/api/json",
             headers={
                 "Origin": "https://api-client.com",
-                "Content-Type": "application/json"
-            }
+                "Content-Type": "application/json",
+            },
         )
         assert json_response.status_code == 200
-        assert json_response.headers["Access-Control-Allow-Origin"] == "https://api-client.com"
+        assert (
+            json_response.headers["Access-Control-Allow-Origin"]
+            == "https://api-client.com"
+        )
 
         # Test text request
         text_response = client.post(
             "/api/text",
-            headers={
-                "Origin": "https://api-client.com",
-                "Content-Type": "text/plain"
-            }
+            headers={"Origin": "https://api-client.com", "Content-Type": "text/plain"},
         )
         assert text_response.status_code == 200
-        assert text_response.headers["Access-Control-Allow-Origin"] == "https://api-client.com"
+        assert (
+            text_response.headers["Access-Control-Allow-Origin"]
+            == "https://api-client.com"
+        )
 
-        
     def test_cors_with_websocket_upgrade_requests(self):
         """Test CORS handling during WebSocket upgrade requests"""
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["https://chat.myapp.com"],
-                "allow_methods": ["GET"],  # WebSocket upgrade uses GET
-                "allow_headers": ["Upgrade", "Connection", "Sec-WebSocket-Key", "Sec-WebSocket-Version"],
-                "allow_credentials": True
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["https://chat.myapp.com"],
+                    "allow_methods": ["GET"],  # WebSocket upgrade uses GET
+                    "allow_headers": [
+                        "Upgrade",
+                        "Connection",
+                        "Sec-WebSocket-Key",
+                        "Sec-WebSocket-Version",
+                    ],
+                    "allow_credentials": True,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -410,24 +459,29 @@ class TestCORSIntegration:
                 "Upgrade": "websocket",
                 "Connection": "Upgrade",
                 "Sec-WebSocket-Key": "test-key",
-                "Sec-WebSocket-Version": "13"
-            }
+                "Sec-WebSocket-Version": "13",
+            },
         )
 
         assert ws_response.status_code == 101
-        assert ws_response.headers["Access-Control-Allow-Origin"] == "https://chat.myapp.com"
+        assert (
+            ws_response.headers["Access-Control-Allow-Origin"]
+            == "https://chat.myapp.com"
+        )
         assert ws_response.headers["Access-Control-Allow-Credentials"] == "true"
 
     def test_cors_with_subdomain_wildcard(self):
         """Test CORS with subdomain wildcard patterns"""
-        config = MakeConfig({
-            "cors": {
-                "allow_origin_regex": r"https://.*\.myapp\.com",
-                "allow_methods": ["GET", "POST"],
-                "allow_credentials": True,
-                "expose_headers": ["X-Subdomain"]
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origin_regex": r"https://.*\.myapp\.com",
+                    "allow_methods": ["GET", "POST"],
+                    "allow_credentials": True,
+                    "expose_headers": ["X-Subdomain"],
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -436,7 +490,7 @@ class TestCORSIntegration:
         async def subdomain_data(request: Request, response: Response):
             origin = request.origin
             if origin:
-                subdomain = origin.split('.')[0].replace('https://', '')
+                subdomain = origin.split(".")[0].replace("https://", "")
                 response.set_header("X-Subdomain", subdomain)
             return response.json({"data": "test"})
 
@@ -461,13 +515,15 @@ class TestCORSIntegration:
         many_origins = [f"https://app{i}.example.com" for i in range(100)]
         many_origins.extend([f"http://localhost:{port}" for port in range(3000, 3100)])
 
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": many_origins,
-                "allow_methods": ["GET"],
-                "allow_credentials": False
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": many_origins,
+                    "allow_methods": ["GET"],
+                    "allow_credentials": False,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -489,21 +545,26 @@ class TestCORSIntegration:
 
     def test_cors_with_request_id_tracking(self):
         """Test CORS with request ID tracking middleware"""
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["https://tracking.myapp.com"],
-                "allow_methods": ["GET", "POST"],
-                "allow_credentials": True,
-                "expose_headers": ["X-Request-ID", "X-Trace-ID"]
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": ["https://tracking.myapp.com"],
+                    "allow_methods": ["GET", "POST"],
+                    "allow_credentials": True,
+                    "expose_headers": ["X-Request-ID", "X-Trace-ID"],
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
 
         # Request ID middleware
-        async def request_id_middleware(request: Request, response: Response, call_next):
+        async def request_id_middleware(
+            request: Request, response: Response, call_next
+        ):
             import uuid
+
             request_id = str(uuid.uuid4())
             request.scope["request_id"] = request_id
 
@@ -525,12 +586,20 @@ class TestCORSIntegration:
 
         client = TestClient(app)
 
-        response = client.get("/tracked-request", headers={"Origin": "https://tracking.myapp.com"})
+        response = client.get(
+            "/tracked-request", headers={"Origin": "https://tracking.myapp.com"}
+        )
 
         assert response.status_code == 200
-        assert response.headers["Access-Control-Allow-Origin"] == "https://tracking.myapp.com"
+        assert (
+            response.headers["Access-Control-Allow-Origin"]
+            == "https://tracking.myapp.com"
+        )
         assert response.headers["Access-Control-Allow-Credentials"] == "true"
-        assert response.headers["Access-Control-Expose-Headers"] == "X-Request-ID, X-Trace-ID"
+        assert (
+            response.headers["Access-Control-Expose-Headers"]
+            == "X-Request-ID, X-Trace-ID"
+        )
 
         # Verify request ID is accessible
         request_id_header = response.headers["X-Request-ID"]

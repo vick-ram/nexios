@@ -8,19 +8,27 @@ This module tests the session authentication backend including:
 - Custom session keys
 """
 
-from nexios.config.base import MakeConfig
-import pytest
 from functools import partial
-from nexios.auth import auth, BaseUser, AuthenticationMiddleware
-from nexios.auth.backends.session import SessionAuthBackend, login, logout
+
+import pytest
+
 from nexios.application import NexiosApp
+from nexios.auth import AuthenticationMiddleware, BaseUser, auth
+from nexios.auth.backends.session import SessionAuthBackend, login, logout
+from nexios.config.base import MakeConfig
 from nexios.http import Request, Response
 from nexios.session.middleware import SessionMiddleware
 from nexios.testclient import AsyncTestClient
 
 
 class TestUser(BaseUser):
-    def __init__(self, user_id: str, username: str, roles: list = None, is_authenticated: bool = True):
+    def __init__(
+        self,
+        user_id: str,
+        username: str,
+        roles: list = None,
+        is_authenticated: bool = True,
+    ):
         self.user_id = user_id
         self.username = username
         self.roles = roles or []
@@ -59,9 +67,7 @@ def test_client():
 
 
 async def test_session_auth_backend_success(test_client):
-    app = NexiosApp(config=MakeConfig(
-        secret_key="secret"
-    ))    
+    app = NexiosApp(config=MakeConfig(secret_key="secret"))
     app.add_middleware(AuthenticationMiddleware(TestUser, [SessionAuthBackend()]))
     app.add_middleware(SessionMiddleware())
 
@@ -74,7 +80,9 @@ async def test_session_auth_backend_success(test_client):
     @app.get("/protected")
     @auth("session")
     async def protected(req: Request, res: Response):
-        return res.json({"user_id": req.user.identity, "username": req.user.display_name})
+        return res.json(
+            {"user_id": req.user.identity, "username": req.user.display_name}
+        )
 
     client = test_client(app)
     res_login = await client.post("/login")
@@ -90,9 +98,7 @@ async def test_session_auth_backend_success(test_client):
 
 
 async def test_session_auth_backend_no_session(test_client):
-    app = NexiosApp(config=MakeConfig(
-        secret_key="secret"
-    ))
+    app = NexiosApp(config=MakeConfig(secret_key="secret"))
     app.add_middleware(AuthenticationMiddleware(TestUser, SessionAuthBackend()))
     app.add_middleware(SessionMiddleware())
 
@@ -108,9 +114,7 @@ async def test_session_auth_backend_no_session(test_client):
 
 
 async def test_session_auth_backend_missing_session_middleware(test_client):
-    app = NexiosApp(config=MakeConfig(
-        secret_key="secret"
-    ))
+    app = NexiosApp(config=MakeConfig(secret_key="secret"))
     app.add_middleware(AuthenticationMiddleware(TestUser, SessionAuthBackend()))
 
     @app.get("/protected")
@@ -125,9 +129,7 @@ async def test_session_auth_backend_missing_session_middleware(test_client):
 
 
 async def test_session_auth_backend_logout(test_client):
-    app = NexiosApp(config=MakeConfig(
-        secret_key="secret"
-    ))
+    app = NexiosApp(config=MakeConfig(secret_key="secret"))
     app.add_middleware(AuthenticationMiddleware(TestUser, SessionAuthBackend()))
     app.add_middleware(SessionMiddleware())
 
@@ -159,16 +161,21 @@ async def test_session_auth_backend_logout(test_client):
 
 
 async def test_session_auth_backend_custom_session_key(test_client):
-    app = NexiosApp(config=MakeConfig(
-        secret_key="secret"
-    ))    
-    app.add_middleware(AuthenticationMiddleware(TestUser, SessionAuthBackend(session_key="custom_user")))
+    app = NexiosApp(config=MakeConfig(secret_key="secret"))
+    app.add_middleware(
+        AuthenticationMiddleware(
+            TestUser, SessionAuthBackend(session_key="custom_user")
+        )
+    )
     app.add_middleware(SessionMiddleware())
 
     @app.post("/login")
     async def login_route(req: Request, res: Response):
         user = TestUser("1", "testuser", ["read", "write"])
-        req.session["custom_user"] = {"id": user.identity, "display_name": user.display_name}
+        req.session["custom_user"] = {
+            "id": user.identity,
+            "display_name": user.display_name,
+        }
         return res.json({"message": "logged in"})
 
     @app.get("/protected")

@@ -1,15 +1,24 @@
-from nexios.auth import AuthenticationMiddleware, JWTAuthBackend, create_jwt, auth, has_permission, BaseUser
-from nexios.auth.backends.base import AuthenticationBackend
-from nexios.auth.model import AuthResult
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from nexios.application import NexiosApp
+from nexios.auth import (
+    AuthenticationMiddleware,
+    BaseUser,
+    JWTAuthBackend,
+    auth,
+    create_jwt,
+    has_permission,
+)
+from nexios.auth.backends.base import AuthenticationBackend
 from nexios.auth.backends.jwt import decode_jwt
+from nexios.auth.model import AuthResult
 from nexios.auth.users.simple import SimpleUser, UnauthenticatedUser
 from nexios.config import MakeConfig, set_config
 from nexios.http import Request, Response
 from nexios.testing import Client
-from datetime import datetime,timedelta,timezone
+
 
 # Test User Model for authentication
 class TestUser(BaseUser):
@@ -32,7 +41,7 @@ class TestUser(BaseUser):
         return self.user_id
 
     def has_permission(self, permission: str) -> bool:
-       
+
         return permission in self.roles
 
     @classmethod
@@ -159,9 +168,7 @@ async def test_jwt_auth_validation_failure(test_client, valid_token):
     async def protected_route(req: Request, res: Response):
         return res.json({"user": req.user})
 
-    response = await client.get(
-        "/protected", headers={"Authorization": "Bearer"}
-    )
+    response = await client.get("/protected", headers={"Authorization": "Bearer"})
 
     # Should return 401 because user identity "nonexistent" is not found
     assert response.status_code == 401
@@ -233,8 +240,9 @@ async def test_custom_auth_backend(test_client):
                 return AuthResult(success=True, identity="123456789", scope="X-auth")
             return AuthResult(success=False, identity="", scope="X-auth")
 
-
-    app.add_middleware(AuthenticationMiddleware(backend=CustomAuthBackend(),user_model=SimpleUser))
+    app.add_middleware(
+        AuthenticationMiddleware(backend=CustomAuthBackend(), user_model=SimpleUser)
+    )
 
     @app.get("/custom-protected")
     @auth("X-auth")
@@ -260,11 +268,15 @@ async def test_has_permission_decorator(test_client):
     class DummuMiddleware(AuthenticationMiddleware):
 
         def __init__(self):
-            super().__init__(TestUser,AuthenticationBackend())
-        async def process_request(self, request: Request, response: Response,  call_next):
-            
-            request.scope["user"] = TestUser("1", "testuser", ["read","write"])
+            super().__init__(TestUser, AuthenticationBackend())
+
+        async def process_request(
+            self, request: Request, response: Response, call_next
+        ):
+
+            request.scope["user"] = TestUser("1", "testuser", ["read", "write"])
             return await call_next()
+
     app.add_middleware(DummuMiddleware())
 
     @app.get("/protected-route")
@@ -273,10 +285,18 @@ async def test_has_permission_decorator(test_client):
         return {"message": "Access granted"}
 
     # Create a valid token for user "1" who has "read" permission
-    token = create_jwt({"id": "1", "username": "testuser","exp": datetime.now(timezone.utc) + timedelta(days=1)})
+    token = create_jwt(
+        {
+            "id": "1",
+            "username": "testuser",
+            "exp": datetime.now(timezone.utc) + timedelta(days=1),
+        }
+    )
 
     # Test with user having the required permission
-    response = await client.get("/protected-route", headers={"Authorization": f"Bearer {token}"})
+    response = await client.get(
+        "/protected-route", headers={"Authorization": f"Bearer {token}"}
+    )
     assert response.status_code == 200
     assert (response.json()) == {"message": "Access granted"}
 
@@ -287,7 +307,9 @@ async def test_has_permission_decorator(test_client):
         return {"message": "Admin access"}
 
     # User "2" doesn't have "admin" permission according to our TestUser.load_user
-    response = await client.get("/admin-route", headers={"Authorization": f"Bearer {token}"})
+    response = await client.get(
+        "/admin-route", headers={"Authorization": f"Bearer {token}"}
+    )
     assert response.status_code == 403  # Forbidden
 
     # Test with multiple required permissions (all must be present)
@@ -296,7 +318,9 @@ async def test_has_permission_decorator(test_client):
     async def edit_route(request, response):
         return {"message": "Edit access"}
 
-    response = await client.get("/edit-route", headers={"Authorization": f"Bearer {token}"})
+    response = await client.get(
+        "/edit-route", headers={"Authorization": f"Bearer {token}"}
+    )
     assert response.status_code == 200
     assert (response.json()) == {"message": "Edit access"}
 
@@ -306,7 +330,8 @@ async def test_has_permission_decorator(test_client):
     async def any_auth_route(request, response):
         return {"message": "Any authenticated access"}
 
-    response = await client.get("/any-auth-route", headers={"Authorization": f"Bearer {token}"})
+    response = await client.get(
+        "/any-auth-route", headers={"Authorization": f"Bearer {token}"}
+    )
     assert response.status_code == 200
     assert (response.json()) == {"message": "Any authenticated access"}
- 

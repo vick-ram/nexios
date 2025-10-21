@@ -12,12 +12,12 @@ from nexios._internals._formparsers import (
     MultiPartParser,
     UploadedFile,
 )
+from nexios.session.base import BaseSessionInterface
 from nexios.structs import URL, Address, FormData, Headers, QueryParams, State
 from nexios.utils.async_helpers import (
     AwaitableOrContextManager,
     AwaitableOrContextManagerWrapper,
 )
-from nexios.session.base import BaseSessionInterface
 
 if typing.TYPE_CHECKING:
     from nexios import NexiosApp
@@ -294,7 +294,7 @@ class Request(HTTPConnection):
                 self._json = json.loads(body)
             except json.JSONDecodeError:
                 self._json = {}
-        return self._json # type: ignore
+        return self._json  # type: ignore
 
     @property
     async def text(self) -> str:
@@ -319,9 +319,9 @@ class Request(HTTPConnection):
         max_fields: typing.Optional[int] = 1000,
     ) -> FormData:
         if self._form is None:  # type:ignore
-            assert parse_options_header is not None, (
-                "The `python-multipart` library must be installed to use form parsing."
-            )
+            assert (
+                parse_options_header is not None
+            ), "The `python-multipart` library must be installed to use form parsing."
             content_type_header = self.headers.get("Content-Type")
             content_type: bytes
             content_type, _ = parse_options_header(content_type_header)  # type:ignore
@@ -408,7 +408,7 @@ class Request(HTTPConnection):
         Handles both URL-encoded and multipart form data.
         Uses the existing form_data property which already handles all form types.
         """
-        if not hasattr(self, "_form") or self._form is None: # type: ignore
+        if not hasattr(self, "_form") or self._form is None:  # type: ignore
             form_data = await self.form_data
             self._form = form_data
         return self._form
@@ -438,8 +438,6 @@ class Request(HTTPConnection):
 
     def url_for(self, _name: str, **path_params: typing.Dict[str, typing.Any]) -> str:
         return self.base_app.url_for(_name, **path_params)
-
- 
 
     def __str__(self) -> str:
         return f"<Request {self.method} {self.url}>"
@@ -586,5 +584,3 @@ class Request(HTTPConnection):
         if not auth.startswith("Bearer "):
             return ""
         return auth[7:]
-
-    

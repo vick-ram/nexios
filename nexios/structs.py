@@ -3,10 +3,11 @@ from __future__ import annotations
 import typing
 from typing import Any, Dict, ItemsView, Iterator, KeysView, Sequence, ValuesView
 from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit
-from nexios.utils.concurrency import run_in_threadpool
-from pydantic import GetJsonSchemaHandler,GetCoreSchemaHandler
+
+from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
 from pydantic_core import core_schema
 
+from nexios.utils.concurrency import run_in_threadpool
 
 Scope = typing.MutableMapping[str, typing.Any]
 Message = typing.MutableMapping[str, typing.Any]
@@ -761,31 +762,26 @@ class UploadedFile:
             f"size={self.size!r}, "
             f"headers={self.headers!r})"
         )
+
     @classmethod
     def __get_pydantic_core_schema__(
         cls, source: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
         # treat this type as bytes in validation
         return core_schema.no_info_after_validator_function(
-            cls,
-            core_schema.bytes_schema()
+            cls, core_schema.bytes_schema()
         )
 
     @classmethod
     def __get_pydantic_json_schema__(
         cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
-    ) -> JsonSchemaValue:
+    ) -> dict[str, str]:
         # represent in OpenAPI as a file upload
         return {
             "type": "string",
             "format": "binary",
         }
 
-    
-    
- 
-
-    
 
 class FormData(
     MultiDict[str, typing.Union[UploadedFile, str, Sequence[Any]]]  # type:ignore

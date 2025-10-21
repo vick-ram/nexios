@@ -1,16 +1,17 @@
-import pytest
 import urllib.parse
-from typing import Dict, Any
+from typing import Any, Dict
+
+import pytest
 
 from nexios.pagination import (
-    PageNumberPagination,
-    LimitOffsetPagination,
     CursorPagination,
-    PaginationError,
+    InvalidCursorError,
     InvalidPageError,
     InvalidPageSizeError,
-    InvalidCursorError,
+    LimitOffsetPagination,
     LinkBuilder,
+    PageNumberPagination,
+    PaginationError,
 )
 
 
@@ -24,7 +25,7 @@ class TestLinkBuilder:
             "page": "2",
             "page_size": "10",
             "filter": "active",
-            "sort": "name"
+            "sort": "name",
         }
         pagination_params = ["page", "page_size"]
 
@@ -32,7 +33,9 @@ class TestLinkBuilder:
 
         # Should include non-pagination params and new params
         result = link_builder.build_link({"page": 3, "page_size": 20})
-        expected = "http://example.com/api/items?filter=active&sort=name&page=3&page_size=20"
+        expected = (
+            "http://example.com/api/items?filter=active&sort=name&page=3&page_size=20"
+        )
         assert result == expected
 
     def test_build_link_with_no_pagination_params(self):
@@ -56,7 +59,9 @@ class TestLinkBuilder:
         link_builder = LinkBuilder(base_url, request_params, pagination_params)
 
         result = link_builder.build_link({"tags": ["python", "api"], "page": 1})
-        expected = "http://example.com/api/items?category=tech&tags=python&tags=api&page=1"
+        expected = (
+            "http://example.com/api/items?category=tech&tags=python&tags=api&page=1"
+        )
         assert result == expected
 
 
@@ -134,7 +139,9 @@ class TestPageNumberPagination:
         base_url = "http://example.com/api/items"
         request_params = {"page": "1", "page_size": "10"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["total_pages"] == 10
@@ -153,7 +160,9 @@ class TestPageNumberPagination:
         base_url = "http://example.com/api/items"
         request_params = {"page": "3", "page_size": "10"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["total_pages"] == 10
@@ -172,7 +181,9 @@ class TestPageNumberPagination:
         base_url = "http://example.com/api/items"
         request_params = {"page": "10", "page_size": "10"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["total_pages"] == 10
@@ -188,9 +199,16 @@ class TestPageNumberPagination:
         total_items = 100
         items = [{"id": 1}]
         base_url = "http://example.com/api/items"
-        request_params = {"page": "1", "page_size": "10", "filter": "active", "category": "tech"}
+        request_params = {
+            "page": "1",
+            "page_size": "10",
+            "filter": "active",
+            "category": "tech",
+        }
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         # Check that non-pagination params are preserved in links
         next_link = metadata["links"]["next"]
@@ -206,7 +224,9 @@ class TestPageNumberPagination:
         base_url = "http://example.com/api/items"
         request_params = {"page": "1", "page_size": "10"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 0
         assert metadata["total_pages"] == 0
@@ -284,7 +304,9 @@ class TestLimitOffsetPagination:
         base_url = "http://example.com/api/items"
         request_params = {"limit": "10", "offset": "0"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["limit"] == 10
@@ -304,7 +326,9 @@ class TestLimitOffsetPagination:
         base_url = "http://example.com/api/items"
         request_params = {"limit": "10", "offset": "30"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["limit"] == 10
@@ -324,7 +348,9 @@ class TestLimitOffsetPagination:
         base_url = "http://example.com/api/items"
         request_params = {"limit": "10", "offset": "90"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["limit"] == 10
@@ -343,7 +369,9 @@ class TestLimitOffsetPagination:
         base_url = "http://example.com/api/items"
         request_params = {"limit": "10", "offset": "150"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["limit"] == 10
@@ -372,7 +400,10 @@ class TestCursorPagination:
     def test_parse_parameters_with_cursor(self):
         """Test parsing parameters with cursor"""
         pagination = CursorPagination()
-        params = {"cursor": "eyJpZCI6MTB9", "page_size": "50"}  # base64 encoded {"id": 10}
+        params = {
+            "cursor": "eyJpZCI6MTB9",
+            "page_size": "50",
+        }  # base64 encoded {"id": 10}
 
         cursor, page_size = pagination.parse_parameters(params)
 
@@ -398,6 +429,7 @@ class TestCursorPagination:
         # Should be base64 encoded JSON
         import base64
         import json
+
         decoded = base64.b64decode(cursor).decode("utf-8")
         cursor_data = json.loads(decoded)
         assert cursor_data == {"id": 42}
@@ -410,6 +442,7 @@ class TestCursorPagination:
 
         import base64
         import json
+
         decoded = base64.b64decode(cursor).decode("utf-8")
         cursor_data = json.loads(decoded)
         assert cursor_data == {"created_at": "2023-01-01T00:00:00Z"}
@@ -422,13 +455,14 @@ class TestCursorPagination:
         original_data = {"id": 42}
         import base64
         import json
-        encoded_cursor = base64.b64encode(json.dumps(original_data).encode("utf-8")).decode("utf-8")
+
+        encoded_cursor = base64.b64encode(
+            json.dumps(original_data).encode("utf-8")
+        ).decode("utf-8")
 
         decoded = pagination.decode_cursor(encoded_cursor)
 
         assert decoded == {"id": 42}
-
-  
 
     def test_decode_cursor_invalid_json(self):
         """Test cursor decoding with invalid JSON"""
@@ -436,11 +470,11 @@ class TestCursorPagination:
 
         # Valid base64 but invalid JSON
         import base64
+
         invalid_json = base64.b64encode(b"invalid_json").decode("utf-8")
 
         with pytest.raises(InvalidCursorError, match="Invalid cursor format"):
             pagination.decode_cursor(invalid_json)
-
 
     def test_generate_metadata_first_page(self):
         """Test metadata generation for first page (no cursor)"""
@@ -450,7 +484,9 @@ class TestCursorPagination:
         base_url = "http://example.com/api/items"
         request_params = {"page_size": "10"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["page_size"] == 10
@@ -466,7 +502,9 @@ class TestCursorPagination:
         base_url = "http://example.com/api/items"
         request_params = {"cursor": "eyJpZCI6MjB9", "page_size": "10"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["page_size"] == 10
@@ -482,7 +520,9 @@ class TestCursorPagination:
         base_url = "http://example.com/api/items"
         request_params = {"cursor": "eyJpZCI6OTB9", "page_size": "10"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["page_size"] == 10
@@ -497,7 +537,9 @@ class TestCursorPagination:
         base_url = "http://example.com/api/items"
         request_params = {"cursor": "eyJpZCI6MTB9", "page_size": "10"}
 
-        metadata = pagination.generate_metadata(total_items, items, base_url, request_params)
+        metadata = pagination.generate_metadata(
+            total_items, items, base_url, request_params
+        )
 
         assert metadata["total_items"] == 100
         assert metadata["page_size"] == 10

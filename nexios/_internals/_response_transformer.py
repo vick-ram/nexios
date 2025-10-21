@@ -42,12 +42,12 @@ async def request_response(
     assert asyncio.iscoroutinefunction(func), "Endpoints must be async"
 
     async def app(scope: Scope, receive: Receive, send: Send) -> None:
-        response_manager = Response._instance # type: ignore[reportPrivateUsage]
+        response_manager = Response._instance  # type: ignore[reportPrivateUsage]
         if not response_manager:
             request = Request(scope, receive, send)
             response_manager = Response(request)
         else:
-            request = response_manager._request # type: ignore[reportPrivateUsage]
+            request = response_manager._request  # type: ignore[reportPrivateUsage]
 
         ctx = Context(
             request=request,
@@ -67,7 +67,7 @@ async def request_response(
                 )
         finally:
             current_context.reset(token)
-        response =  _process_response(response_manager, func_result)
+        response = _process_response(response_manager, func_result)
         return await response(scope, receive, send)
 
     return app

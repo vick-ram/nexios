@@ -80,7 +80,7 @@ async def run_in_threadpool(func: Callable[..., T], *args: Any, **kwargs: Any) -
 
 async def run_until_first_complete(
     *args: Union[
-        Tuple[Callable[[], Coroutine[Any, Any, T]], dict[Any,Any]],
+        Tuple[Callable[[], Coroutine[Any, Any, T]], dict[Any, Any]],
         Callable[[], Coroutine[Any, Any, T]],
     ],
 ) -> T:

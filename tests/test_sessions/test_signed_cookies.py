@@ -1,10 +1,13 @@
 """
 Tests for signed cookie session manager
 """
-import pytest
+
 import json
-from nexios.session.signed_cookies import SignedSessionManager
+
+import pytest
+
 from nexios.config import MakeConfig, set_config
+from nexios.session.signed_cookies import SignedSessionManager
 
 
 class TestSignedSessionManager:
@@ -12,15 +15,17 @@ class TestSignedSessionManager:
 
     def setup_method(self):
         """Set up test configuration"""
-        config = MakeConfig({
-            "secret_key": "test-secret-key-for-signed-sessions",
-            "session": {
-                "session_cookie_name": "test_session",
-                "session_expiration_time": 3600,
-                "session_permanent": False,
-                "session_refresh_each_request": False
+        config = MakeConfig(
+            {
+                "secret_key": "test-secret-key-for-signed-sessions",
+                "session": {
+                    "session_cookie_name": "test_session",
+                    "session_expiration_time": 3600,
+                    "session_permanent": False,
+                    "session_refresh_each_request": False,
+                },
             }
-        })
+        )
         set_config(config)
 
     def test_signed_session_initialization(self):
@@ -80,7 +85,6 @@ class TestSignedSessionManager:
         # Verify the cookie can be deserialized
         verified_data = session.verify_session_data(cookie)
         assert verified_data == {"user_id": 123, "username": "testuser"}
-
 
     async def test_async_save(self):
         """Test async save method"""
@@ -145,8 +149,7 @@ class TestSignedSessionManager:
 
     async def test_session_key_generation(self):
         """Test session key generation"""
-        session = SignedSessionManager(
-        )
+        session = SignedSessionManager()
 
         # Initially no key
         assert session.session_key is None
@@ -184,23 +187,18 @@ class TestSignedSessionManager:
 
     async def test_session_with_complex_data(self):
         """Test session with complex data types"""
-        session = SignedSessionManager(
-            session_key="test-session-key-for-complex-data"
-        )
+        session = SignedSessionManager(session_key="test-session-key-for-complex-data")
 
         complex_data = {
             "user": {
                 "id": 404,
                 "profile": {
                     "name": "Test User",
-                    "preferences": {
-                        "theme": "light",
-                        "notifications": True
-                    }
-                }
+                    "preferences": {"theme": "light", "notifications": True},
+                },
             },
             "items": [1, 2, 3],
-            "active": True
+            "active": True,
         }
 
         session["complex"] = complex_data

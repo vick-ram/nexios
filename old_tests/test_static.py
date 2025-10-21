@@ -7,6 +7,7 @@ from nexios import NexiosApp
 from nexios.static import StaticFiles
 from nexios.testing.client import Client
 
+
 @pytest.mark.asyncio
 async def test_static_file_serving():
     app = NexiosApp()
@@ -138,7 +139,9 @@ async def test_static_file_range_requests():
         assert resp.headers.get("content-range") is not None
 
         # Test invalid range
-        resp = await client.get("/static/example.txt", headers={"Range": "bytes=100-200"})
+        resp = await client.get(
+            "/static/example.txt", headers={"Range": "bytes=100-200"}
+        )
         assert resp.status_code == 416  # Range Not Satisfiable
 
 

@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from nexios import NexiosApp
 from nexios.static import StaticFiles
 from nexios.testclient import TestClient
@@ -83,7 +84,6 @@ def test_static_file_http_methods():
         assert resp.status_code == 405
 
 
-
 def test_static_file_cache_headers():
     app = NexiosApp()
     static_dir = Path(__file__).parent / "static"
@@ -121,8 +121,6 @@ def test_static_file_error_cases():
 
         resp = client.get("/static/")
         assert resp.status_code in [200, 404]
-
- 
 
 
 def test_static_file_query_params():

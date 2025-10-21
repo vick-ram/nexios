@@ -8,12 +8,21 @@ This module tests the JWT authentication backend including:
 - Custom identifier fields
 """
 
-import pytest
-from functools import partial
 from datetime import datetime, timedelta, timezone
-from nexios.auth import JWTAuthBackend, create_jwt, decode_jwt, auth, BaseUser, AuthenticationMiddleware
-from nexios.auth.users.simple import SimpleUser
+from functools import partial
+
+import pytest
+
 from nexios.application import NexiosApp
+from nexios.auth import (
+    AuthenticationMiddleware,
+    BaseUser,
+    JWTAuthBackend,
+    auth,
+    create_jwt,
+    decode_jwt,
+)
+from nexios.auth.users.simple import SimpleUser
 from nexios.config import MakeConfig, set_config
 from nexios.http import Request, Response
 from nexios.testclient import AsyncTestClient
@@ -21,7 +30,13 @@ from nexios.testclient import AsyncTestClient
 
 # Test User Model for authentication
 class TestUser(BaseUser):
-    def __init__(self, user_id: str, username: str, roles: list = None, is_authenticated: bool = True):
+    def __init__(
+        self,
+        user_id: str,
+        username: str,
+        roles: list = None,
+        is_authenticated: bool = True,
+    ):
         self.user_id = user_id
         self.username = username
         self.roles = roles or []
@@ -93,11 +108,15 @@ async def test_jwt_auth_backend_success(test_client, valid_jwt_token):
     @app.get("/protected")
     @auth("jwt")
     async def protected_route(req: Request, res: Response):
-        return res.json({"user_id": req.user.identity, "username": req.user.display_name})
+        return res.json(
+            {"user_id": req.user.identity, "username": req.user.display_name}
+        )
 
     client = test_client(app)
     async with client:
-        res = await client.get("/protected", headers={"Authorization": f"Bearer {valid_jwt_token}"})
+        res = await client.get(
+            "/protected", headers={"Authorization": f"Bearer {valid_jwt_token}"}
+        )
         assert res.status_code == 200
         data = res.json()
         assert data["user_id"] == "1"
@@ -148,7 +167,9 @@ async def test_jwt_auth_backend_invalid_token(test_client, invalid_jwt_token):
 
     client = test_client(app)
     async with client:
-        res = await client.get("/protected", headers={"Authorization": f"Bearer {invalid_jwt_token}"})
+        res = await client.get(
+            "/protected", headers={"Authorization": f"Bearer {invalid_jwt_token}"}
+        )
         assert res.status_code == 401
 
 
@@ -164,7 +185,9 @@ async def test_jwt_auth_backend_expired_token(test_client, expired_jwt_token):
 
     client = test_client(app)
     async with client:
-        res = await client.get("/protected", headers={"Authorization": f"Bearer {expired_jwt_token}"})
+        res = await client.get(
+            "/protected", headers={"Authorization": f"Bearer {expired_jwt_token}"}
+        )
         assert res.status_code == 401
 
 
@@ -183,7 +206,9 @@ async def test_jwt_auth_backend_user_not_found(test_client):
 
     client = test_client(app)
     async with client:
-        res = await client.get("/protected", headers={"Authorization": f"Bearer {token}"})
+        res = await client.get(
+            "/protected", headers={"Authorization": f"Bearer {token}"}
+        )
         assert res.status_code == 401
 
 
@@ -202,5 +227,7 @@ async def test_jwt_auth_backend_wrong_identifier_field(test_client):
 
     client = test_client(app)
     async with client:
-        res = await client.get("/protected", headers={"Authorization": f"Bearer {token}"})
+        res = await client.get(
+            "/protected", headers={"Authorization": f"Bearer {token}"}
+        )
         assert res.status_code == 200

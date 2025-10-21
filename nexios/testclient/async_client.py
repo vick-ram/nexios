@@ -26,11 +26,10 @@ from nexios.testclient._internal.types import ASGI2App, RequestData
 from nexios.testclient._internal.utils import AsyncBackend, WrapASGI2, is_asgi3
 from nexios.testclient._internal.websockets import WebSocketTestSession
 from nexios.testclient.exceptions import UpgradeException
-from nexios.testclient._internal.types import ASGIApp
+from nexios.types import ASGIApp
 
 
 class AsyncTestClient(httpx.AsyncClient):
-    
 
     __test__ = False
 
@@ -47,7 +46,9 @@ class AsyncTestClient(httpx.AsyncClient):
         follow_redirects: bool = True,
         check_asgi_conformance: bool = True,
     ) -> None:
-        self.async_backend = AsyncBackend(backend=backend, backend_options=backend_options or {})
+        self.async_backend = AsyncBackend(
+            backend=backend, backend_options=backend_options or {}
+        )
 
         if is_asgi3(app):
             asgi_app = cast(ASGIApp, app)  # type: ignore
@@ -97,14 +98,20 @@ class AsyncTestClient(httpx.AsyncClient):
         params: QueryParamTypes | None = None,
         headers: HeaderTypes | None = None,
         cookies: CookieTypes | None = None,
-        auth: AuthTypes | httpx._client.UseClientDefault = httpx._client.USE_CLIENT_DEFAULT,
+        auth: (
+            AuthTypes | httpx._client.UseClientDefault
+        ) = httpx._client.USE_CLIENT_DEFAULT,
         follow_redirects: bool | None = None,
-        timeout: TimeoutTypes | httpx._client.UseClientDefault = httpx._client.USE_CLIENT_DEFAULT,
+        timeout: (
+            TimeoutTypes | httpx._client.UseClientDefault
+        ) = httpx._client.USE_CLIENT_DEFAULT,
         extensions: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> httpx.Response:
         url = self._merge_url(url)
-        redirect: bool | httpx._client.UseClientDefault = httpx._client.USE_CLIENT_DEFAULT
+        redirect: bool | httpx._client.UseClientDefault = (
+            httpx._client.USE_CLIENT_DEFAULT
+        )
         if follow_redirects is not None:
             redirect = follow_redirects
 

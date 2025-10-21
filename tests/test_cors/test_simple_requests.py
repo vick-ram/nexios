@@ -1,28 +1,32 @@
 """
 Tests for simple CORS requests (GET, POST, PUT, DELETE)
 """
+
 import pytest
+
 from nexios import NexiosApp
 from nexios.config import MakeConfig, set_config
-from nexios.middleware.cors import CORSMiddleware
 from nexios.http import Request, Response
+from nexios.middleware.cors import CORSMiddleware
 from nexios.testclient import TestClient
 
 
 @pytest.fixture
 def cors_app():
     """Create a test app with CORS middleware configured"""
-    config = MakeConfig({
-        "cors": {
-            "allow_origins": ["http://example.com", "https://example.org"],
-            "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization", "X-Custom-Header"],
-            "allow_credentials": True,
-            "expose_headers": ["X-Exposed-Header", "X-Response-Time"],
-            "max_age": 3600,
-            "debug": True,
+    config = MakeConfig(
+        {
+            "cors": {
+                "allow_origins": ["http://example.com", "https://example.org"],
+                "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                "allow_headers": ["Content-Type", "Authorization", "X-Custom-Header"],
+                "allow_credentials": True,
+                "expose_headers": ["X-Exposed-Header", "X-Response-Time"],
+                "max_age": 3600,
+                "debug": True,
+            }
         }
-    })
+    )
     set_config(config)
 
     app = NexiosApp(config)
@@ -65,7 +69,10 @@ class TestSimpleRequests:
         assert response.json() == {"message": "OK"}
         assert response.headers["Access-Control-Allow-Origin"] == "http://example.com"
         assert response.headers["Access-Control-Allow-Credentials"] == "true"
-        assert response.headers["Access-Control-Expose-Headers"] == "X-Exposed-Header, X-Response-Time"
+        assert (
+            response.headers["Access-Control-Expose-Headers"]
+            == "X-Exposed-Header, X-Response-Time"
+        )
 
     def test_get_request_disallowed_origin(self, client):
         """Test simple GET request with disallowed origin"""
@@ -119,14 +126,18 @@ class TestSimpleRequests:
             ("GET", "/test"),
             ("POST", "/data"),
             ("PUT", "/update"),
-            ("DELETE", "/delete")
+            ("DELETE", "/delete"),
         ]
 
         for method, route in methods_and_routes:
-            response = client.request(method, route, headers={"Origin": "http://example.com"})
+            response = client.request(
+                method, route, headers={"Origin": "http://example.com"}
+            )
 
             assert response.status_code == 200
-            assert response.headers["Access-Control-Allow-Origin"] == "http://example.com"
+            assert (
+                response.headers["Access-Control-Allow-Origin"] == "http://example.com"
+            )
             assert response.headers["Access-Control-Allow-Credentials"] == "true"
 
     def test_multiple_origins_same_method(self, client):
@@ -153,13 +164,18 @@ class TestSimpleRequests:
     def test_origin_with_ports(self, client):
         """Test origins with explicit ports"""
         # Create app that allows specific port
-        config = MakeConfig({
-            "cors": {
-                "allow_origins": ["http://example.com:8080", "https://example.org:3000"],
-                "allow_methods": ["GET"],
-                "allow_credentials": True
+        config = MakeConfig(
+            {
+                "cors": {
+                    "allow_origins": [
+                        "http://example.com:8080",
+                        "https://example.org:3000",
+                    ],
+                    "allow_methods": ["GET"],
+                    "allow_credentials": True,
+                }
             }
-        })
+        )
         set_config(config)
 
         app = NexiosApp(config)
@@ -173,12 +189,19 @@ class TestSimpleRequests:
         port_client = TestClient(app)
 
         # Test allowed port
-        response1 = port_client.get("/port-test", headers={"Origin": "http://example.com:8080"})
+        response1 = port_client.get(
+            "/port-test", headers={"Origin": "http://example.com:8080"}
+        )
         assert response1.status_code == 200
-        assert response1.headers["Access-Control-Allow-Origin"] == "http://example.com:8080"
+        assert (
+            response1.headers["Access-Control-Allow-Origin"]
+            == "http://example.com:8080"
+        )
 
         # Test different port should not match
-        response2 = port_client.get("/port-test", headers={"Origin": "http://example.com:9090"})
+        response2 = port_client.get(
+            "/port-test", headers={"Origin": "http://example.com:9090"}
+        )
         assert "Access-Control-Allow-Origin" not in response2.headers
 
     def test_request_without_origin_header_different_methods(self, client):
@@ -187,7 +210,7 @@ class TestSimpleRequests:
             ("GET", "/test"),
             ("POST", "/data"),
             ("PUT", "/update"),
-            ("DELETE", "/delete")
+            ("DELETE", "/delete"),
         ]
 
         for method, route in methods_and_routes:

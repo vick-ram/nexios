@@ -121,7 +121,7 @@ class WSRouter(BaseRouter):
             # Using with a pre-constructed route
             route = WebsocketRoutes("/ws/chat", chat_handler)
             app.add_ws_route(route)
-            
+
             # Or directly with path and handler
             app.add_ws_route(path="/ws/chat", handler=chat_handler)
             ```

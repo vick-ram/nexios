@@ -7,13 +7,15 @@ This module tests custom authentication backends including:
 - Integration with middleware
 """
 
-import pytest
 from functools import partial
-from nexios.auth import auth, BaseUser, AuthenticationMiddleware
+
+import pytest
+
+from nexios.application import NexiosApp
+from nexios.auth import AuthenticationMiddleware, BaseUser, auth
 from nexios.auth.backends.base import AuthenticationBackend
 from nexios.auth.model import AuthResult
 from nexios.auth.users.simple import SimpleUser
-from nexios.application import NexiosApp
 from nexios.http import Request, Response
 from nexios.testclient import AsyncTestClient
 
@@ -54,7 +56,11 @@ class CustomTestUser(BaseUser):
     async def load_user(cls, identity: str):
         users_db = {
             "custom1": cls("custom1", "customuser", ["custom_read", "custom_write"]),
-            "custom2": cls("custom2", "customadmin", ["custom_read", "custom_write", "custom_admin"]),
+            "custom2": cls(
+                "custom2",
+                "customadmin",
+                ["custom_read", "custom_write", "custom_admin"],
+            ),
         }
         return users_db.get(str(identity))
 
@@ -62,6 +68,7 @@ class CustomTestUser(BaseUser):
 # -------------------------
 # Tests
 # -------------------------
+
 
 async def test_custom_auth_backend_success(test_client):
     app = NexiosApp()
@@ -79,10 +86,14 @@ async def test_custom_auth_backend_success(test_client):
     @app.get("/protected")
     @auth("custom")
     async def protected_route(req: Request, res: Response):
-        return res.json({"user_id": req.user.identity, "permissions": req.user.permissions})
+        return res.json(
+            {"user_id": req.user.identity, "permissions": req.user.permissions}
+        )
 
     async with client:
-        res = await client.get("/protected", headers={"X-Custom-Auth": "valid_token_123"})
+        res = await client.get(
+            "/protected", headers={"X-Custom-Auth": "valid_token_123"}
+        )
         assert res.status_code == 200
         data = res.json()
         assert data["user_id"] == "custom1"
@@ -126,7 +137,11 @@ async def test_custom_auth_backend_exception_handling(test_client):
                 return AuthResult(success=True, identity="backup_user", scope="backup")
             return AuthResult(success=False, identity="", scope="")
 
-    app.add_middleware(AuthenticationMiddleware(SimpleUser, [FaultyAuthBackend(), WorkingAuthBackend()]))
+    app.add_middleware(
+        AuthenticationMiddleware(
+            SimpleUser, [FaultyAuthBackend(), WorkingAuthBackend()]
+        )
+    )
 
     @app.get("/protected")
     @auth("backup")
@@ -149,8 +164,14 @@ async def test_custom_auth_backend_complex_logic(test_client):
             token = request.headers.get("Authorization")
             user_param = request.query_params.get("user")
 
-            if api_key == "complex_key" and token == "Bearer complex_token" and user_param == "complex_user":
-                return AuthResult(success=True, identity="complex_user", scope="complex")
+            if (
+                api_key == "complex_key"
+                and token == "Bearer complex_token"
+                and user_param == "complex_user"
+            ):
+                return AuthResult(
+                    success=True, identity="complex_user", scope="complex"
+                )
             return AuthResult(success=False, identity="", scope="")
 
     app.add_middleware(AuthenticationMiddleware(SimpleUser, ComplexAuthBackend()))
@@ -164,7 +185,10 @@ async def test_custom_auth_backend_complex_logic(test_client):
         # Valid case
         res = await client.get(
             "/protected?user=complex_user",
-            headers={"X-API-Key": "complex_key", "Authorization": "Bearer complex_token"},
+            headers={
+                "X-API-Key": "complex_key",
+                "Authorization": "Bearer complex_token",
+            },
         )
         assert res.status_code == 200
         assert res.json()["user_id"] == "complex_user"

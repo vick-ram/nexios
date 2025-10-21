@@ -4,10 +4,10 @@ from nexios import NexiosApp
 from nexios.http import Request, Response
 from nexios.pagination import (
     AsyncListDataHandler,
-    PageNumberPagination,
-    LimitOffsetPagination,
-    CursorPagination,
     AsyncPaginator,
+    CursorPagination,
+    LimitOffsetPagination,
+    PageNumberPagination,
     PaginationError,
 )
 from nexios.testing import Client
@@ -122,7 +122,9 @@ class TestPaginationIntegration:
         assert "prev" not in data["pagination"]["links"]
 
         # Test with cursor navigation
-        next_cursor = data["pagination"]["links"]["next"].split("cursor=")[1].split("&")[0]
+        next_cursor = (
+            data["pagination"]["links"]["next"].split("cursor=")[1].split("&")[0]
+        )
         response = await client.get(f"/items-cursor?cursor={next_cursor}&page_size=10")
         assert response.status_code == 200
         data = response.json()
@@ -308,7 +310,10 @@ class TestPaginationIntegration:
         """Test pagination with complex query parameters"""
         client, app = test_client
 
-        test_data = [{"id": i, "category": "tech", "tags": ["python", "web"]} for i in range(1, 101)]
+        test_data = [
+            {"id": i, "category": "tech", "tags": ["python", "web"]}
+            for i in range(1, 101)
+        ]
 
         @app.get("/complex-items")
         async def get_complex_items(req: Request, res: Response):
@@ -323,7 +328,9 @@ class TestPaginationIntegration:
             return res.json(result)
 
         # Test with multiple query parameters
-        response = await client.get("/complex-items?page=1&page_size=5&category=tech&sort=name&filter=active&tags=python&tags=web")
+        response = await client.get(
+            "/complex-items?page=1&page_size=5&category=tech&sort=name&filter=active&tags=python&tags=web"
+        )
         assert response.status_code == 200
         data = response.json()
 
@@ -342,7 +349,3 @@ class TestPaginationIntegration:
 
 class TestPaginationPerformance:
     """Performance tests for pagination"""
-
-    
-
-

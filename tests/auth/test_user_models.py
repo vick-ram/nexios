@@ -8,6 +8,7 @@ This module tests user models including:
 """
 
 import pytest
+
 from nexios.auth.users.base import BaseUser
 from nexios.auth.users.simple import SimpleUser, UnauthenticatedUser
 

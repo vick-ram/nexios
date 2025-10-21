@@ -3,8 +3,8 @@ End-to-end CSRF middleware tests (no mocks, full network flow)
 """
 
 from nexios import NexiosApp
-from nexios.http import Request, Response
 from nexios.config import MakeConfig, set_config
+from nexios.http import Request, Response
 from nexios.middleware.csrf import CSRFMiddleware
 
 
@@ -66,9 +66,14 @@ def test_protected_request_valid_token(test_client_factory):
         token = token_resp.json()["token"]
         cookie = token_resp.cookies.get("csrftoken")
 
-        headers = {"X-CSRFToken": token, "content-type": "application/x-www-form-urlencoded"}
+        headers = {
+            "X-CSRFToken": token,
+            "content-type": "application/x-www-form-urlencoded",
+        }
         cookies = {"csrftoken": cookie}
-        res = client.post("/protected", headers=headers, cookies=cookies, data={"_": "ok"})
+        res = client.post(
+            "/protected", headers=headers, cookies=cookies, data={"_": "ok"}
+        )
 
         assert res.status_code == 200
         assert res.json() == {"status": "protected"}
@@ -95,7 +100,10 @@ def test_protected_request_invalid_token(test_client_factory):
         cookie = token_resp.cookies.get("csrftoken")
 
         bad_token = "tampered-token"
-        headers = {"X-CSRFToken": bad_token, "content-type": "application/x-www-form-urlencoded"}
+        headers = {
+            "X-CSRFToken": bad_token,
+            "content-type": "application/x-www-form-urlencoded",
+        }
         cookies = {"csrftoken": cookie}
         res = client.post("/protected", headers=headers, cookies=cookies)
 

@@ -7,23 +7,31 @@ This module tests:
 - Edge cases (unauthenticated, invalid scope/permissions)
 """
 
-import pytest
 from functools import partial
-from nexios.auth import auth, has_permission, BaseUser, AuthenticationMiddleware
+
+import pytest
+
+from nexios.application import NexiosApp
+from nexios.auth import AuthenticationMiddleware, BaseUser, auth, has_permission
 from nexios.auth.backends.base import AuthenticationBackend
 from nexios.auth.model import AuthResult
 from nexios.auth.users.simple import SimpleUser, UnauthenticatedUser
-from nexios.application import NexiosApp
 from nexios.http import Request, Response
 from nexios.testclient import AsyncTestClient
-
 
 # --------------------------------------------------------------------------
 # Test User Model
 # --------------------------------------------------------------------------
 
+
 class TestUser(BaseUser):
-    def __init__(self, user_id: str, username: str, roles: list = None, is_authenticated: bool = True):
+    def __init__(
+        self,
+        user_id: str,
+        username: str,
+        roles: list = None,
+        is_authenticated: bool = True,
+    ):
         self.user_id = user_id
         self.username = username
         self.roles = roles or []
@@ -59,6 +67,7 @@ class TestUser(BaseUser):
 # Fixture
 # --------------------------------------------------------------------------
 
+
 @pytest.fixture
 def test_client():
     return partial(AsyncTestClient)
@@ -67,6 +76,7 @@ def test_client():
 # --------------------------------------------------------------------------
 # Auth Decorator Tests
 # --------------------------------------------------------------------------
+
 
 async def test_auth_decorator_single_scope(test_client):
     app = NexiosApp()
@@ -109,7 +119,9 @@ async def test_auth_decorator_multiple_scopes(test_client):
         return res.json({"authenticated": True})
 
     async with test_client(app) as client:
-        res = await client.get("/protected", headers={"Authorization": "Bearer multi_token"})
+        res = await client.get(
+            "/protected", headers={"Authorization": "Bearer multi_token"}
+        )
         assert res.status_code == 200
 
         res = await client.get("/protected")
@@ -140,6 +152,7 @@ async def test_auth_decorator_no_scopes(test_client):
 # --------------------------------------------------------------------------
 # Permission Decorator Tests
 # --------------------------------------------------------------------------
+
 
 async def test_has_permission_single_permission(test_client):
     app = NexiosApp()
@@ -229,7 +242,9 @@ async def test_has_permission_unauthenticated_user(test_client):
         def __init__(self):
             super().__init__(TestUser, AuthenticationBackend())
 
-        async def process_request(self, request: Request, response: Response, call_next):
+        async def process_request(
+            self, request: Request, response: Response, call_next
+        ):
             request.scope["user"] = UnauthenticatedUser()
             request.scope["auth"] = None
             return await call_next()

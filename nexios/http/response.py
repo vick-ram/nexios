@@ -115,7 +115,7 @@ class BaseResponse:
             ):
                 content_type += "; charset=" + self.charset
             self._headers.append((b"content-type", content_type.encode("latin-1")))
-        
+
         self._headers.extend(raw_headers)
 
     def set_cookie(
@@ -183,12 +183,14 @@ class BaseResponse:
         etag = self._generate_etag()
         self.set_header("etag", etag)
 
-        expires = datetime.now(timezone.utc) + timedelta(seconds=max_age) 
+        expires = datetime.now(timezone.utc) + timedelta(seconds=max_age)
         self.set_header("expires", formatdate(expires.timestamp(), usegmt=True))
 
     def disable_caching(self) -> None:
         """Disable caching for this response."""
-        self.set_header("cache-control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.set_header(
+            "cache-control", "no-store, no-cache, must-revalidate, max-age=0"
+        )
         self.set_header("pragma", "no-cache")
         self.set_header("expires", "0")
 
@@ -200,7 +202,7 @@ class BaseResponse:
             {
                 "type": "http.response.start",
                 "status": self.status_code,
-                "headers": self._headers +  scope.get("pre-response-headers", []),
+                "headers": self._headers + scope.get("pre-response-headers", []),
             }
         )
 
@@ -380,7 +382,7 @@ class FileResponse(BaseResponse):
             for range_str in ranges.split(","):
                 range = range_str.split("-")
                 start: int = int(range[0])
-                end: int = int(range[-1]) if range[-1] != "" else 0 # type: ignore
+                end: int = int(range[-1]) if range[-1] != "" else 0  # type: ignore
                 start = int(start) if start else 0
                 end: int = int(end) if end else file_size - 1
 

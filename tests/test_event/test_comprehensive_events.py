@@ -17,29 +17,30 @@ Tests cover:
 
 import asyncio
 import json
-import pytest
-import time
 import threading
+import time
 import weakref
-from unittest.mock import Mock, call, patch
 from typing import Callable
+from unittest.mock import Mock, call, patch
+
+import pytest
 
 from nexios.events import (
-    Event,
-    EventEmitter,
-    EventNamespace,
     AsyncEventEmitter,
-    EventPriority,
-    EventPhase,
+    Event,
+    EventCancelledError,
     EventContext,
+    EventEmitter,
     EventError,
+    EventNamespace,
+    EventPhase,
+    EventPriority,
     ListenerAlreadyRegisteredError,
     MaxListenersExceededError,
-    EventCancelledError,
 )
 
-
 # ========== Fixtures ==========
+
 
 @pytest.fixture
 def event_emitter():
@@ -67,6 +68,7 @@ def listener_mock():
 
 
 # ========== Basic Event Tests ==========
+
 
 def test_event_creation():
     """Test basic event creation"""
@@ -131,6 +133,7 @@ def test_event_triggering_with_context(event_emitter, listener_mock):
 
 # ========== One-time Listeners Tests ==========
 
+
 def test_once_listener(event_emitter, listener_mock):
     """Test one-time listeners that are removed after first trigger"""
     event = event_emitter.event("test_event")
@@ -169,6 +172,7 @@ def test_once_listener_with_multiple_calls(event_emitter, listener_mock):
 
 # ========== Priority Tests ==========
 
+
 def test_event_priorities(event_emitter, listener_mock):
     """Test that listeners are executed in priority order"""
     event = event_emitter.event("test_event")
@@ -184,7 +188,13 @@ def test_event_priorities(event_emitter, listener_mock):
     event.trigger()
 
     # Check execution order (highest priority first)
-    expected_calls = [call("highest"), call("high"), call("normal"), call("low"), call("lowest")]
+    expected_calls = [
+        call("highest"),
+        call("high"),
+        call("normal"),
+        call("low"),
+        call("lowest"),
+    ]
     assert listener_mock.call_args_list == expected_calls
 
 
@@ -199,6 +209,7 @@ def test_event_priority_listener_registration(event_emitter, listener_mock):
 
 
 # ========== Propagation Tests ==========
+
 
 def test_event_propagation_parent_child(event_emitter, listener_mock):
     """Test event propagation from parent to child"""
@@ -252,6 +263,7 @@ def test_event_propagation_capture_bubble_phases(event_emitter, listener_mock):
 
 # ========== Cancellation Tests ==========
 
+
 def test_event_cancellation(event_emitter, listener_mock):
     """Test event cancellation"""
     event = event_emitter.event("test_event")
@@ -292,6 +304,7 @@ def test_event_prevent_default(event_emitter, listener_mock):
 
 
 # ========== Async Listeners Tests ==========
+
 
 @pytest.mark.asyncio
 async def test_async_listener_support(event_emitter, listener_mock):
@@ -341,6 +354,7 @@ async def test_mixed_sync_async_listeners(event_emitter, listener_mock):
 
 # ========== Namespace Tests ==========
 
+
 def test_event_namespaces(event_emitter, listener_mock):
     """Test event namespaces"""
     # Create namespace
@@ -386,6 +400,7 @@ def test_namespace_event_access(event_emitter, listener_mock):
 
 
 # ========== Metrics and History Tests ==========
+
 
 def test_event_metrics(event_emitter, listener_mock):
     """Test event metrics collection"""
@@ -451,6 +466,7 @@ def test_event_history_with_limit(event_emitter, listener_mock):
 
 # ========== Error Handling Tests ==========
 
+
 def test_listener_exception_handling(event_emitter, listener_mock):
     """Test that listener exceptions are caught and logged"""
     event = event_emitter.event("test_event")
@@ -498,6 +514,7 @@ def test_duplicate_listener_registration(event_emitter, listener_mock):
 
 # ========== Weak Reference Tests ==========
 
+
 def test_weak_reference_listener(event_emitter):
     """Test weak reference listeners"""
     event = event_emitter.event("test_event")
@@ -542,6 +559,7 @@ def test_weak_reference_method(event_emitter):
 
 # ========== Serialization Tests ==========
 
+
 def test_event_serialization(event_emitter, listener_mock):
     """Test event serialization"""
     event = event_emitter.event("test_event")
@@ -577,8 +595,10 @@ def test_event_serialization_roundtrip(event_emitter, listener_mock):
 
 # ========== EventEmitter Integration Tests ==========
 
+
 def test_event_emitter_decorator_usage(event_emitter, listener_mock):
     """Test EventEmitter decorator usage"""
+
     # Register using decorator
     @event_emitter.on("test_event")
     def decorated_listener(*args, **kwargs):
@@ -593,6 +613,7 @@ def test_event_emitter_decorator_usage(event_emitter, listener_mock):
 
 def test_event_emitter_once_decorator(event_emitter, listener_mock):
     """Test EventEmitter once decorator"""
+
     @event_emitter.once("test_event")
     def once_listener(*args, **kwargs):
         listener_mock("once")
@@ -678,10 +699,7 @@ def test_concurrent_event_triggering(event_emitter, listener_mock):
     import concurrent.futures
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [
-            executor.submit(event.trigger)
-            for _ in range(3)
-        ]
+        futures = [executor.submit(event.trigger) for _ in range(3)]
 
         results = [future.result() for future in futures]
 
@@ -701,8 +719,10 @@ def test_large_number_of_listeners(event_emitter):
     # Add many listeners
     listeners = []
     for i in range(100):
+
         def listener(i=i):
             pass  # Simple no-op listener
+
         event.listen(listener)
         listeners.append(listener)
 
@@ -717,6 +737,7 @@ def test_large_number_of_listeners(event_emitter):
 
 
 # ========== Decorator Tests ==========
+
 
 def test_event_decorator_usage(event_emitter, listener_mock):
     """Test using Event.listen as decorator"""
@@ -751,6 +772,7 @@ def test_event_once_decorator(event_emitter, listener_mock):
 
 # ========== EventEmitter Namespace Integration Tests ==========
 
+
 def test_namespace_decorator_usage(event_emitter, listener_mock):
     """Test namespace decorator usage"""
     user_ns = event_emitter.namespace("user")
@@ -775,6 +797,7 @@ def test_namespace_decorator_usage(event_emitter, listener_mock):
 
 
 # ========== Complete Integration Test ==========
+
 
 def test_complete_event_workflow(event_emitter, listener_mock):
     """Test a complete event workflow with multiple features"""
@@ -814,10 +837,5 @@ def test_complete_event_workflow(event_emitter, listener_mock):
     user_event.trigger("user456")
 
     # Check execution order and results
-    expected_order = [
-        "app_startup", "user_login", "welcome", "session", "user_login"
-    ]
+    expected_order = ["app_startup", "user_login", "welcome", "session", "user_login"]
     assert set(execution_order) == set(expected_order)
-
-    
-

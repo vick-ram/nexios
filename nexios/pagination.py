@@ -297,12 +297,12 @@ class CursorPagination(BasePaginationStrategy):
     def calculate_offset_limit(  # type:ignore
         self, cursor: Optional[str], page_size: int
     ) -> Tuple[int, int]:  # type:ignore
-        decoded_cursor = urllib.parse.unquote(cursor) if cursor else None 
+        decoded_cursor = urllib.parse.unquote(cursor) if cursor else None
         if decoded_cursor:
             try:
                 cursor_data = self.decode_cursor(decoded_cursor)
             except InvalidCursorError:
-                raise InvalidCursorError("Invalid cursor format")   
+                raise InvalidCursorError("Invalid cursor format")
             return cursor_data[self.sort_field], page_size
         return 0, page_size
 

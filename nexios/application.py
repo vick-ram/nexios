@@ -5,12 +5,11 @@ from typing import (
     Callable,
     Dict,
     List,
+    Literal,
     Optional,
     Type,
     Union,
 )
-from typing import Literal
-from nexios.dependencies import Depend
 
 from pydantic import BaseModel
 from typing_extensions import Annotated, Doc
@@ -20,8 +19,9 @@ from nexios._internals._middleware import (
 )
 from nexios._internals._middleware import DefineMiddleware as Middleware
 from nexios.config import DEFAULT_CONFIG, MakeConfig
+from nexios.dependencies import Depend
 from nexios.events import AsyncEventEmitter
-from nexios.exception_handler import ExceptionHandlerType,ExceptionMiddleware
+from nexios.exception_handler import ExceptionHandlerType, ExceptionMiddleware
 from nexios.logging import create_logger
 from nexios.middleware.errors.server_error_handler import (
     ServerErrHandlerType,
@@ -127,16 +127,18 @@ class NexiosApp(object):
         self.startup_handlers: List[Callable[[], Awaitable[None]]] = []
         self.shutdown_handlers: List[Callable[[], Awaitable[None]]] = []
         self.server_error_handler = server_error_handler
-        self._background_tasks  = set() #type:ignore
+        self._background_tasks = set()  # type:ignore
 
         self.app = Router(routes=routes, dependencies=self.dependencies)  # type:ignore
         self.exceptions_handler = ExceptionMiddleware()
         self.router = self.app
         self.route = self.router.route
         self.lifespan_context: Optional[lifespan_manager] = lifespan
-        self.state :Dict[str, Any] = {}
+        self.state: Dict[str, Any] = {}
 
-        openapi_config: Dict[str, Any] = self.config.to_dict().get("openapi", {})  # type:ignore
+        openapi_config: Dict[str, Any] = self.config.to_dict().get(
+            "openapi", {}
+        )  # type:ignore
         self.openapi_config = OpenAPIConfig(
             title=openapi_config.get("title", title or "Nexios API"),
             version=openapi_config.get("version", version or "1.0.0"),
@@ -312,8 +314,6 @@ class NexiosApp(object):
             else:
                 await send({"type": "lifespan.shutdown.failed", "message": str(e)})
 
-    
-
     def add_middleware(
         self,
         middleware: Annotated[
@@ -381,14 +381,18 @@ class NexiosApp(object):
             app.add_ws_route(route)
             ```
         """
-     
+
         if route:
-            if (not path or path == route.raw_path) and (not handler or handler == route.handler):
+            if (not path or path == route.raw_path) and (
+                not handler or handler == route.handler
+            ):
                 self.ws_router.add_ws_route(route)
                 return
 
         if path is None or handler is None:
-            raise ValueError("path and handler are required when 'route' is not provided.")
+            raise ValueError(
+                "path and handler are required when 'route' is not provided."
+            )
 
         self.ws_router.add_ws_route(
             WebsocketRoutes(path, handler, middleware=middleware)
@@ -507,7 +511,9 @@ class NexiosApp(object):
             ]
             + self.http_middleware
             + [
-                Middleware(ASGIRequestResponseBridge, dispatch=self.exceptions_handler)  # type:ignore
+                Middleware(
+                    ASGIRequestResponseBridge, dispatch=self.exceptions_handler
+                )  # type:ignore
             ]
         )
         for cls, args, kwargs in reversed(middleware):
@@ -817,8 +823,14 @@ class NexiosApp(object):
             ),
         ] = None,
         request_content_type: Annotated[
-            Literal["application/json", "multipart/form-data", "application/x-www-form-urlencoded"],
-            Doc("Content type for the request body in OpenAPI docs. Defaults to 'application/json'."),
+            Literal[
+                "application/json",
+                "multipart/form-data",
+                "application/x-www-form-urlencoded",
+            ],
+            Doc(
+                "Content type for the request body in OpenAPI docs. Defaults to 'application/json'."
+            ),
         ] = "application/json",
         middleware: Annotated[
             List[Any],
@@ -1281,7 +1293,11 @@ class NexiosApp(object):
             ),
         ] = False,
         request_content_type: Annotated[
-            Literal["application/json", "application/x-www-form-urlencoded", "multipart/form-data"],
+            Literal[
+                "application/json",
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ],
             Doc(
                 """
                 Request content type.
@@ -1492,8 +1508,12 @@ class NexiosApp(object):
             """
             ),
         ] = False,
-         request_content_type: Annotated[
-            Literal["application/json", "application/x-www-form-urlencoded", "multipart/form-data"],
+        request_content_type: Annotated[
+            Literal[
+                "application/json",
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ],
             Doc(
                 """
                 Request content type.
@@ -2042,7 +2062,11 @@ class NexiosApp(object):
             ),
         ] = None,
         request_content_type: Annotated[
-            Literal["application/json", "application/x-www-form-urlencoded", "multipart/form-data"],
+            Literal[
+                "application/json",
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ],
             Doc(
                 """
                 Request content type.
@@ -2186,7 +2210,7 @@ class NexiosApp(object):
                 exc_class_or_status_code, handler
             )
 
-    def url_for(self, _name: str, **path_params:Any) -> URLPath:
+    def url_for(self, _name: str, **path_params: Any) -> URLPath:
         return self.router.url_for(_name, **path_params)
 
     def wrap_asgi(

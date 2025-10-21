@@ -111,7 +111,6 @@ async def test_context_dep_injection(async_client: Client):
 # --- App-level and Router-level Dependency Tests ---
 
 
-
 @pytest.fixture
 def app_with_app_dep():
     calls = []

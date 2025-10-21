@@ -4,13 +4,15 @@ import traceback
 import typing
 
 from nexios import logging
+from nexios._internals._response_transformer import (
+    _process_response,  # type: ignore[import] #
+)
 from nexios.auth.exceptions import AuthenticationFailed, AuthErrorHandler
 from nexios.config import get_config
 from nexios.exceptions import HTTPException, NotFoundException
 from nexios.handlers.not_found import handle_404_error
 from nexios.http import Request, Response
 from nexios.types import ExceptionHandlerType
-from nexios._internals._response_transformer import _process_response # type: ignore[import] #
 
 logger = logging.getLogger("nexios")
 
@@ -48,7 +50,7 @@ async def wrap_http_exceptions(
             )  # type: ignore
             if handler:
                 return _process_response(response, await handler(request, response, exc))  # type: ignore
-            
+
         if handler is None:  # type: ignore
             handler = _lookup_exception_handler(exception_handlers, exc)
             if not handler:
@@ -88,7 +90,7 @@ class ExceptionMiddleware:
         request: Request,
         response: Response,
         call_next: typing.Callable[[], typing.Awaitable[Response]],
-    ):  
+    ):
         if len(self._exception_handlers) == 0 and len(self._status_handlers) == 0:
             return await call_next()
         return await wrap_http_exceptions(
@@ -102,7 +104,7 @@ class ExceptionMiddleware:
     async def http_exception(
         self, request: Request, response: Response, exc: HTTPException
     ) -> typing.Any:
-        
+
         assert isinstance(exc, HTTPException)
         if exc.status_code in {204, 304}:  # type:ignore
             return response.empty(status_code=exc.status_code, headers=exc.headers)

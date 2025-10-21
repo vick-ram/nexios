@@ -2,19 +2,21 @@ try:
     import jwt
 except ImportError:
     jwt = None
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from .base import AuthenticationBackend
+from nexios.auth.model import AuthResult
 from nexios.config import get_config
 from nexios.http import Request, Response
-from nexios.auth.model import AuthResult
-from datetime import datetime,timedelta,timezone
+
+from .base import AuthenticationBackend
+
 
 def create_jwt(
-    payload: Dict[str, Any], 
-    secret: Optional[str] = None, 
+    payload: Dict[str, Any],
+    secret: Optional[str] = None,
     algorithm: str = "HS256",
-    expires_in:Optional[timedelta] = None,
+    expires_in: Optional[timedelta] = None,
 ) -> str:
     """
     Create a JWT token.
@@ -27,7 +29,7 @@ def create_jwt(
     """
     if jwt is None:
         raise ImportError("JWT support is not installed.")
-    
+
     secret = secret or get_config().secret_key
     if expires_in and not payload.get("exp"):
         payload["exp"] = datetime.now(timezone.utc) + expires_in
@@ -58,10 +60,12 @@ def decode_jwt(
 
 
 class JWTAuthBackend(AuthenticationBackend):
-    def __init__(self,identifier: str = "id"):  # type:ignore
+    def __init__(self, identifier: str = "id"):  # type:ignore
         self.identifier = identifier
 
-    async def authenticate(self, request: Request, response: Response) -> Any:  # type:ignore
+    async def authenticate(
+        self, request: Request, response: Response
+    ) -> Any:  # type:ignore
         app_config = get_config()
         self.secret = app_config.secret_key
         self.algorithms = app_config.jwt_algorithms or ["HS256"]
@@ -77,4 +81,6 @@ class JWTAuthBackend(AuthenticationBackend):
         except ValueError as _:
             return AuthResult(success=False, identity="", scope="")
 
-        return AuthResult(success=True, identity=payload.get(self.identifier, ""), scope="jwt")
+        return AuthResult(
+            success=True, identity=payload.get(self.identifier, ""), scope="jwt"
+        )

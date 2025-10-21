@@ -1,15 +1,15 @@
 import pytest
 
 from nexios.pagination import (
-    PageNumberPagination,
-    LimitOffsetPagination,
-    CursorPagination,
-    SyncPaginator,
-    AsyncPaginator,
-    SyncListDataHandler,
     AsyncListDataHandler,
-    PaginatedResponse,
     AsyncPaginatedResponse,
+    AsyncPaginator,
+    CursorPagination,
+    LimitOffsetPagination,
+    PageNumberPagination,
+    PaginatedResponse,
+    SyncListDataHandler,
+    SyncPaginator,
 )
 
 
@@ -119,7 +119,9 @@ class TestEdgeCases:
         base_url = "http://example.com/api/items"
 
         # Get first page
-        first_paginator = SyncPaginator(handler, pagination, base_url, {"page_size": "10"})
+        first_paginator = SyncPaginator(
+            handler, pagination, base_url, {"page_size": "10"}
+        )
         first_result = first_paginator.paginate()
 
         # Get cursor for last item of first page
@@ -142,8 +144,6 @@ class TestEdgeCases:
         with pytest.raises(Exception):  # Should raise InvalidPageSizeError
             pagination.parse_parameters({"page": "1", "page_size": "0"})
 
-    
-
     def test_negative_numbers_edge_cases(self):
         """Test pagination with negative numbers (should raise errors)"""
         pagination = PageNumberPagination()
@@ -164,7 +164,7 @@ class TestEdgeCases:
             {"id": 3, "active": True},
             {"id": 4, "data": [1, 2, 3]},
             {"id": 5, "nested": {"key": "value"}},
-            {"id": 6, "null_value": None}
+            {"id": 6, "null_value": None},
         ]
         handler = SyncListDataHandler(data)
         pagination = PageNumberPagination(max_page_size=3)
@@ -187,7 +187,7 @@ class TestEdgeCases:
             {"id": 2, "description": "café"},  # Accented characters
             {"id": 3, "tags": ["python", "测试"]},  # Mixed
             {"id": 4, "emoji": "🚀"},
-            {"id": 5, "special": "!@#$%^&*()"}
+            {"id": 5, "special": "!@#$%^&*()"},
         ]
         handler = SyncListDataHandler(data)
         pagination = PageNumberPagination(default_page_size=2)
@@ -226,12 +226,7 @@ class TestEdgeCases:
         # Test with None values
         data = {
             "items": None,
-            "pagination": {
-                "total_items": 0,
-                "page": 1,
-                "page_size": 10,
-                "links": {}
-            }
+            "pagination": {"total_items": 0, "page": 1, "page_size": 10, "links": {}},
         }
 
         # Should handle None items gracefully

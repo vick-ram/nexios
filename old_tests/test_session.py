@@ -16,18 +16,18 @@ from nexios.testing import Client
 async def file_session_client(tmp_path) -> Tuple[Client, NexiosApp]:
     """Client with file-based session configuration"""
     config = MakeConfig(
-            {
-                "secret_key": "file_session_secret",
-                "session": {
-                    "session_cookie_name": "file_session",
-                    "session_permanent": True,
-                    "session_expiration_time": 30,
-                    "manager": FileSessionManager,
-                },
-                "session_file_name": str(tmp_path / "sessions"),
-                "SESSION_FILE_STORAGE_PATH": str(tmp_path / "sessions"),
-            }
-        )
+        {
+            "secret_key": "file_session_secret",
+            "session": {
+                "session_cookie_name": "file_session",
+                "session_permanent": True,
+                "session_expiration_time": 30,
+                "manager": FileSessionManager,
+            },
+            "session_file_name": str(tmp_path / "sessions"),
+            "SESSION_FILE_STORAGE_PATH": str(tmp_path / "sessions"),
+        }
+    )
     set_config(config)
     app = NexiosApp(config)
     app.add_middleware(SessionMiddleware())
@@ -39,16 +39,16 @@ async def file_session_client(tmp_path) -> Tuple[Client, NexiosApp]:
 async def signed_session_client() -> Tuple[Client, NexiosApp]:
     """Client with signed cookie session configuration"""
     config = MakeConfig(
-            {
-                "secret_key": "signed_session_secret",
-                "session": {
-                    "session_cookie_name": "signed_session",
-                    "session_permanent": True,
-                    "session_expiration_time": 30,
-                    "manager": SignedSessionManager,
-                },
-            }
-        )
+        {
+            "secret_key": "signed_session_secret",
+            "session": {
+                "session_cookie_name": "signed_session",
+                "session_permanent": True,
+                "session_expiration_time": 30,
+                "manager": SignedSessionManager,
+            },
+        }
+    )
     set_config(config)
     app = NexiosApp(config)
     async with Client(app) as client:

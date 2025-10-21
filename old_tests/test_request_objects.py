@@ -154,9 +154,6 @@ async def test_form_data(test_client):
     assert data["field2"] == "value2"
 
 
-
-
-
 async def test_valid_method(test_client):
     client, app = test_client
 

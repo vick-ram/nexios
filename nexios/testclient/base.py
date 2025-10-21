@@ -78,7 +78,9 @@ class TestClient(httpx.Client):
         follow_redirects: bool = True,
         check_asgi_conformance: bool = True,
     ) -> None:
-        self.async_backend = AsyncBackend(backend=backend, backend_options=backend_options or {})
+        self.async_backend = AsyncBackend(
+            backend=backend, backend_options=backend_options or {}
+        )
         if is_asgi3(app):
             asgi_app = app
         else:
@@ -116,7 +118,9 @@ class TestClient(httpx.Client):
         if self.portal is not None:
             yield self.portal
         else:
-            with anyio.from_thread.start_blocking_portal(**self.async_backend) as portal:
+            with anyio.from_thread.start_blocking_portal(
+                **self.async_backend
+            ) as portal:
                 yield portal
 
     def request(
@@ -131,9 +135,13 @@ class TestClient(httpx.Client):
         params: QueryParamTypes | None = None,
         headers: HeaderTypes | None = None,
         cookies: CookieTypes | None = None,
-        auth: AuthTypes | httpx._client.UseClientDefault = httpx._client.USE_CLIENT_DEFAULT,
+        auth: (
+            AuthTypes | httpx._client.UseClientDefault
+        ) = httpx._client.USE_CLIENT_DEFAULT,
         follow_redirects: bool | None = None,
-        timeout: TimeoutTypes | httpx._client.UseClientDefault = httpx._client.USE_CLIENT_DEFAULT,
+        timeout: (
+            TimeoutTypes | httpx._client.UseClientDefault
+        ) = httpx._client.USE_CLIENT_DEFAULT,
         extensions: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> httpx.Response:
@@ -159,7 +167,9 @@ class TestClient(httpx.Client):
             httpx.Response: The HTTP response.
         """
         url = self._merge_url(url)
-        redirect: bool | httpx._client.UseClientDefault = httpx._client.USE_CLIENT_DEFAULT
+        redirect: bool | httpx._client.UseClientDefault = (
+            httpx._client.USE_CLIENT_DEFAULT
+        )
         if follow_redirects is not None:
             redirect = follow_redirects
 
@@ -198,7 +208,9 @@ class TestClient(httpx.Client):
             extensions=extensions,
         )
 
-    def _process_request(self, method: str, url: URLTypes, **kwargs: Any) -> httpx.Request:
+    def _process_request(
+        self, method: str, url: URLTypes, **kwargs: Any
+    ) -> httpx.Request:
         """
         Processes the request.
 

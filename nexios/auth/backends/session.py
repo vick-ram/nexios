@@ -1,21 +1,23 @@
 from typing import Any
 
 from nexios.auth.base import AuthenticationBackend
-from nexios.http import Request, Response
 from nexios.auth.model import AuthResult
 from nexios.auth.users.base import BaseUser
+from nexios.http import Request, Response
 
 _session_key = "user"
 _identifier = "id"
+
+
 def login(request: Request, user: type[BaseUser]):
     assert "session" in request.scope, "No Session Middleware Installed"
-    if request.session.get(_session_key): 
+    if request.session.get(_session_key):
         del request.session[_session_key]
     request.session[_session_key] = {
         _identifier: user.identity,
         "display_name": user.display_name,
     }
-    
+
 
 def logout(request: Request):
     assert "session" in request.scope, "No Session Middleware Installed"
@@ -30,11 +32,7 @@ class SessionAuthBackend(AuthenticationBackend):
     This backend checks for authenticated user data in the existing session.
     """
 
-    def __init__(
-        self,
-        session_key: str = "user",
-        identifier: str = "id"
-    ):
+    def __init__(self, session_key: str = "user", identifier: str = "id"):
         """
         Initialize the session auth backend.
 
@@ -65,5 +63,6 @@ class SessionAuthBackend(AuthenticationBackend):
         if not user:
             return AuthResult(success=False, identity="", scope="")
 
-      
-        return AuthResult(success=True, identity=user.get(_identifier, ""), scope="session")
+        return AuthResult(
+            success=True, identity=user.get(_identifier, ""), scope="session"
+        )

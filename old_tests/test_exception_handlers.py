@@ -183,7 +183,9 @@ async def test_combined_exception_handling(async_client: Tuple[Client, NexiosApp
     assert response.json() == {"custom": True}
 
 
-async def test_exception_handler_returning_jsonable_object(async_client: Tuple[Client, NexiosApp]):
+async def test_exception_handler_returning_jsonable_object(
+    async_client: Tuple[Client, NexiosApp],
+):
     client, app = async_client
 
     class CustomError(Exception):

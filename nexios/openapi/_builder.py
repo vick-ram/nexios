@@ -30,14 +30,14 @@ if TYPE_CHECKING:
 class APIDocumentation:
     _instance = None
 
-    def __new__(cls, *args:list[Any], **kwargs:dict[str, Any]):
+    def __new__(cls, *args: list[Any], **kwargs: dict[str, Any]):
         if not cls._instance:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__( # type: ignore
+    def __init__(  # type: ignore
         self,
-        app: Optional["NexiosApp"] = None, 
+        app: Optional["NexiosApp"] = None,
         config: Optional[OpenAPIConfig] = None,
         swagger_url: str = "/docs",
         redoc_url: str = "/redoc",
@@ -164,7 +164,7 @@ class APIDocumentation:
         :param external_docs: External documentation reference
         """
 
-        def decorator(func : Callable[..., Any]):
+        def decorator(func: Callable[..., Any]):
             # Prepare request body specification
             request_body_spec = None
 
@@ -272,8 +272,8 @@ class APIDocumentation:
                 responses_spec["200"] = OpenAPIResponse(
                     description="Successful Response",
                     content={
-                        "application/json": MediaType(  
-                            schema=Schema( # type:ignore
+                        "application/json": MediaType(
+                            schema=Schema(  # type:ignore
                                 example={"example": "This is an example response"},
                                 type="object",
                             )  # type:ignore
@@ -317,7 +317,7 @@ class APIDocumentation:
             setattr(self.config.openapi_spec.paths[path], method.lower(), operation)
 
             @wraps(func)
-            async def wrapper(*args : list[Any], **kwargs : dict[str, Any]) -> Any:
+            async def wrapper(*args: list[Any], **kwargs: dict[str, Any]) -> Any:
                 return await func(*args, **kwargs)
 
             return wrapper
@@ -340,7 +340,8 @@ class APIDocumentation:
             **schema.model_json_schema()
         )
 
+
 def get_instance() -> APIDocumentation:
-    if APIDocumentation._instance is None: # type: ignore
-        APIDocumentation._instance = APIDocumentation() # type: ignore
-    return APIDocumentation._instance # type: ignore
+    if APIDocumentation._instance is None:  # type: ignore
+        APIDocumentation._instance = APIDocumentation()  # type: ignore
+    return APIDocumentation._instance  # type: ignore

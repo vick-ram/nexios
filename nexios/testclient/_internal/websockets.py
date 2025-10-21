@@ -210,7 +210,9 @@ class WebSocketTestSession:
         """
         self.send({"type": "websocket.receive", "bytes": data})
 
-    def send_json(self, data: typing.Any, mode: typing.Literal["text", "binary"] = "text") -> None:
+    def send_json(
+        self, data: typing.Any, mode: typing.Literal["text", "binary"] = "text"
+    ) -> None:
         """
         Send JSON data to the WebSocketTestSession.
 
@@ -268,7 +270,9 @@ class WebSocketTestSession:
         self._raise_on_close(message)
         return typing.cast(bytes, message["bytes"])
 
-    def receive_json(self, mode: typing.Literal["text", "binary"] = "text") -> typing.Any:
+    def receive_json(
+        self, mode: typing.Literal["text", "binary"] = "text"
+    ) -> typing.Any:
         """
         Receive JSON data from the WebSocketTestSession.
 

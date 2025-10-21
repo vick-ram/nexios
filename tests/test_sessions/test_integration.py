@@ -1,17 +1,20 @@
 """
 Integration tests for Nexios session functionality
 """
-import pytest
-import tempfile
+
 import os
+import tempfile
 import time
+
+import pytest
+
 from nexios import NexiosApp
+from nexios.config import MakeConfig, set_config
+from nexios.http import Request, Response
+from nexios.session.file import FileSessionManager
 from nexios.session.middleware import SessionMiddleware
 from nexios.session.signed_cookies import SignedSessionManager
-from nexios.session.file import FileSessionManager
-from nexios.http import Request, Response
 from nexios.testclient import TestClient
-from nexios.config import MakeConfig, set_config
 
 
 class TestSessionIntegration:
@@ -19,15 +22,17 @@ class TestSessionIntegration:
 
     def setup_method(self):
         """Set up test configuration"""
-        config = MakeConfig({
-            "secret_key": "test-secret-key-integration",
-            "session": {
-                "session_cookie_name": "integration_session",
-                "session_expiration_time": 3600,
-                "session_permanent": False,
-                "session_refresh_each_request": False
+        config = MakeConfig(
+            {
+                "secret_key": "test-secret-key-integration",
+                "session": {
+                    "session_cookie_name": "integration_session",
+                    "session_expiration_time": 3600,
+                    "session_permanent": False,
+                    "session_refresh_each_request": False,
+                },
             }
-        })
+        )
         set_config(config)
 
     def test_signed_cookie_integration_flow(self):
@@ -50,11 +55,9 @@ class TestSessionIntegration:
                 return response.json({"error": "Not logged in"}, status_code=401)
 
             login_time = request.session.get("login_time", 0)
-            return response.json({
-                "user_id": user_id,
-                "login_time": login_time,
-                "session_active": True
-            })
+            return response.json(
+                {"user_id": user_id, "login_time": login_time, "session_active": True}
+            )
 
         @app.post("/logout")
         async def logout(request: Request, response: Response):
@@ -77,8 +80,9 @@ class TestSessionIntegration:
         assert session_cookie is not None
 
         # Test profile access with session
-        profile_response = client.get("/profile",
-                                    cookies={"integration_session": session_cookie})
+        profile_response = client.get(
+            "/profile", cookies={"integration_session": session_cookie}
+        )
         assert profile_response.status_code == 200
         profile_data = profile_response.json()
         assert profile_data["user_id"] == 123
@@ -86,15 +90,13 @@ class TestSessionIntegration:
         assert "login_time" in profile_data
 
         # Test logout
-        logout_response = client.post("/logout",
-                                    cookies={"integration_session": session_cookie})
+        logout_response = client.post(
+            "/logout", cookies={"integration_session": session_cookie}
+        )
         assert logout_response.status_code == 200
         logout_data = logout_response.json()
         assert logout_data["logged_out"] is True
 
-        
-
-    
     def test_session_persistence_across_requests(self):
         """Test session persistence across multiple requests"""
         app = NexiosApp()
@@ -127,7 +129,6 @@ class TestSessionIntegration:
         assert response2.status_code == 200
         assert response2.json()["count"] == 2
 
-        
         # Reset session
         reset_response = client.get("/reset", cookies={"integration_session": cookie})
         assert reset_response.status_code == 200
@@ -164,8 +165,9 @@ class TestSessionIntegration:
         client = TestClient(app)
 
         # Set user data
-        set_response = client.post("/set-user",
-                                 json={"id": 789, "name": "Test User", "role": "admin"})
+        set_response = client.post(
+            "/set-user", json={"id": 789, "name": "Test User", "role": "admin"}
+        )
         assert set_response.status_code == 200
 
         cookie = set_response.cookies.get("integration_session")
@@ -178,8 +180,8 @@ class TestSessionIntegration:
         assert get_data["user"]["name"] == "Test User"
 
         # Check user existence from third route
-        check_response = client.get("/check-user", cookies={"integration_session": cookie})
+        check_response = client.get(
+            "/check-user", cookies={"integration_session": cookie}
+        )
         assert check_response.status_code == 200
         assert check_response.json()["has_user"] is True
-
-    

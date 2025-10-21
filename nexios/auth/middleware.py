@@ -5,11 +5,10 @@ import typing
 from typing_extensions import Annotated, Doc
 
 from nexios import logging
+from nexios.auth.backends.base import AuthenticationBackend
+from nexios.auth.users.simple import BaseUser, UnauthenticatedUser
 from nexios.http import Request, Response
 from nexios.middleware.base import BaseMiddleware
-
-from nexios.auth.backends.base import AuthenticationBackend
-from nexios.auth.users.simple import UnauthenticatedUser,BaseUser
 
 logger = logging.create_logger(__name__)
 
@@ -81,13 +80,14 @@ class AuthenticationMiddleware(BaseMiddleware):
         # Try each backend until one successfully authenticates the user
         for backend in self.backends:
             try:
-              
+
                 auth_result = await backend.authenticate(request, response)
-                
 
                 if auth_result.success:
                     # Authentication successful, store user and auth type
-                    request.scope["user"] = await self.user_model.load_user(auth_result.identity)
+                    request.scope["user"] = await self.user_model.load_user(
+                        auth_result.identity
+                    )
                     request.scope["auth"] = auth_result.scope
                     break
 

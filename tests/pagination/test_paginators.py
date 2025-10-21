@@ -1,16 +1,17 @@
+from typing import Any, Dict
+
 import pytest
-from typing import Dict, Any
 
 from nexios.pagination import (
-    SyncPaginator,
-    AsyncPaginator,
-    PageNumberPagination,
-    LimitOffsetPagination,
-    CursorPagination,
-    SyncListDataHandler,
     AsyncListDataHandler,
+    AsyncPaginator,
+    CursorPagination,
     InvalidPageError,
     InvalidPageSizeError,
+    LimitOffsetPagination,
+    PageNumberPagination,
+    SyncListDataHandler,
+    SyncPaginator,
 )
 
 
@@ -86,11 +87,17 @@ class TestSyncPaginator:
         base_url = "http://example.com/api/items"
 
         # First, get the first page to extract cursor
-        first_paginator = SyncPaginator(handler, pagination, base_url, {"page_size": "10"})
+        first_paginator = SyncPaginator(
+            handler, pagination, base_url, {"page_size": "10"}
+        )
         first_result = first_paginator.paginate()
 
         # Extract cursor from first page
-        next_cursor = first_result["pagination"]["links"]["next"].split("cursor=")[1].split("&")[0]
+        next_cursor = (
+            first_result["pagination"]["links"]["next"]
+            .split("cursor=")[1]
+            .split("&")[0]
+        )
         print("next_cursor:", next_cursor)
         # Use cursor for second page
         request_params = {"cursor": next_cursor, "page_size": "10"}
@@ -146,7 +153,6 @@ class TestSyncPaginator:
 
         paginator = SyncPaginator(handler, pagination, base_url, request_params)
 
-
         # Should return empty items but valid metadata
         with pytest.raises(InvalidPageError):
             paginator.paginate()
@@ -159,10 +165,14 @@ class TestSyncPaginator:
         base_url = "http://example.com/api/items"
         request_params = {"limit": "10", "offset": "10"}
 
-        paginator = SyncPaginator(handler, pagination, base_url, request_params, validate_total_items=True)
+        paginator = SyncPaginator(
+            handler, pagination, base_url, request_params, validate_total_items=True
+        )
 
         # Should raise error when validation is enabled and offset exceeds total
-        with pytest.raises(InvalidPageError, match="Requested offset exceeds total items"):
+        with pytest.raises(
+            InvalidPageError, match="Requested offset exceeds total items"
+        ):
             paginator.paginate()
 
     def test_paginate_with_filters_preserved(self):
@@ -171,7 +181,12 @@ class TestSyncPaginator:
         handler = SyncListDataHandler(data)
         pagination = PageNumberPagination()
         base_url = "http://example.com/api/items"
-        request_params = {"page": "2", "page_size": "10", "filter": "active", "category": "tech"}
+        request_params = {
+            "page": "2",
+            "page_size": "10",
+            "filter": "active",
+            "category": "tech",
+        }
 
         paginator = SyncPaginator(handler, pagination, base_url, request_params)
 
@@ -334,10 +349,14 @@ class TestAsyncPaginator:
         import asyncio
 
         async def run_test():
-            paginator = AsyncPaginator(handler, pagination, base_url, request_params, validate_total_items=True)
+            paginator = AsyncPaginator(
+                handler, pagination, base_url, request_params, validate_total_items=True
+            )
 
             # Should raise error when validation is enabled and offset exceeds total
-            with pytest.raises(InvalidPageError, match="Requested offset exceeds total items"):
+            with pytest.raises(
+                InvalidPageError, match="Requested offset exceeds total items"
+            ):
                 await paginator.paginate()
 
         asyncio.run(run_test())
@@ -353,15 +372,23 @@ class TestAsyncPaginator:
 
         async def run_test():
             # First, get the first page to extract cursor
-            first_paginator = AsyncPaginator(handler, pagination, base_url, {"page_size": "10"})
+            first_paginator = AsyncPaginator(
+                handler, pagination, base_url, {"page_size": "10"}
+            )
             first_result = await first_paginator.paginate()
 
             # Extract cursor from first page
-            next_cursor = first_result["pagination"]["links"]["next"].split("cursor=")[1].split("&")[0]
-            print("Next cursor:", next_cursor,first_result)
+            next_cursor = (
+                first_result["pagination"]["links"]["next"]
+                .split("cursor=")[1]
+                .split("&")[0]
+            )
+            print("Next cursor:", next_cursor, first_result)
             # Use cursor for second page
             request_params = {"cursor": next_cursor, "page_size": "10"}
-            second_paginator = AsyncPaginator(handler, pagination, base_url, request_params)
+            second_paginator = AsyncPaginator(
+                handler, pagination, base_url, request_params
+            )
             second_result = await second_paginator.paginate()
 
             assert len(second_result["items"]) == 10

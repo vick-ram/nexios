@@ -13,8 +13,6 @@ class BaseRouter(ABC):
     Subclasses should implement the `__call__` method to handle specific routing logic.
     """
 
- 
-
     @abstractmethod
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         raise NotImplementedError("Subclasses must implement this method")
@@ -25,11 +23,7 @@ class BaseRouter(ABC):
     def build_middleware_stack(self, app: ASGIApp) -> ASGIApp:
         raise NotImplementedError("Subclasses must implement this method")
 
-       
-
-    def mount_router(self, app: Any):
-        ...
-   
+    def mount_router(self, app: Any): ...
 
 
 class BaseRoute(ABC):
@@ -37,22 +31,26 @@ class BaseRoute(ABC):
     Base class for routes. This class should not be instantiated directly.
     Subclasses should implement the `matches` method to handle specific routing logic.
     """
+
     def __init__(
-        self, path: str, methods: List[str] = [], name: Optional[str] = None ,**kwargs: Dict[str, Any]
+        self,
+        path: str,
+        methods: List[str] = [],
+        name: Optional[str] = None,
+        **kwargs: Dict[str, Any],
     ) -> None:
         self.path = path
         self.methods = methods
         self.name = name
-  
 
     @abstractmethod
     def match(self, *args: Any, **kwargs: Any) -> Any:
         """
         Match a path against this route's pattern.
-        
+
         Subclasses can implement this method with any signature that makes sense for the route type.
         The base implementation doesn't enforce any specific signature to allow for flexibility.
-        
+
         Returns:
             Any: The return type is not enforced, but should be consistent with the route's needs.
         """
@@ -68,4 +66,3 @@ class BaseRoute(ABC):
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         raise NotImplementedError("Subclasses must implement this method")
-

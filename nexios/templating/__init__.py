@@ -11,6 +11,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from nexios.config import MakeConfig, get_config
 from nexios.http.response import HTMLResponse
 from nexios.types import Request
+
 from .middleware import template_context
 
 engine: Union["TemplateEngine", None] = None
@@ -68,7 +69,6 @@ class TemplateEngine:
             trim_blocks=self.config.trim_blocks,
             lstrip_blocks=self.config.lstrip_blocks,
         )
-
 
         config_ = self.config.to_dict()
         if config_.get("custom_filters"):

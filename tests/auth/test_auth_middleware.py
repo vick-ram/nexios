@@ -8,13 +8,15 @@ This module tests the authentication middleware including:
 - Backend fallback scenarios
 """
 
-import pytest
 from functools import partial
-from nexios.auth import AuthenticationMiddleware, auth, BaseUser
+
+import pytest
+
+from nexios.application import NexiosApp
+from nexios.auth import AuthenticationMiddleware, BaseUser, auth
 from nexios.auth.backends.base import AuthenticationBackend
 from nexios.auth.model import AuthResult
 from nexios.auth.users.simple import SimpleUser, UnauthenticatedUser
-from nexios.application import NexiosApp
 from nexios.http import Request, Response
 from nexios.testclient import AsyncTestClient
 
@@ -31,7 +33,13 @@ def test_client():
 # Mock Users
 # -------------------------
 class TestUser(BaseUser):
-    def __init__(self, user_id: str, username: str, roles: list = None, is_authenticated: bool = True):
+    def __init__(
+        self,
+        user_id: str,
+        username: str,
+        roles: list = None,
+        is_authenticated: bool = True,
+    ):
         self.user_id = user_id
         self.username = username
         self.roles = roles or []
@@ -90,6 +98,7 @@ class CustomUser(BaseUser):
 # Tests
 # -------------------------
 
+
 async def test_auth_middleware_multiple_backends_success(test_client):
     app = NexiosApp()
     client = test_client(app)
@@ -106,12 +115,16 @@ async def test_auth_middleware_multiple_backends_success(test_client):
                 return AuthResult(success=True, identity="second_user", scope="second")
             return AuthResult(success=False, identity="", scope="")
 
-    app.add_middleware(AuthenticationMiddleware(SimpleUser, [FirstBackend(), SecondBackend()]))
+    app.add_middleware(
+        AuthenticationMiddleware(SimpleUser, [FirstBackend(), SecondBackend()])
+    )
 
     @app.get("/protected")
     @auth("first")
     async def protected_route(req: Request, res: Response):
-        return res.json({"user_id": req.user.identity, "auth_method": req.scope.get("auth")})
+        return res.json(
+            {"user_id": req.user.identity, "auth_method": req.scope.get("auth")}
+        )
 
     async with client:
         res = await client.get("/protected", headers={"X-First-Auth": "first_valid"})
@@ -135,7 +148,9 @@ async def test_auth_middleware_multiple_backends_fallback(test_client):
                 return AuthResult(success=True, identity="second_user", scope="second")
             return AuthResult(success=False, identity="", scope="")
 
-    app.add_middleware(AuthenticationMiddleware(SimpleUser, [FirstBackend(), SecondBackend()]))
+    app.add_middleware(
+        AuthenticationMiddleware(SimpleUser, [FirstBackend(), SecondBackend()])
+    )
 
     @app.get("/protected")
     @auth("second")
@@ -186,7 +201,9 @@ async def test_auth_middleware_user_loading_failure(test_client):
     token = create_jwt(payload)
 
     async with client:
-        res = await client.get("/protected", headers={"Authorization": f"Bearer {token}"})
+        res = await client.get(
+            "/protected", headers={"Authorization": f"Bearer {token}"}
+        )
         assert res.status_code == 401
 
 
@@ -204,7 +221,11 @@ async def test_auth_middleware_backend_exception_handling(test_client):
                 return AuthResult(success=True, identity="backup_user", scope="backup")
             return AuthResult(success=False, identity="", scope="")
 
-    app.add_middleware(AuthenticationMiddleware(SimpleUser, [FaultyAuthBackend(), WorkingAuthBackend()]))
+    app.add_middleware(
+        AuthenticationMiddleware(
+            SimpleUser, [FaultyAuthBackend(), WorkingAuthBackend()]
+        )
+    )
 
     @app.get("/protected")
     @auth("backup")

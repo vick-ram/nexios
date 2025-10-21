@@ -17,7 +17,3 @@ def get_route_path(scope: Scope) -> str:
         return path[len(root_path) :]
 
     return path
-
-
-
-
