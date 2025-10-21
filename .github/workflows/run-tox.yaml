@@ -34,8 +34,6 @@ jobs:
       - name: Install dependencies
         run: uv pip install -e ".[dev]"
 
-      - name: Install Tox
-        run: uv pip install tox
-
+     
       - name: Run Tox
-        run: uv run tox
+        run: pytest tests -vvv
