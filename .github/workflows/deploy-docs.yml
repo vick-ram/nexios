@@ -6,7 +6,8 @@ on:
   # Runs on pushes targeting the `main` branch. Change this to `master` if you're
   # using the `master` branch as the default branch.
   push:
-    branches: [v3]
+    tags:
+      - 'v*'  # only triggers on tags like v1.0.0
     paths:
       - "docs/**"
 
