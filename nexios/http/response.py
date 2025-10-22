@@ -197,7 +197,6 @@ class BaseResponse:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Make the response callable as an ASGI application."""
         self._init_headers()
-        # print("response called"*15)
         await send(
             {
                 "type": "http.response.start",
@@ -241,6 +240,15 @@ class BaseResponse:
             self._headers = [(k, v) for k, v in self._headers if k != key_bytes]
 
         self._headers.append(new_header)
+        return self
+    
+    def set_headers(self, headers: Dict[str, str], overide_all: bool = False):
+        if overide_all:
+            self._headers = [(k.lower().encode("latin-1"), v.encode("latin-1")) for k, v in headers.items()]
+            return
+        """Set multiple headers at once."""
+        for key, value in headers.items():
+            self.set_header(key, value)
         return self
 
 
@@ -883,6 +891,7 @@ class NexiosResponse:
 
     def set_headers(self, headers: Dict[str, str], overide_all: bool = False):
         if overide_all:
+            self._response.set_headers(headers)
             self._response._headers = [  # type:ignore
                 (bytes(str(k), "utf-8"), bytes(str(v), "utf-8"))
                 for k, v in self.headers.items()

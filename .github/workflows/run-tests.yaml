@@ -35,5 +35,5 @@ jobs:
 
      
       - name: Run Tests
-        run: uv run pytest tests -v -s --cov=nexios --cov-report=xml 
+        run: uv run pytest tests
 

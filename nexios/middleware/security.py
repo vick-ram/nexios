@@ -16,14 +16,6 @@ class SecurityMiddleware(BaseMiddleware):
         csp_enabled: bool = True,
         csp_policy: Optional[Dict[str, Union[str, List[str]]]] = None,
         csp_report_only: bool = False,
-        # CORS
-        cors_enabled: bool = True,
-        allowed_origins: Optional[List[str]] = None,
-        allowed_methods: Optional[List[str]] = None,
-        allowed_headers: Optional[List[str]] = None,
-        expose_headers: Optional[List[str]] = None,
-        max_age: int = 600,
-        allow_credentials: bool = False,
         # HSTS
         hsts_enabled: bool = True,
         hsts_max_age: int = 31536000,
@@ -79,13 +71,6 @@ class SecurityMiddleware(BaseMiddleware):
             csp_enabled: Enable Content Security Policy
             csp_policy: CSP directives
             csp_report_only: Use CSP in report-only mode
-            cors_enabled: Enable CORS headers
-            allowed_origins: List of allowed origins for CORS
-            allowed_methods: List of allowed HTTP methods for CORS
-            allowed_headers: List of allowed headers for CORS
-            expose_headers: Headers to expose in CORS
-            max_age: Max age for CORS preflight requests
-            allow_credentials: Allow credentials in CORS
             hsts_enabled: Enable HTTP Strict Transport Security
             hsts_max_age: HSTS max age in seconds
             hsts_include_subdomains: Include subdomains in HSTS
@@ -133,20 +118,6 @@ class SecurityMiddleware(BaseMiddleware):
             "form-action": ["'self'"],
         }
         self.csp_report_only = csp_report_only
-
-        self.cors_enabled = cors_enabled
-        self.allowed_origins = allowed_origins or ["*"]
-        self.allowed_methods = allowed_methods or [
-            "GET",
-            "POST",
-            "PUT",
-            "DELETE",
-            "OPTIONS",
-        ]
-        self.allowed_headers = allowed_headers or ["*"]
-        self.expose_headers = expose_headers or []
-        self.max_age = max_age
-        self.allow_credentials = allow_credentials
 
         self.hsts_enabled = hsts_enabled
         self.hsts_max_age = hsts_max_age
@@ -235,19 +206,6 @@ class SecurityMiddleware(BaseMiddleware):
             )
             headers[header_name] = self._build_csp_header()
 
-        # CORS headers
-        if self.cors_enabled:
-            headers["Access-Control-Allow-Origin"] = ", ".join(self.allowed_origins)
-            headers["Access-Control-Allow-Methods"] = ", ".join(self.allowed_methods)
-            headers["Access-Control-Allow-Headers"] = ", ".join(self.allowed_headers)
-            if self.expose_headers:
-                headers["Access-Control-Expose-Headers"] = ", ".join(
-                    self.expose_headers
-                )
-            headers["Access-Control-Max-Age"] = str(self.max_age)
-            if self.allow_credentials:
-                headers["Access-Control-Allow-Credentials"] = "true"
-
         # HSTS
         if self.hsts_enabled:
             hsts_value = f"max-age={self.hsts_max_age}"
@@ -332,5 +290,5 @@ class SecurityMiddleware(BaseMiddleware):
             headers.pop("Server", None)
         elif self.server_header:
             headers["Server"] = self.server_header
-        response.set_headers(headers, overide_all=True)  # type:ignore
+        response.set_headers(headers)  # type:ignore
         return response
