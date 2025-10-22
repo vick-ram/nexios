@@ -81,4 +81,3 @@ async def test_template_context_middleware(app):
         assert response.status_code == 200
         assert "Welcome, Test User!" in response.text
         assert "Welcome to our test app!" in response.text
-
