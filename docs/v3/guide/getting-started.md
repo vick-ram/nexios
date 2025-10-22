@@ -10,7 +10,7 @@ head:
     - property: og:description
       content: Welcome to Nexios! This comprehensive guide will walk you through everything you need to know to get started with Nexios, a modern, async-first Python web framework designed for high-performance applications.
 ---
-## What is Nexios?
+## 🚀 What is Nexios?
 
 Nexios is a cutting-edge Python web framework that combines the best of modern web development practices with exceptional performance. Built on ASGI (Asynchronous Server Gateway Interface), Nexios provides a clean, intuitive API that makes building scalable web applications straightforward and enjoyable.
 
@@ -37,7 +37,7 @@ Nexios stands out from other Python web frameworks for several reasons:
 
 **Production Features**: Built-in support for authentication, CORS, rate limiting, and other production-ready features means you can focus on your business logic rather than infrastructure concerns.
 
-## Prerequisites
+## 📋 Prerequisites
 
 Before you begin with Nexios, ensure you have the following:
 
@@ -57,7 +57,7 @@ Before you begin with Nexios, ensure you have the following:
 | Better async/await support                                                   | 3.7+         |
 
 
-### Async/Await Fundamentals
+### ⚡ Async/Await Fundamentals
 
 If you're new to async/await in Python, here are the key concepts you'll encounter:
 
@@ -69,7 +69,7 @@ If you're new to async/await in Python, here are the key concepts you'll encount
 Nexios uses async/await extensively for handling concurrent requests efficiently. Don't worry if this is new to you - we'll cover it in detail throughout the documentation.
 
 
-## Installation
+## 📦 Installation
 
 Nexios can be installed using any Python package manager. We recommend using `uv` for the fastest and most reliable experience.
 
@@ -167,7 +167,7 @@ virtualenv venv
 ```
 :::
 
-## Your First Nexios Application
+## 🛠️ Your First Nexios Application
 
 Now that you have Nexios installed, let's create your first application. We'll start with a simple example and gradually build up to more complex features.
 
@@ -237,7 +237,7 @@ Once your application is running, you can test it by opening your browser and na
 
 nexios provide an intaractive  API documentation interface. This allows you to test your API endpoints and explore the available routes.
 
-## Understanding the Code
+## 🔍 Understanding the Code
 
 Let's break down what's happening in our first application:
 
@@ -281,7 +281,7 @@ if __name__ == "__main__":
 ```
 
 
-## Next Steps
+## 🎯 Next Steps
 
 Congratulations! You've successfully created and run your first Nexios application. Here's what you can explore next:
 
@@ -292,7 +292,7 @@ Congratulations! You've successfully created and run your first Nexios applicati
 | [Core Concepts](/v3/guide/concepts)                                | Dive deeper into Nexios architecture and concepts:<br>- [Framework Architecture](/v3/guide/concepts)<br>- [Async Python](/v3/guide/async-python)<br>- [Configuration](/v3/guide/configuration)                                            |
 | [Advanced Features](/v3/guide/middleware)                           | Explore more advanced features as you become comfortable with the basics:<br>- [Middleware](/v3/guide/middleware)<br>- [Authentication](/v3/guide/authentication)<br>- [WebSockets](/v3/guide/websockets)<br>- [Templating](/v3/guide/templating) |
 
-## Common Questions
+## ❓ Common Questions
 
 ### Why do all handlers need to be async?
 
@@ -365,7 +365,7 @@ Nexios offers a unique combination of simplicity and performance:
 
 `app.run()` is a convenience method that starts a development server. For production, you should use uvicorn, hypercorn, or another ASGI server directly for better control and performance.
 
-## Getting Help
+## 🆘 Getting Help
 
 If you run into issues or have questions:
 

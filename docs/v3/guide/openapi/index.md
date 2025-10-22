@@ -1,4 +1,4 @@
-# OpenAPI Documentation in Nexios
+# 📋 OpenAPI Documentation in Nexios
 
 Nexios offers robust, automatic API documentation powered by the OpenAPI standard. This enables developers, teams, and integrators to understand, explore, and test your API with confidence and clarity.
 
@@ -15,7 +15,7 @@ This guide covers:
 
 ---
 
-## Automatic Documentation
+## 🤖 Automatic Documentation
 
 Every route you define in Nexios is automatically documented. This includes:
 
@@ -27,7 +27,7 @@ Every route you define in Nexios is automatically documented. This includes:
 
 You can instantly visualize and test your API using the `/docs` interface—no extra configuration required.
 
-## Basic Example
+## 💡 Basic Example
 
 ```python
 from nexios import NexiosApp
@@ -41,7 +41,7 @@ async def get_root(req, res):
 
 ![Basic OpenAPI Output](./basic-config.png)
 
-## Enhancing Your Documentation
+## 📝 Enhancing Your Documentation
 
 For professional APIs, always provide clear summaries and detailed descriptions for each endpoint. This improves developer experience and reduces support requests.
 
@@ -62,7 +62,7 @@ async def get_user(req, res, user_id: int):
 Use the `summary` for a concise, one-line explanation. Use `description` to provide details, edge cases, and business rules.
 :::
 
-## Next Steps
+## 🎯 Next Steps
 
 - Add parameter and model documentation (see next pages)
 - Document authentication and error responses

@@ -9,11 +9,11 @@ head:
     - property: og:description
       content: Learn how to use concurrency utilities in Nexios
 ---
-# Concurrency Utilities
+# ⚡ Concurrency Utilities
 
 Nexios provides concurrency utilities to handle common async patterns in web applications. Here's how to use them effectively in your route handlers.
 
-## TaskGroup - Parallel API Calls
+## 🚀 TaskGroup - Parallel API Calls
 
 Perfect for aggregating data from multiple sources:
 
@@ -49,7 +49,7 @@ async def fetch_user_data(user_id: str):
         return r.json()
 ```
 
-## Run in ThreadPool - Heavy Processing
+## 🏭 Run in ThreadPool - Heavy Processing
 
 Use for CPU-intensive operations in your handlers:
 
@@ -82,7 +82,7 @@ def create_thumbnail(image: Image.Image, size: tuple):
     return image.resize(size, Image.LANCZOS)
 ```
 
-## Run Until First Complete - Redundancy
+## 🏆 Run Until First Complete - Redundancy
 
 Great for failover and timeout scenarios:
 
@@ -121,7 +121,7 @@ async def search_fallback(query: str, timeout: float):
     return ["fallback"]
 ```
 
-## Background Tasks - Async Processing
+## 🔄 Background Tasks - Async Processing
 
 Perfect for handling long-running tasks without blocking the response:
 
@@ -158,7 +158,7 @@ async def get_tasks_status(req, res):
     }
 ```
 
-## AsyncLazy - Cached Computations
+## 💾 AsyncLazy - Cached Computations
 
 Useful for expensive operations that can be reused:
 
@@ -200,7 +200,7 @@ async def setup_cache_reset():
     task.add_done_callback(app._background_tasks.discard)
 ```
 
-## Error Handling Best Practices
+## ⚠️ Error Handling Best Practices
 
 Always handle errors appropriately in your handlers:
 
@@ -228,7 +228,7 @@ async def protected_operation(req, res):
         return {"error": "Internal error"}, 500
 ```
 
-## Performance Tips
+## 📈 Performance Tips
 
 1. Use `TaskGroup` for parallel API calls or database queries
 2. Move image/video processing to `run_in_threadpool`

@@ -44,24 +44,24 @@ const emeriti = [
 <VPTeamPage>
   <VPTeamPageTitle>
     <template #title>
-      Our Team
+      Our 🚀 Team
     </template>
     <template #lead>
-      The development of Nexios is guided by an experienced team of developers who are passionate about building fast, clean, and developer-friendly web frameworks. The project thrives thanks to contributions from our amazing community.
+      The development of Nexios is guided by an experienced team of developers who are passionate about building fast, clean, and developer-friendly web frameworks. The project thrives thanks to contributions from our amazing community. 🌟
     </template>
   </VPTeamPageTitle>
 
   <VPTeamPageSection>
-    <template #title>Core Team</template>
-    <template #lead>The core development team behind Nexios.</template>
+    <template #title>👑 Core Team</template>
+    <template #lead>The core development team behind Nexios. ✨</template>
     <template #members>
       <VPTeamMembers size="medium" :members="coreTeam" />
     </template>
   </VPTeamPageSection>
 
   <VPTeamPageSection>
-    <template #title>Maintainers</template>
-    <template #lead>Active maintainers helping to ensure Nexios's continued development and success.</template>
+    <template #title>🛠️ Maintainers</template>
+    <template #lead>Active maintainers helping to ensure Nexios's continued development and success. 💪</template>
     <template #members>
       <VPTeamMembers size="medium" :members="maintainers" />
     </template>

@@ -1,10 +1,10 @@
-# Response Models in Nexios
+# 📤 Response Models in Nexios
 
 Response models describe the structure and content of the data your API returns. Nexios leverages Pydantic models for response validation and OpenAPI documentation, ensuring your API is both robust and clearly documented.
 
 ---
 
-## Why Use Response Models?
+## ❓ Why Use Response Models?
 
 - **Automatic serialization**: Ensures consistent, type-safe output.
 - **Clear documentation**: Consumers know exactly what to expect.
@@ -12,7 +12,7 @@ Response models describe the structure and content of the data your API returns.
 
 ---
 
-## Single Response Model (Default)
+## 🎯 Single Response Model (Default)
 
 By default, Nexios documents a 200 response using the model you specify in the `responses` argument.
 
@@ -35,7 +35,7 @@ async def get_user(req, res, user_id: int):
 
 ---
 
-## Multiple Response Models (Status Codes)
+## 🔄 Multiple Response Models (Status Codes)
 
 You can document multiple possible responses by passing a dictionary to `responses`, mapping status codes to models. This is essential for production APIs that may return errors or alternate results.
 
@@ -66,7 +66,7 @@ async def get_user(req, res, user_id: int):
 
 ---
 
-## Returning Lists of Models
+## 📋 Returning Lists of Models
 
 You can use `List[Model]` to document endpoints that return arrays of objects.
 
@@ -90,7 +90,7 @@ async def list_users(req, res):
 
 ---
 
-## Best Practices
+## ✅ Best Practices
 
 - Always document all possible responses (success, error, validation, etc.).
 - Use descriptive model names and field descriptions.

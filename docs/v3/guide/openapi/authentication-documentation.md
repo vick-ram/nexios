@@ -1,10 +1,10 @@
-# OpenAPI Authentication in Nexios
+# 🔐 OpenAPI Authentication in Nexios
 
 Securing your API is essential for protecting user data and enabling safe integrations. Nexios supports multiple authentication schemes and provides first-class OpenAPI documentation for each.
 
 ---
 
-## 1. Why Secure Your API?
+## ❓ Why Secure Your API?
 
 APIs without authentication are vulnerable to abuse and data leaks. Always protect sensitive endpoints!
 
@@ -22,7 +22,7 @@ async def private_info(req, res):
 
 ---
 
-## 2. Bearer (JWT) Authentication
+## 🔑 Bearer (JWT) Authentication
 
 JWT (JSON Web Token) is the default method. Nexios includes a `bearerAuth` scheme automatically.
 
@@ -69,7 +69,7 @@ app.docs.add_security_scheme(
 
 ---
 
-## 3. API Key Authentication (Header, Query, Cookie)
+## 🗝️ API Key Authentication (Header, Query, Cookie)
 
 API keys are great for simple, programmatic access. You must register the scheme first.
 
@@ -109,7 +109,7 @@ APIKey(
 
 ---
 
-## 4. OAuth2 Authentication (with Scopes)
+## 🔓 OAuth2 Authentication (with Scopes)
 
 OAuth2 is for delegated, third-party access. Nexios supports all flows.
 
@@ -145,7 +145,7 @@ async def admin_dashboard(req, res):
 
 ---
 
-## 5. Combining Security Schemes
+## 🔗 Combining Security Schemes
 
 You can require multiple or alternative auth methods.
 
@@ -159,7 +159,7 @@ async def superuser_panel(req, res):
 
 ---
 
-## 6. Best Practices & Troubleshooting
+## ✅ Best Practices & Troubleshooting
 
 - Register all security schemes before referencing them.
 - Use clear, descriptive names for each scheme.

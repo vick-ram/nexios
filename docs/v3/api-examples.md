@@ -2,17 +2,17 @@
 outline: deep
 ---
 
-# Nexios API Examples
+# 🚀 Nexios API Examples 🌟
 
-This guide provides canonical, working examples for building APIs with Nexios. All code is idiomatic and matches the Nexios source, docs, and real-world examples.
+This guide provides canonical, working examples for building APIs with Nexios. All code is idiomatic and matches the Nexios source, docs, and real-world examples. ✨
 
-::: tip Nexios Request API
+::: tip 💡 Nexios Request API
 - Use `await req.json` (not `req.json()`)
 - Use `await req.files` (not `req.files()`)
 - Use `req.path_params.param` (not `req.path_params['param']`)
 :::
 
-## 1. Minimal App and REST API
+## 1. 🚀 Minimal App and REST API 📚
 
 ```python
 from nexios import NexiosApp
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=5000, reload=True)
 ```
 
-## 2. Request Input Handling (JSON Body)
+## 2. 📥 Request Input Handling (JSON Body)
 
 ```python
 from pydantic import BaseModel, ValidationError
@@ -56,7 +56,7 @@ async def process_json(req, res):
         return res.json({"error": str(e)}, status_code=422)
 ```
 
-## 3. File Upload and Download
+## 3. 📁 File Upload and Download
 
 ```python
 from nexios import NexiosApp
@@ -97,9 +97,9 @@ async def download_file(req, res):
     return FileResponse(filepath, filename=filename)
 ```
 
-## 4. Authentication (Session and JWT)
+## 4. 🔐 Authentication (Session and JWT)
 
-### Session Auth Example
+### 🔑 Session Auth Example
 ```python
 from nexios import NexiosApp
 from nexios.auth.backends.session import SessionAuthBackend
@@ -122,7 +122,7 @@ async def protected(req, res):
     return res.json({"error": "Not authenticated"}, status_code=401)
 ```
 
-### JWT Auth Example
+### 🎫 JWT Auth Example
 ```python
 from nexios import NexiosApp
 from nexios.auth.backends.jwt import JWTAuthBackend, create_jwt
@@ -166,7 +166,7 @@ async def protected(req, res):
     return res.json({"error": "Not authenticated"}, status_code=401)
 ```
 
-## 5. Middleware Usage
+## 5. 🛠️ Middleware Usage
 
 ```python
 from nexios import NexiosApp
@@ -177,7 +177,7 @@ app.add_middleware(CORSMiddleware())
 app.add_middleware(SecurityMiddleware())
 ```
 
-## 6. Error Handling
+## 6. 🚨 Error Handling
 
 ```python
 from nexios import NexiosApp
@@ -194,7 +194,7 @@ async def handle_http_exception(req, res, exc):
     return res.json({"error": exc.detail}, status_code=exc.status_code)
 ```
 
-## 7. WebSockets (Minimal)
+## 7. 🌐 WebSockets (Minimal)
 
 ```python
 from nexios import NexiosApp
@@ -215,7 +215,7 @@ async def websocket_handler(websocket: WebSocket):
         await websocket.close()
 ```
 
-## 8. WebSockets (Chat Room)
+## 8. 💬 WebSockets (Chat Room)
 
 ```python
 from typing import Dict, Set
@@ -251,7 +251,7 @@ async def chat_room(websocket: WebSocket):
         await websocket.close()
 ```
 
-## 9. Advanced Validation (Pydantic, Enums, Query Params)
+## 9. ✅ Advanced Validation (Pydantic, Enums, Query Params)
 
 ```python
 from datetime import date, datetime
@@ -312,7 +312,7 @@ async def list_users(request, response):
     return response.json({"items": users, "total": len(users), "page": params.page, "limit": params.limit})
 ```
 
-## 10. Advanced Templating (Inheritance, Context, Filters)
+## 10. 🎨 Advanced Templating (Inheritance, Context, Filters)
 
 ```python
 from pathlib import Path
@@ -336,7 +336,7 @@ async def home(request, response):
     )
 ```
 
-## 11. Advanced Routing (Typed Path Params, Wildcards)
+## 11. 🛣️ Advanced Routing (Typed Path Params, Wildcards)
 
 ```python
 from nexios import NexiosApp
@@ -360,7 +360,7 @@ async def get_wildcard(req: Request, res: Response):
     return res.json({"wildcard_path": wildcard_path, "type": "path"})
 ```
 
-## 12. Custom Response Types
+## 12. 📤 Custom Response Types
 
 ```python
 from nexios import NexiosApp
@@ -390,4 +390,4 @@ async def xml_handler(req, res):
 
 ---
 
-For more, see the official Nexios documentation and the `examples/` folder in the repo. 
+For more, see the official Nexios documentation and the `examples/` folder in the repo. 🌟 

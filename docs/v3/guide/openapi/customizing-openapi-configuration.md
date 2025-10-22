@@ -1,10 +1,10 @@
-# Customizing OpenAPI Configuration in Nexios
+# 🎨 Customizing OpenAPI Configuration in Nexios
 
 Nexios empowers you to tailor your OpenAPI documentation to match your project's branding, technical requirements, and support needs. This guide explains how to configure everything from basic metadata to advanced custom fields, ensuring your API docs are professional and informative.
 
 ---
 
-## Why Customize OpenAPI?
+## ❓ Why Customize OpenAPI?
 
 Clear, accurate, and branded documentation:
 
@@ -14,7 +14,7 @@ Clear, accurate, and branded documentation:
 
 ---
 
-## Basic Configuration: Title, Version, and Description
+## 📋 Basic Configuration: Title, Version, and Description
 
 Set fundamental API information directly in the `NexiosApp` constructor:
 
@@ -32,7 +32,7 @@ This metadata appears at the top of your OpenAPI docs and helps users quickly un
 
 ---
 
-## Example Endpoint (With Metadata)
+## 💡 Example Endpoint (With Metadata)
 
 ```python
 @app.get("/status", summary="Health check", description="Returns API uptime and status.")
@@ -44,7 +44,7 @@ async def status(req, res):
 
 ---
 
-## Advanced Configuration: Full OpenAPI Customization
+## ⚙️ Advanced Configuration: Full OpenAPI Customization
 
 For complete control, use `MakeConfig` and provide a full OpenAPI configuration dictionary. This is essential for large teams, enterprise APIs, or when integrating with external partners.
 
@@ -76,7 +76,7 @@ app = NexiosApp(config=config)
 
 ---
 
-## Visual Example
+## 👁️ Visual Example
 
 Your custom configuration will be reflected in the generated documentation, including contact and license information:
 
@@ -84,7 +84,7 @@ Your custom configuration will be reflected in the generated documentation, incl
 
 ---
 
-## Best Practices
+## ✅ Best Practices
 
 - Always provide a meaningful description and version.
 - Include contact and license information for support and legal clarity.

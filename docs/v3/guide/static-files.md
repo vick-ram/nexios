@@ -10,7 +10,7 @@ head:
       content: Serving static files is a common requirement for web applications. Nexios provides a robust and flexible system for serving static assets like CSS, JavaScript, images, and other file types with security and performance in mind.
 ---
 
-# Static Files
+# 📂 Static Files
 
 Serving static files is a common requirement for web applications. Nexios provides a robust and flexible system for serving static assets like CSS, JavaScript, images, and other file types with security and performance in mind.
 
@@ -18,7 +18,7 @@ Serving static files is a common requirement for web applications. Nexios provid
 The `StaticFilesHandler` class is deprecated and will be removed in a future version. Please use the new `StaticFiles` class instead.
 :::
 
-## Basic Setup
+## 🚀 Basic Setup
 
 To serve static files in Nexios, you can use either the new `StaticFiles` class or the deprecated `StaticFilesHandler`:
 
@@ -79,7 +79,7 @@ static_handler = StaticFilesHandler(
 )
 ```
 
-## Multiple Directories
+## 📁 Multiple Directories
 
 For more complex setups, you can serve files from multiple directories:
 
@@ -97,7 +97,7 @@ static_handler = StaticFilesHandler(
 
 When serving from multiple directories, Nexios searches for files in the order the directories are specified.
 
-## URL Prefixing
+## 🛣️ URL Prefixing
 
 The `prefix` parameter (for `StaticFiles`) or `url_prefix` parameter (for `StaticFilesHandler`) defines the URL path under which static files are served:
 

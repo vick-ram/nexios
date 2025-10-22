@@ -186,7 +186,6 @@ export default defineConfig({
             { text: 'File Upload', link: '/v3/guide/file-upload' },
             { text: 'Cors', link: '/v3/guide/cors' },
             { text: 'CSRF', link: '/v3/guide/csrf' },
-            { text: 'File Router', link: '/v3/guide/file-router' },
             { text: 'Concurrency Utilities', link: '/v3/guide/concurrency' },
             { text: 'Security', link: '/v3/guide/security' },
             { text: 'Pydantic Integration', link: '/v3/guide/pydantic-integration' },

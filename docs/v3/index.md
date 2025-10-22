@@ -12,7 +12,7 @@ head:
 hero:
   name: Nexios
   text: Async Python Web Framework
-  tagline: Nexios is a fast, minimalist Python framework for building async APIs with clean architecture, zero boilerplate, and a Pythonic feel.
+  tagline: 🚀 Nexios is a fast, minimalist Python framework for building async APIs with clean architecture, zero boilerplate, and a Pythonic feel.
 
   image:
     src: /logo.png
@@ -98,7 +98,7 @@ features:
       - Database integrations
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ::: code-group
 
@@ -145,11 +145,11 @@ app = NexiosApp(
 
 :::
 
-::: tip Quick Development
+::: tip 💡 Quick Development
 Use `nexios run --reload` for automatic reloading during development.
 :::
 
-## Key Features
+## 🔑 Key Features
 
 ### Type-Safe Routing
 
@@ -336,35 +336,35 @@ async def profile(
 
 :::
 
-::: tip Production Ready
+::: tip ✅ Production Ready
 Nexios is built for production use with:
 
-- Comprehensive error handling
-- Security best practices
-- Performance optimizations
-- Monitoring support
+- 🔒 Comprehensive error handling
+- 🛡️ Security best practices
+- ⚡ Performance optimizations
+- 📊 Monitoring support
   :::
 
-::: warning Python Version
+::: warning ⚠️ Python Version
 Nexios requires Python 3.9+ for:
 
-- Native async/await
-- Type hints
-- Modern language features
+- 🌐 Native async/await
+- 📝 Type hints
+- ✨ Modern language features
   :::
 
-## Nexios CLI
+## 🛠️ Nexios CLI
 
 Nexios comes with a powerful command-line interface that makes development and deployment a breeze. The Nexios CLI is your primary tool for managing Nexios applications throughout their lifecycle.
 
 ### Key Features
 
-- **Project Scaffolding**: Quickly bootstrap new projects with a modern structure
-- **Development Server**: Run and test your application with hot reload
-- **Code Generation**: Generate components, models, and controllers with a single command
-- **Database Tools**: Handle migrations and database operations
-- **Testing**: Run tests with detailed reporting
-- **Build & Deploy**: Prepare and deploy your application
+- 🚀 **Project Scaffolding**: Quickly bootstrap new projects with a modern structure
+- 🔄 **Development Server**: Run and test your application with hot reload
+- ⚙️ **Code Generation**: Generate components, models, and controllers with a single command
+- 🗄️ **Database Tools**: Handle migrations and database operations
+- 🧪 **Testing**: Run tests with detailed reporting
+- 📦 **Build & Deploy**: Prepare and deploy your application
 
 ### Basic Usage
 
@@ -375,43 +375,43 @@ nexios new my-awesome-app
 ```
 
 
-::: danger Important Note
+::: danger 🚫 Important Note
 Do not use the Nexios CLI if you are still learning Python.
 :::
 
 For complete documentation on using the Nexios CLI, check out the [CLI Documentation](/v3/guide/cli).
 
-## The Zen of Nexios
+## 🧘 The Zen of Nexios
 
 Nexios embraces the Zen of Python, particularly the second principle: "Explicit is better than implicit." Here's how:
 
-- **Explicit Routing**: Every route is explicitly defined, making it clear what endpoints are available
-- **Dependency Injection**: Dependencies are explicitly declared and injected
-- **Type Annotations**: Full support for Python's type hints throughout the framework
-- **Configuration Over Convention**: While we provide sensible defaults, we don't hide important behavior behind "magic"
+- 🎯 **Explicit Routing**: Every route is explicitly defined, making it clear what endpoints are available
+- 💉 **Dependency Injection**: Dependencies are explicitly declared and injected
+- 📋 **Type Annotations**: Full support for Python's type hints throughout the framework
+- ⚙️ **Configuration Over Convention**: While we provide sensible defaults, we don't hide important behavior behind "magic"
 
 ## Key Features
 
-### Performance Optimized
+### ⚡ Performance Optimized
 - Built on top of Starlette and Uvicorn for exceptional performance
-- Async-first architecture for handling thousands of concurrent connections
-- Middleware system for fine-grained performance optimization
+- 🌊 Async-first architecture for handling thousands of concurrent connections
+- 🛠️ Middleware system for fine-grained performance optimization
 
-### Developer Experience
-- Automatic API documentation with OpenAPI/Swagger
-- Built-in testing utilities
-- Detailed error messages and stack traces
-- Interactive API documentation at `/docs`
+### 👩‍💻 Developer Experience
+- 📖 Automatic API documentation with OpenAPI/Swagger
+- 🧪 Built-in testing utilities
+- 🚨 Detailed error messages and stack traces
+- 🔍 Interactive API documentation at `/docs`
 
-### Extensibility
-- Plugin system for adding custom functionality
-- Support for WebSockets and HTTP/2
-- Custom middleware support
-- Background tasks and scheduled jobs
+### 🔌 Extensibility
+- 🧩 Plugin system for adding custom functionality
+- 🌐 Support for WebSockets and HTTP/2
+- 🛠️ Custom middleware support
+- ⏰ Background tasks and scheduled jobs
 
-### Security First
-- Built-in CSRF protection
-- JWT Authentication
-- CORS middleware
-- Secure by default configurations
+### 🔒 Security First
+- 🛡️ Built-in CSRF protection
+- 🔑 JWT Authentication
+- 🌐 CORS middleware
+- 🔐 Secure by default configurations
 
