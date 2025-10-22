@@ -19,5 +19,3 @@ class RouteDecorator:
         if obj is None:
             return self
         return self.__class__(obj)  # type:ignore
-
-
