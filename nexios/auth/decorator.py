@@ -2,7 +2,7 @@ import inspect
 import typing
 from functools import wraps
 
-from nexios.decorators import RouteDecorator
+from nexios.decorator_helper import RouteDecorator
 from nexios.http import Request, Response
 
 from .exceptions import AuthenticationFailed, PermissionDenied

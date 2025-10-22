@@ -5,7 +5,7 @@ import pytest
 from nexios import NexiosApp
 from nexios.templating import TemplateConfig, TemplateEngine, render
 from nexios.templating.middleware import TemplateContextMiddleware
-from nexios.testing import Client as TestClient
+from nexios.testclient import TestClient
 
 
 @pytest.fixture
@@ -77,7 +77,8 @@ async def test_template_filters(template_engine):
 async def test_template_context_middleware(app):
     """Test template context middleware"""
     async with TestClient(app) as client:
-        response = await client.get("/")
+        response = client.get("/")
         assert response.status_code == 200
         assert "Welcome, Test User!" in response.text
         assert "Welcome to our test app!" in response.text
+
