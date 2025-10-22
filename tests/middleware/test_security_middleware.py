@@ -133,7 +133,7 @@ def test_xss_protection_enabled():
 
     with TestClient(app) as client:
         resp = client.get("/test")
-        assert "1; mode=block" in resp.headers["X-XSS-Protection"] 
+        assert "1; mode=block" in resp.headers["X-XSS-Protection"]
 
 
 def test_xss_protection_disabled():
@@ -162,7 +162,7 @@ def test_frame_options_deny():
 
     with TestClient(app) as client:
         resp = client.get("/test")
-        assert "DENY" in resp.headers["X-Frame-Options"] 
+        assert "DENY" in resp.headers["X-Frame-Options"]
 
 
 def test_frame_options_sameorigin():
@@ -171,12 +171,14 @@ def test_frame_options_sameorigin():
 
     with TestClient(app) as client:
         resp = client.get("/test")
-        assert  "SAMEORIGIN" in resp.headers["X-Frame-Options"]
+        assert "SAMEORIGIN" in resp.headers["X-Frame-Options"]
 
 
 def test_frame_options_allow_from():
     app = create_app()
-    app.add_middleware(SecurityMiddleware(frame_options_allow_from="https://example.com"))
+    app.add_middleware(
+        SecurityMiddleware(frame_options_allow_from="https://example.com")
+    )
 
     with TestClient(app) as client:
         resp = client.get("/test")
@@ -189,7 +191,7 @@ def test_content_type_options_enabled():
 
     with TestClient(app) as client:
         resp = client.get("/test")
-        assert "nosniff"  in resp.headers["X-Content-Type-Options"]
+        assert "nosniff" in resp.headers["X-Content-Type-Options"]
 
 
 def test_content_type_options_disabled():
@@ -204,7 +206,9 @@ def test_content_type_options_disabled():
 
 def test_referrer_policy():
     app = create_app()
-    app.add_middleware(SecurityMiddleware(referrer_policy="strict-origin-when-cross-origin"))
+    app.add_middleware(
+        SecurityMiddleware(referrer_policy="strict-origin-when-cross-origin")
+    )
 
     with TestClient(app) as client:
         resp = client.get("/test")
@@ -249,15 +253,17 @@ def test_download_options():
 
 def test_cross_origin_policies():
     app = create_app()
-    app.add_middleware(SecurityMiddleware(
-        cross_origin_opener_policy="same-origin",
-        cross_origin_embedder_policy="require-corp",
-        cross_origin_resource_policy="same-origin"
-    ))
+    app.add_middleware(
+        SecurityMiddleware(
+            cross_origin_opener_policy="same-origin",
+            cross_origin_embedder_policy="require-corp",
+            cross_origin_resource_policy="same-origin",
+        )
+    )
 
     with TestClient(app) as client:
         resp = client.get("/test")
-        assert "same-origin" in resp.headers["Cross-Origin-Opener-Policy"] 
+        assert "same-origin" in resp.headers["Cross-Origin-Opener-Policy"]
         assert "require-corp" in resp.headers["Cross-Origin-Embedder-Policy"]
 
 
@@ -304,7 +310,9 @@ def test_server_header_hidden():
 
 def test_server_header_custom():
     app = create_app()
-    app.add_middleware(SecurityMiddleware(server_header="Custom-Server/1.0", hide_server=False))
+    app.add_middleware(
+        SecurityMiddleware(server_header="Custom-Server/1.0", hide_server=False)
+    )
 
     with TestClient(app) as client:
         resp = client.get("/test")
@@ -323,10 +331,11 @@ def test_trusted_types_enabled():
 
 def test_trusted_types_with_policies():
     app = create_app()
-    app.add_middleware(SecurityMiddleware(
-        trusted_types=True,
-        trusted_types_policies=["policy1", "policy2"]
-    ))
+    app.add_middleware(
+        SecurityMiddleware(
+            trusted_types=True, trusted_types_policies=["policy1", "policy2"]
+        )
+    )
 
     with TestClient(app) as client:
         resp = client.get("/test")
