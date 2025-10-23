@@ -241,10 +241,13 @@ class BaseResponse:
 
         self._headers.append(new_header)
         return self
-    
+
     def set_headers(self, headers: Dict[str, str], overide_all: bool = False):
         if overide_all:
-            self._headers = [(k.lower().encode("latin-1"), v.encode("latin-1")) for k, v in headers.items()]
+            self._headers = [
+                (k.lower().encode("latin-1"), v.encode("latin-1"))
+                for k, v in headers.items()
+            ]
             return
         """Set multiple headers at once."""
         for key, value in headers.items():
