@@ -7,8 +7,6 @@ from nexios.routing import BaseRouter
 from nexios.types import Receive, Scope, Send
 
 
-
-
 class StaticFiles(BaseRouter):
     def __init__(
         self,
