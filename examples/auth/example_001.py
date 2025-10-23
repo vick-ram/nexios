@@ -1,8 +1,8 @@
 from nexios import NexiosApp
-from nexios.auth.backends.session import SessionAuthBackend
+from nexios.auth.backends.session import SessionAuthBackend, login
 from nexios.auth.middleware import AuthenticationMiddleware
 from nexios.auth.users.base import BaseUser
-from nexios.auth.backends.session import login
+
 
 class User(BaseUser):
     def __init__(self, id: str, username: str, password: str):
@@ -30,28 +30,32 @@ class User(BaseUser):
         # Load user by ID - replace with your database logic
         user_data = await db.get_user(identity)
         if user_data:
-            return cls(id=user_data["id"], username=user_data["username"], password=user_data["password"])
+            return cls(
+                id=user_data["id"],
+                username=user_data["username"],
+                password=user_data["password"],
+            )
         return None
-   
+
+
 class db:
     @classmethod
     async def get_user(cls, user_id):
         # Mock database - replace with your actual database
         return {"id": user_id, "username": "user", "password": "password"}
+
     @classmethod
     async def get_by_email(cls, email):
         return {"id": "123", "username": "user", "password": "password"}
-    
+
 
 app = NexiosApp()
 
 # Session backend - no authenticate_func needed
 session_backend = SessionAuthBackend()
 
-app.add_middleware(AuthenticationMiddleware(
-    user_model=User,
-    backend=session_backend
-))
+app.add_middleware(AuthenticationMiddleware(user_model=User, backend=session_backend))
+
 
 @app.get("/login")
 async def login(req, res):
@@ -62,6 +66,7 @@ async def login(req, res):
         <input type="submit" value="Login">
     </form>
     """
+
 
 @app.post("/login")
 async def login_post(req, res):
@@ -76,14 +81,17 @@ async def login_post(req, res):
 
     return res.html("Invalid username or password", status_code=401)
 
+
 @app.get("/protected")
 async def protected(req, res):
     if req.user and req.user.is_authenticated:
         return res.html(f"Hello, {req.user.display_name}!")
     return res.redirect("/login")
 
+
 @app.get("/logout")
 async def logout(req, res):
     from nexios.auth.backends.session import logout
+
     logout(req)
     return res.redirect("/login")
