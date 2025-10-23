@@ -5,6 +5,7 @@ Tests for WebSocket error handling middleware
 import asyncio
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from nexios import NexiosApp
@@ -12,8 +13,11 @@ from nexios.exceptions import WebSocketException
 from nexios.routing import WSRouter
 from nexios.testclient import TestClient
 from nexios.types import ASGIApp, Receive, Scope, Send
-from nexios.websockets.errors import WebSocketErrorMiddleware, websocket_exception_handler
 from nexios.websockets.base import WebSocket
+from nexios.websockets.errors import (
+    WebSocketErrorMiddleware,
+    websocket_exception_handler,
+)
 
 
 class TestWebSocketErrorMiddleware:
@@ -62,10 +66,9 @@ class TestWebSocketErrorMiddleware:
         asyncio.run(middleware(scope, receive, send))
         app.assert_called_once_with(scope, receive, send)
 
-    
-
     def test_general_exception_handling(self):
         """Test that general exceptions are handled as internal server errors"""
+
         # Create an app that raises a general exception
         async def failing_app(scope: Scope, receive: Receive, send: Send):
             raise ValueError("Something went wrong")
@@ -87,16 +90,13 @@ class TestWebSocketErrorMiddleware:
         asyncio.run(middleware(scope, receive, send))
 
         # Verify websocket.close was called with internal server error code
-        send.assert_called_once_with({
-            "type": "websocket.close",
-            "code": 1011,
-            "reason": "Internal Server Error"
-        })
-
-   
+        send.assert_called_once_with(
+            {"type": "websocket.close", "code": 1011, "reason": "Internal Server Error"}
+        )
 
     def test_logging_on_websocket_exception(self):
         """Test that WebSocketException is logged"""
+
         async def failing_app(scope: Scope, receive: Receive, send: Send):
             raise WebSocketException(code=1008, reason="Test error")
 
@@ -112,7 +112,7 @@ class TestWebSocketErrorMiddleware:
         receive = AsyncMock()
         send = AsyncMock()
 
-        with patch('nexios.websockets.errors.logger') as mock_logger:
+        with patch("nexios.websockets.errors.logger") as mock_logger:
             asyncio.run(middleware(scope, receive, send))
 
             # Verify error was logged
@@ -122,6 +122,7 @@ class TestWebSocketErrorMiddleware:
 
     def test_logging_on_general_exception(self):
         """Test that general exceptions are logged"""
+
         async def failing_app(scope: Scope, receive: Receive, send: Send):
             raise RuntimeError("Unexpected error")
 
@@ -137,16 +138,13 @@ class TestWebSocketErrorMiddleware:
         receive = AsyncMock()
         send = AsyncMock()
 
-        with patch('nexios.websockets.errors.logger') as mock_logger:
+        with patch("nexios.websockets.errors.logger") as mock_logger:
             asyncio.run(middleware(scope, receive, send))
 
             # Verify error was logged
             mock_logger.error.assert_called_once()
             log_call = mock_logger.error.call_args[0][0]
             assert "Unexpected error:" in log_call
-
-
-
 
 
 class TestWebSocketErrorIntegration:

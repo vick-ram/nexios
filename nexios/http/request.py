@@ -251,7 +251,7 @@ class Request(HTTPConnection):
         content_type_header = self.headers.get("Content-Type")
         content_type: str
         content_type, _ = parse_options_header(content_type_header)  # type:ignore
-        return content_type.decode("utf-8") if content_type else None #type: ignore
+        return content_type.decode("utf-8") if content_type else None  # type: ignore
 
     async def stream(self) -> typing.AsyncGenerator[bytes, None]:
         if hasattr(self, "_body"):
@@ -483,8 +483,8 @@ class Request(HTTPConnection):
         """
         content_type = self.content_type
         return content_type is not None and (
-            content_type.startswith("application/x-www-form-urlencoded") or
-            content_type.startswith("multipart/form-data")
+            content_type.startswith("application/x-www-form-urlencoded")
+            or content_type.startswith("multipart/form-data")
         )
 
     @property
@@ -494,7 +494,9 @@ class Request(HTTPConnection):
         Returns True if Content-Type starts with multipart/form-data.
         """
         content_type = self.content_type
-        return content_type is not None and content_type.startswith("multipart/form-data")
+        return content_type is not None and content_type.startswith(
+            "multipart/form-data"
+        )
 
     @property
     def is_urlencoded(self) -> bool:
@@ -503,7 +505,10 @@ class Request(HTTPConnection):
         Returns True if Content-Type is application/x-www-form-urlencoded.
         """
         content_type = self.content_type
-        return content_type is not None and content_type == "application/x-www-form-urlencoded"
+        return (
+            content_type is not None
+            and content_type == "application/x-www-form-urlencoded"
+        )
 
     @property
     def has_cookie(self) -> bool:
@@ -523,6 +528,7 @@ class Request(HTTPConnection):
         try:
             # This will check if there are any files in the form data
             import asyncio
+
             if self.is_multipart:
                 # Try to get form data to check for files
                 loop = asyncio.get_event_loop()
@@ -587,7 +593,7 @@ class Request(HTTPConnection):
         Get a header value with a default if not found.
         Case-insensitive header lookup.
         """
-        return self.headers.get(key.lower()) or  default
+        return self.headers.get(key.lower()) or default
 
     def has_header(self, key: str) -> bool:
         """
