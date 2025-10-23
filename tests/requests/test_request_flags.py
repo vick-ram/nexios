@@ -3,6 +3,7 @@ Tests for new Request utility flags and methods
 """
 
 import pytest
+
 from nexios import NexiosApp
 from nexios.http import Request, Response
 from nexios.testclient import TestClient
@@ -28,7 +29,9 @@ def test_request_is_json_flag(test_client_factory):
         assert data["is_json"] is True
 
         # Test non-JSON request
-        resp = client.post("/text", data="plain text", headers={"Content-Type": "text/plain"})
+        resp = client.post(
+            "/text", data="plain text", headers={"Content-Type": "text/plain"}
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["is_json"] is False
@@ -209,14 +212,16 @@ def test_request_flags_with_different_content_types(test_client_factory):
 
     @app.post("/check")
     async def check_endpoint(request: Request, response: Response):
-        return response.json({
-            "is_json": request.is_json,
-            "is_form": request.is_form,
-            "is_multipart": request.is_multipart,
-            "is_urlencoded": request.is_urlencoded,
-            "has_body": request.has_body,
-            "content_type": request.content_type,
-        })
+        return response.json(
+            {
+                "is_json": request.is_json,
+                "is_form": request.is_form,
+                "is_multipart": request.is_multipart,
+                "is_urlencoded": request.is_urlencoded,
+                "has_body": request.has_body,
+                "content_type": request.content_type,
+            }
+        )
 
     with test_client_factory(app) as client:
         # Test JSON request
@@ -248,11 +253,13 @@ def test_request_has_header_method(test_client_factory):
 
     @app.get("/headers")
     async def headers_endpoint(request: Request, response: Response):
-        return response.json({
-            "has_content_type": request.has_header("content-type"),
-            "has_authorization": request.has_header("authorization"),
-            "has_custom_header": request.has_header("x-custom-header"),
-        })
+        return response.json(
+            {
+                "has_content_type": request.has_header("content-type"),
+                "has_authorization": request.has_header("authorization"),
+                "has_custom_header": request.has_header("x-custom-header"),
+            }
+        )
 
     with test_client_factory(app) as client:
         # Test with Content-Type header
@@ -270,11 +277,13 @@ def test_request_get_header_method(test_client_factory):
 
     @app.get("/headers")
     async def headers_endpoint(request: Request, response: Response):
-        return response.json({
-            "content_type": request.get_header("content-type"),
-            "missing_header": request.get_header("x-missing", "default_value"),
-            "none_default": request.get_header("x-none"),
-        })
+        return response.json(
+            {
+                "content_type": request.get_header("content-type"),
+                "missing_header": request.get_header("x-missing", "default_value"),
+                "none_default": request.get_header("x-none"),
+            }
+        )
 
     with test_client_factory(app) as client:
         # Test with headers
