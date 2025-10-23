@@ -251,7 +251,7 @@ class Request(HTTPConnection):
         content_type_header = self.headers.get("Content-Type")
         content_type: str
         content_type, _ = parse_options_header(content_type_header)  # type:ignore
-        return content_type  # type:ignore
+        return content_type.decode("utf-8") if content_type else None #type: ignore
 
     async def stream(self) -> typing.AsyncGenerator[bytes, None]:
         if hasattr(self, "_body"):
@@ -458,15 +458,6 @@ class Request(HTTPConnection):
         return self.url.scheme == "https"
 
     @property
-    def accepts_json(self) -> bool:
-        """
-        Check if the request accepts JSON response.
-        Returns True if the Accept header includes application/json.
-        """
-        accept = self.headers.get("accept", "")
-        return "application/json" in accept or "*/*" in accept
-
-    @property
     def accepts_html(self) -> bool:
         """
         Check if the request accepts HTML response.
@@ -475,12 +466,128 @@ class Request(HTTPConnection):
         accept = self.headers.get("accept", "")
         return "text/html" in accept or "*/*" in accept
 
+    @property
+    def is_json(self) -> bool:
+        """
+        Check if the request content type is JSON.
+        Returns True if Content-Type header starts with application/json.
+        """
+        content_type = self.content_type
+        return content_type is not None and "application/json" in content_type
+
+    @property
+    def is_form(self) -> bool:
+        """
+        Check if the request is form data (either URL-encoded or multipart).
+        Returns True if Content-Type is application/x-www-form-urlencoded or multipart/form-data.
+        """
+        content_type = self.content_type
+        return content_type is not None and (
+            content_type.startswith("application/x-www-form-urlencoded") or
+            content_type.startswith("multipart/form-data")
+        )
+
+    @property
+    def is_multipart(self) -> bool:
+        """
+        Check if the request is multipart form data.
+        Returns True if Content-Type starts with multipart/form-data.
+        """
+        content_type = self.content_type
+        return content_type is not None and content_type.startswith("multipart/form-data")
+
+    @property
+    def is_urlencoded(self) -> bool:
+        """
+        Check if the request is URL-encoded form data.
+        Returns True if Content-Type is application/x-www-form-urlencoded.
+        """
+        content_type = self.content_type
+        return content_type is not None and content_type == "application/x-www-form-urlencoded"
+
+    @property
+    def has_cookie(self) -> bool:
+        """
+        Check if the request has cookies.
+        Returns True if Cookie header exists and has content.
+        """
+        cookie_header = self.headers.get("cookie")
+        return cookie_header is not None and cookie_header.strip() != ""
+
+    @property
+    def has_files(self) -> bool:
+        """
+        Check if the request contains uploaded files.
+        Returns True if the request has multipart form data with files.
+        """
+        try:
+            # This will check if there are any files in the form data
+            import asyncio
+            if self.is_multipart:
+                # Try to get form data to check for files
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If we're in an async context, we can't use asyncio.run
+                    # Just check if the content type suggests files might be present
+                    return True
+                else:
+                    # Safe to use asyncio.run
+                    form_data = loop.run_until_complete(self.form_data)
+                    for value in form_data.values():
+                        if hasattr(value, "filename") and value.filename:
+                            return True
+                    return False
+            return False
+        except Exception:
+            return False
+
+    @property
+    def has_body(self) -> bool:
+        """
+        Check if the request has a body.
+        Returns True if Content-Length > 0 or if body contains data.
+        """
+        content_length = self.content_length
+        if content_length > 0:
+            return True
+
+        # For methods that typically have bodies
+        if self.method in ("POST", "PUT", "PATCH"):
+            return True
+
+        return False
+
+    @property
+    def is_authenticated(self) -> bool:
+        """
+        Check if the request is authenticated (has user in scope).
+        Returns True if user is set in the request scope.
+        """
+        return self.user is not None
+
+    @property
+    def has_session(self) -> bool:
+        """
+        Check if session middleware is available.
+        Returns True if session is available in the request scope.
+        """
+        return "session" in self.scope
+
+    @property
+    def accepts_json(self) -> bool:
+        """
+        Check if the request accepts JSON response.
+        Returns True if the Accept header includes application/json.
+        """
+        accept = self.headers.get("accept", "")
+        return "application/json" in accept or "*/*" in accept
+
     def get_header(self, key: str, default: typing.Any = None) -> typing.Any:
         """
         Get a header value with a default if not found.
         Case-insensitive header lookup.
         """
-        return self.headers.get(key.lower(), default)
+        return self.headers.get(key.lower()) or  default
 
     def has_header(self, key: str) -> bool:
         """
