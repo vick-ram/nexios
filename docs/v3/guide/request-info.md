@@ -126,6 +126,118 @@ async def links_handler(req: Request, res):
 ```
 
 
+## 🔍 Request Type Detection
+
+Nexios provides convenient properties to quickly check the type and characteristics of incoming requests:
+
+### Content Type Flags
+
+```python
+@app.post("/api/endpoint")
+async def handle_request(req: Request, res):
+    # Check content type
+    if req.is_json:
+        data = await req.json()
+        # Handle JSON data
+    elif req.is_form:
+        data = await req.form()
+        # Handle form data
+    elif req.is_multipart:
+        files = await req.files()
+        # Handle file uploads
+    elif req.is_urlencoded:
+        data = await req.form()
+        # Handle URL-encoded form data
+```
+
+### Request State Flags
+
+```python
+@app.post("/process")
+async def process_request(req: Request, res):
+    # Check if request has various components
+    if req.has_cookie:
+        session_id = req.cookies.get("session")
+
+    if req.has_files:
+        files = await req.files()
+        # Process uploaded files
+
+    if req.has_body:
+        # Request contains body data
+        if req.content_length > 1000000:  # 1MB
+            return res.status(413).text("File too large")
+
+    if req.is_authenticated:
+        user_id = req.user.id
+        # Handle authenticated request
+
+    if req.has_session:
+        session_data = req.session
+        # Access session data
+```
+
+### Request Type Properties
+
+| Property | Description | Example |
+|----------|-------------|---------|
+| `req.is_json` | True if Content-Type is `application/json` | JSON API requests |
+| `req.is_form` | True if Content-Type is form data (URL-encoded or multipart) | HTML forms |
+| `req.is_multipart` | True if Content-Type is `multipart/form-data` | File uploads |
+| `req.is_urlencoded` | True if Content-Type is `application/x-www-form-urlencoded` | Simple forms |
+| `req.has_cookie` | True if request contains cookies | Session management |
+| `req.has_files` | True if request contains uploaded files | File upload detection |
+| `req.has_body` | True if request has a body | POST/PUT/PATCH requests |
+| `req.is_authenticated` | True if user is authenticated | Authenticated requests |
+| `req.has_session` | True if session middleware is available | Session-enabled requests |
+
+### Existing Request Flags
+
+Nexios also provides additional request detection properties:
+
+```python
+@app.get("/responsive")
+async def responsive_handler(req: Request, res):
+    # Check request characteristics
+    if req.is_ajax:
+        return res.json({"message": "AJAX request"})
+
+    if req.is_secure:
+        return res.json({"protocol": "HTTPS"})
+
+    if req.accepts_json:
+        return res.json({"format": "JSON preferred"})
+
+    if req.accepts_html:
+        return res.html("<h1>HTML Response</h1>")
+```
+
+### Header Utilities
+
+```python
+@app.get("/headers")
+async def header_handler(req: Request, res):
+    # Check for specific headers
+    if req.has_header("authorization"):
+        token = req.get_header("authorization")
+
+    # Get header with default value
+    api_version = req.get_header("x-api-version", "v1")
+
+    # Check if header exists
+    if req.has_header("x-custom-header"):
+        custom_value = req.get_header("x-custom-header")
+```
+
+| Method/Property | Description | Example |
+|----------------|-------------|---------|
+| `req.has_header(name)` | Check if header exists (case-insensitive) | `req.has_header("content-type")` |
+| `req.get_header(name, default)` | Get header value with default | `req.get_header("x-api-key", "none")` |
+| `req.is_ajax` | True if X-Requested-With is XMLHttpRequest | AJAX requests |
+| `req.is_secure` | True if request uses HTTPS | Secure connections |
+| `req.accepts_json` | True if client accepts JSON | API responses |
+| `req.accepts_html` | True if client accepts HTML | Web page responses |
+
 ## ⚡ Advanced Features
 
 ### Streaming Requests
