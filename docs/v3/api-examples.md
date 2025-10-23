@@ -56,7 +56,254 @@ async def process_json(req, res):
         return res.json({"error": str(e)}, status_code=422)
 ```
 
-## 3. 📁 File Upload and Download
+## 2.5. 🔍 Request Type Detection and Smart Handling
+
+Nexios provides convenient properties to quickly detect and handle different types of requests:
+
+```python
+from nexios import NexiosApp
+from nexios.http import Request, Response
+
+app = NexiosApp()
+
+@app.post("/api/smart-endpoint")
+async def smart_handler(req: Request, res: Response):
+    """Smart endpoint that handles multiple input types"""
+
+    # Check content type and handle accordingly
+    if req.is_json:
+        data = await req.json()
+        return res.json({
+            "type": "json",
+            "data": data,
+            "content_type": req.content_type
+        })
+
+    elif req.is_form:
+        if req.is_multipart:
+            # Handle file uploads
+            files = await req.files()
+            form_data = await req.form()
+            return res.json({
+                "type": "multipart",
+                "files": list(files.keys()),
+                "form_fields": dict(form_data),
+                "content_type": req.content_type
+            })
+        else:
+            # Handle URL-encoded form
+            form_data = await req.form()
+            return res.json({
+                "type": "urlencoded",
+                "data": dict(form_data),
+                "content_type": req.content_type
+            })
+
+    elif req.has_body:
+        # Handle other content types
+        body_text = await req.text()
+        return res.json({
+            "type": "raw",
+            "content_type": req.content_type,
+            "size": len(body_text)
+        })
+
+    else:
+        return res.json({"error": "No body provided"}, status_code=400)
+
+@app.get("/api/request-info")
+async def request_info(req: Request, res: Response):
+    """Get comprehensive information about the current request"""
+
+    info = {
+        "method": req.method,
+        "path": req.path,
+        "content_type": req.content_type,
+        "content_length": req.content_length,
+
+        # Content type flags
+        "is_json": req.is_json,
+        "is_form": req.is_form,
+        "is_multipart": req.is_multipart,
+        "is_urlencoded": req.is_urlencoded,
+
+        # Request state flags
+        "has_cookie": req.has_cookie,
+        "has_files": req.has_files,
+        "has_body": req.has_body,
+        "is_authenticated": req.is_authenticated,
+        "has_session": req.has_session,
+
+        # Security and client info
+        "is_secure": req.is_secure,
+        "is_ajax": req.is_ajax,
+        "client_ip": req.get_client_ip(),
+        "user_agent": req.user_agent,
+
+        # Headers (using new utilities)
+        "has_authorization": req.has_header("authorization"),
+        "accept_header": req.get_header("accept"),
+    }
+
+    return res.json(info)
+
+@app.post("/api/validate-input")
+async def validate_input(req: Request, res: Response):
+    """Validate and process different input types"""
+
+    # File size validation
+    if req.has_body and req.content_length > 10 * 1024 * 1024:  # 10MB
+        return res.json({"error": "File too large"}, status_code=413)
+
+    # Authentication check
+    if req.is_authenticated:
+        user_info = {
+            "id": req.user.id if req.user else None,
+            "authenticated": True
+        }
+    else:
+        user_info = {"authenticated": False}
+
+    # Content type specific processing
+    if req.is_json:
+        data = await req.json()
+        return res.json({
+            "processed": True,
+            "input_type": "json",
+            "user": user_info,
+            "data": data
+        })
+
+    elif req.is_multipart and req.has_files:
+        files = await req.files()
+        return res.json({
+            "processed": True,
+            "input_type": "multipart",
+            "user": user_info,
+            "files_count": len(files),
+            "files": [f.filename for f in files.values()]
+        })
+
+    elif req.is_form:
+        form_data = await req.form()
+        return res.json({
+            "processed": True,
+            "input_type": "form",
+            "user": user_info,
+            "fields": list(form_data.keys())
+        })
+
+    else:
+        return res.json({
+            "error": "Unsupported content type",
+            "supported_types": ["application/json", "multipart/form-data", "application/x-www-form-urlencoded"]
+        }, status_code=400)
+```
+
+## 3. 📋 Header Management and Custom Headers
+
+```python
+from nexios import NexiosApp
+from nexios.http import Request, Response
+
+app = NexiosApp()
+
+@app.get("/api/headers")
+async def header_demo(req: Request, res: Response):
+    """Demonstrate header utilities"""
+
+    # Check for specific headers
+    if req.has_header("authorization"):
+        auth_type = "Bearer" if "Bearer" in req.get_header("authorization", "") else "Other"
+        return res.json({
+            "authenticated": True,
+            "auth_type": auth_type,
+            "api_version": req.get_header("x-api-version", "v1")
+        })
+
+    # Check for API key
+    api_key = req.get_header("x-api-key")
+    if not api_key:
+        return res.json({"error": "API key required"}, status_code=401)
+
+    # Check client preferences
+    if req.accepts_json:
+        format = "json"
+    elif req.accepts_html:
+        format = "html"
+    else:
+        format = "text"
+
+    return res.json({
+        "api_key_provided": bool(api_key),
+        "preferred_format": format,
+        "is_ajax": req.is_ajax,
+        "user_agent": req.user_agent
+    })
+
+@app.post("/api/webhook")
+async def webhook_handler(req: Request, res: Response):
+    """Handle webhook with signature verification"""
+
+    # Check for required headers
+    if not req.has_header("x-webhook-signature"):
+        return res.json({"error": "Missing signature"}, status_code=400)
+
+    signature = req.get_header("x-webhook-signature")
+    webhook_type = req.get_header("x-webhook-type", "generic")
+
+    # Validate webhook signature (simplified example)
+    if not self._validate_signature(await req.text(), signature):
+        return res.json({"error": "Invalid signature"}, status_code=401)
+
+    # Process based on webhook type
+    if req.is_json:
+        payload = await req.json()
+    else:
+        payload = {"raw_body": await req.text()}
+
+    return res.json({
+        "webhook_type": webhook_type,
+        "signature_valid": True,
+        "payload": payload
+    })
+
+@app.get("/api/adaptive")
+async def adaptive_response(req: Request, res: Response):
+    """Return response based on client preferences"""
+
+    if req.accepts_json:
+        if req.is_ajax:
+            return res.json({
+                "message": "AJAX JSON response",
+                "format": "json",
+                "ajax": True
+            })
+        else:
+            return res.json({
+                "message": "Standard JSON response",
+                "format": "json",
+                "ajax": False
+            })
+
+    elif req.accepts_html:
+        return res.html(f"""
+        <html>
+        <head><title>Adaptive Response</title></head>
+        <body>
+            <h1>Adaptive HTML Response</h1>
+            <p>Method: {req.method}</p>
+            <p>Secure: {req.is_secure}</p>
+            <p>User Agent: {req.user_agent}</p>
+        </body>
+        </html>
+        """)
+
+    else:
+        return res.text(f"Plain text response\nMethod: {req.method}\nSecure: {req.is_secure}")
+```
+
+## 4. 📁 File Upload and Download
 
 ```python
 from nexios import NexiosApp
@@ -95,32 +342,71 @@ async def download_file(req, res):
         return res.json({"error": "File not found"}, status_code=404)
     from nexios.responses import FileResponse
     return FileResponse(filepath, filename=filename)
-```
 
-## 4. 🔐 Authentication (Session and JWT)
+## 5. 🔐 Authentication (Session and JWT)
 
 ### 🔑 Session Auth Example
 ```python
 from nexios import NexiosApp
 from nexios.auth.backends.session import SessionAuthBackend
 from nexios.auth.middleware import AuthenticationMiddleware
+from nexios.auth.base import BaseUser
+
+class User(BaseUser):
+    def __init__(self, id: str, username: str):
+        self.id = id
+        self.username = username
+
+    @property
+    def is_authenticated(self) -> bool:
+        return True
+
+    @property
+    def identity(self) -> str:
+        return self.id
+
+    @property
+    def display_name(self) -> str:
+        return self.username
+
+    @classmethod
+    async def load_user(cls, identity: str):
+        # Replace with your database lookup
+        user_data = get_user_from_db(identity)
+        if user_data:
+            return cls(id=user_data["id"], username=user_data["username"])
+        return None
 
 app = NexiosApp()
 
-async def get_user_by_id(user_id: int):
-    # Replace with your DB lookup
-    return {"id": user_id, "username": "user"}
+# Session backend
+session_backend = SessionAuthBackend()
 
-session_backend = SessionAuthBackend(user_key="user_id", authenticate_func=get_user_by_id)
-app.add_middleware(AuthenticationMiddleware(backend=session_backend))
+app.add_middleware(AuthenticationMiddleware(
+    user_model=User,
+    backend=session_backend
+))
 
 @app.get("/protected")
 async def protected(req, res):
-    user = req.user
-    if user and user.is_authenticated:
-        return res.json({"message": f"Hello, {user.username}!"})
+    if req.user and req.user.is_authenticated:
+        return res.json({"message": f"Hello, {req.user.display_name}!"})
     return res.json({"error": "Not authenticated"}, status_code=401)
-```
+
+@app.post("/login")
+async def login(req, res):
+    data = await req.json
+    username = data.get("username")
+    password = data.get("password")
+
+    # Validate credentials (replace with your logic)
+    if username == "admin" and password == "password":
+        user = User(id="123", username=username)
+        from nexios.auth.backends.session import login
+        login(req, user)
+        return res.json({"message": "Logged in successfully"})
+
+    return res.json({"error": "Invalid credentials"}, status_code=401)
 
 ### 🎫 JWT Auth Example
 ```python
@@ -130,43 +416,61 @@ from nexios.auth.middleware import AuthenticationMiddleware
 from nexios.auth.base import BaseUser
 
 class User(BaseUser):
-    def __init__(self, id, username):
+    def __init__(self, id: str, username: str):
         self.id = id
         self.username = username
+
     @property
-    def is_authenticated(self):
+    def is_authenticated(self) -> bool:
         return True
+
     @property
-    def identity(self):
+    def identity(self) -> str:
         return self.id
+
     @property
-    def display_name(self):
+    def display_name(self) -> str:
         return self.username
 
+    @classmethod
+    async def load_user(cls, identity: str):
+        # Replace with your database lookup
+        user_data = get_user_from_db(identity)
+        if user_data:
+            return cls(id=user_data["id"], username=user_data["username"])
+        return None
+
 app = NexiosApp()
-async def get_user_by_id(**payload):
-    return User(id=payload["sub"], username=payload["sub"])
-jwt_backend = JWTAuthBackend(authenticate_func=get_user_by_id)
-app.add_middleware(AuthenticationMiddleware(backend=jwt_backend))
+
+# JWT backend
+jwt_backend = JWTAuthBackend()
+
+app.add_middleware(AuthenticationMiddleware(
+    user_model=User,
+    backend=jwt_backend
+))
 
 @app.post("/login")
 async def login(req, res):
     data = await req.json
     username = data.get("username")
     password = data.get("password")
+
+    # Validate credentials (replace with your logic)
     if username == "admin" and password == "password":
-        token = create_jwt({"sub": username})
+        user = User(id="123", username=username)
+        token = create_jwt({"sub": user.identity})
         return res.json({"token": token})
+
     return res.json({"error": "Invalid credentials"}, status_code=401)
 
 @app.get("/protected")
 async def protected(req, res):
     if req.user and req.user.is_authenticated:
-        return res.json({"message": f"Hello, {req.user.username}!"})
+        return res.json({"message": f"Hello, {req.user.display_name}!"})
     return res.json({"error": "Not authenticated"}, status_code=401)
-```
 
-## 5. 🛠️ Middleware Usage
+## 6. 🛠️ Middleware Usage
 
 ```python
 from nexios import NexiosApp
@@ -175,9 +479,8 @@ from nexios.middleware import CORSMiddleware, SecurityMiddleware
 app = NexiosApp()
 app.add_middleware(CORSMiddleware())
 app.add_middleware(SecurityMiddleware())
-```
 
-## 6. 🚨 Error Handling
+## 7. 🚨 Error Handling
 
 ```python
 from nexios import NexiosApp
@@ -192,9 +495,8 @@ async def error_route(req, res):
 @app.add_exception_handler(HTTPException)
 async def handle_http_exception(req, res, exc):
     return res.json({"error": exc.detail}, status_code=exc.status_code)
-```
 
-## 7. 🌐 WebSockets (Minimal)
+## 8. 🌐 WebSockets (Minimal)
 
 ```python
 from nexios import NexiosApp
@@ -213,9 +515,8 @@ async def websocket_handler(websocket: WebSocket):
         print(f"WebSocket error: {e}")
     finally:
         await websocket.close()
-```
 
-## 8. 💬 WebSockets (Chat Room)
+## 9. 💬 WebSockets (Chat Room)
 
 ```python
 from typing import Dict, Set
@@ -249,9 +550,8 @@ async def chat_room(websocket: WebSocket):
         if not chat_rooms[room_id]:
             del chat_rooms[room_id]
         await websocket.close()
-```
 
-## 9. ✅ Advanced Validation (Pydantic, Enums, Query Params)
+## 10. ✅ Advanced Validation (Pydantic, Enums, Query Params)
 
 ```python
 from datetime import date, datetime
@@ -312,7 +612,7 @@ async def list_users(request, response):
     return response.json({"items": users, "total": len(users), "page": params.page, "limit": params.limit})
 ```
 
-## 10. 🎨 Advanced Templating (Inheritance, Context, Filters)
+## 11. 🎨 Advanced Templating (Inheritance, Context, Filters)
 
 ```python
 from pathlib import Path
@@ -336,7 +636,7 @@ async def home(request, response):
     )
 ```
 
-## 11. 🛣️ Advanced Routing (Typed Path Params, Wildcards)
+## 12. 🛣️ Advanced Routing (Typed Path Params, Wildcards)
 
 ```python
 from nexios import NexiosApp
@@ -360,7 +660,7 @@ async def get_wildcard(req: Request, res: Response):
     return res.json({"wildcard_path": wildcard_path, "type": "path"})
 ```
 
-## 12. 📤 Custom Response Types
+## 13. 📤 Custom Response Types
 
 ```python
 from nexios import NexiosApp
