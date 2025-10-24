@@ -1,7 +1,7 @@
 from nexios import NexiosApp
 from nexios.auth.backends.jwt import JWTAuthBackend, create_jwt
-from nexios.auth.base import BaseUser
-from nexios.auth.decorators import auth
+from nexios.auth import BaseUser
+from nexios.auth.decorator import auth
 from nexios.auth.middleware import AuthenticationMiddleware
 from nexios.routing import Router
 
