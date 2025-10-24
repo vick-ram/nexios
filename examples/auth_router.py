@@ -1,9 +1,10 @@
 from nexios import NexiosApp
-from nexios.routing import Router
-from nexios.auth.decorators import auth
 from nexios.auth.backends.jwt import JWTAuthBackend, create_jwt
-from nexios.auth.middleware import AuthenticationMiddleware
 from nexios.auth.base import BaseUser
+from nexios.auth.decorators import auth
+from nexios.auth.middleware import AuthenticationMiddleware
+from nexios.routing import Router
+
 
 class User(BaseUser):
     def __init__(self, id: str, username: str):
@@ -30,21 +31,21 @@ class User(BaseUser):
             return cls(id=user_data["id"], username=user_data["username"])
         return None
 
+
 class db:
     @classmethod
     async def get_user(cls, user_id):
         # Mock database - replace with your actual database
         return {"id": user_id, "username": "admin"}
 
+
 # Set up authentication
 jwt_backend = JWTAuthBackend()
 app = NexiosApp()
-app.add_middleware(AuthenticationMiddleware(
-    user_model=User,
-    backend=jwt_backend
-))
+app.add_middleware(AuthenticationMiddleware(user_model=User, backend=jwt_backend))
 
 auth_router = Router()
+
 
 @auth_router.post("/login")
 async def login(req, res):
@@ -61,23 +62,26 @@ async def login(req, res):
 
     return res.json({"error": "Invalid credentials"}, status_code=401)
 
+
 @auth_router.get("/profile")
 @auth()  # Requires authentication
 async def profile(req, res):
-    return res.json({
-        "message": f"Welcome, {req.user.display_name}!",
-        "user_id": req.user.identity,
-        "authenticated": req.user.is_authenticated
-    })
+    return res.json(
+        {
+            "message": f"Welcome, {req.user.display_name}!",
+            "user_id": req.user.identity,
+            "authenticated": req.user.is_authenticated,
+        }
+    )
+
 
 @auth_router.get("/admin")
 @auth()  # Requires authentication
 async def admin(req, res):
-    return res.json({
-        "message": "Admin access granted",
-        "user": req.user.display_name
-    })
+    return res.json({"message": "Admin access granted", "user": req.user.display_name})
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="127.0.0.1", port=5000, reload=True)
