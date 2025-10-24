@@ -39,9 +39,9 @@ export default defineConfig({
       { text: "Discussions", link:"https://github.com/orgs/nexios-labs/discussions"},
       { text: 'Team', link: 'team' },
       {
-        text: 'v3.0.0-beta.1  (Latest)',
+        text: 'v3.0.0-alpha.1  (Latest)',
         items: [
-          { text: 'v3.0.0-beta.1', link: '/guide/getting-started' },
+          { text: 'v3.0.0-alpha.1', link: '/guide/getting-started' },
           { text: 'v2.11.1', link: '/v2/guide/getting-started' },
           { text: 'Changelog', link: 'https://github.com/nexios-labs/nexios/blob/CHANGELOG.md' },
           { text: 'Contributing', link: '/community/contribution-guide' },
