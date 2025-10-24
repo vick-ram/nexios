@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
+ 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/./logo.png' }],
     ['meta', { name: 'theme-color', content: '#ff7e17' }],

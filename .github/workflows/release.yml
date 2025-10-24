@@ -47,4 +47,10 @@ jobs:
       - name: Publish to PyPI
         run: uv publish --token ${{ secrets.POETRY_PYPI_TOKEN_PYPI }}
 
+      - name: Install git-changelog
+        run: uv pip install git-changelog
+
+      - name: Generate changelog
+        run: uv run git-changelog -o CHANGELOG.md
+
       
