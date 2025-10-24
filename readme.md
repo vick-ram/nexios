@@ -15,7 +15,7 @@ Breaking changes may occur in v3 until it reaches stable release. Use at your ow
 <p align="center">
     <img alt=Support height="350" src="https://nexios-docs.netlify.app/logo.png">
     </p>
-    <h1 align="center">Nexios 2.11.x<br></h1>
+    <h1 align="center">Nexios 3.0.0-alpha<br></h1>
 
    </a>
 </p>
@@ -61,7 +61,7 @@ python --version
 pip install nexios
 
 # Or install with specific version
-pip install nexios==2.9.0
+pip install nexios==3.0.0a1
 ```
 
 ## Features ✨
