@@ -1,6 +1,7 @@
-from tempfile import template
-from nexios.templating import TemplateConfig
 import os
+from tempfile import template
+
+from nexios.templating import TemplateConfig
 
 try:
 

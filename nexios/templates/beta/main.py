@@ -1,8 +1,8 @@
-from nexios import NexiosApp
-from nexios.routing import Routes
-
 from config import app_config
 from routes.index import index
+
+from nexios import NexiosApp
+from nexios.routing import Routes
 
 # Create the application
 app = NexiosApp(title="{{project_name_title}}", config=app_config)

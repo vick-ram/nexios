@@ -1,8 +1,7 @@
-from nexios import NexiosApp
-
-from nexios.templating import render, TemplateEngine
 from routes.index.route import index_router
 
+from nexios import NexiosApp
+from nexios.templating import TemplateEngine, render
 
 app = NexiosApp()
 engine = TemplateEngine()
