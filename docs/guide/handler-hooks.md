@@ -9,13 +9,13 @@ head:
     - property: og:description
       content: Nexios provides a set of hooks that allow you to execute code at specific points in the request-response cycle. These hooks can be used to perform tasks such as authentication, logging, and error handling.
 ---
-# Handler Hooks `deprecated`
+# 🎣 Handler Hooks `deprecated`
 
 ::: danger 🚨Warning
 Handler hooks are deprecated and will be removed in a future release. Use middleware instead.
 :::
 
-## before_request
+## 🔄 before_request
 
 The `before_request` hook is executed before the request is processed. It can be used to perform authentication, log the request, or modify the request object.
 
@@ -41,7 +41,7 @@ The befpre request handler must take the requets and response arguments
 
 :::
 
-## `after_request`
+## 🔄 after_request
 
 The `after_request` hook is executed after the request is processed. It can be used to perform logging, error handling, or modify the response object.
 
@@ -64,7 +64,7 @@ async def index(request, response):
     return {"message": "Hello, world!"}
 ```
 
-## `Custom Hooks using python decorators`
+## 🛠️ Custom Hooks using python decorators
 
 Nexios also allows you to create custom hooks using python decorators.
 

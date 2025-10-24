@@ -1,10 +1,10 @@
-# Request Models in Nexios
+# 📦 Request Models in Nexios
 
 Request models are the backbone of robust, secure, and well-documented APIs. In Nexios, request models are built using Pydantic's `BaseModel`, which provides automatic validation, serialization, and OpenAPI integration.
 
 ---
 
-## Why Use Request Models?
+## ❓ Why Use Request Models?
 
 - **Automatic data validation**: Ensure incoming data matches your expectations.
 - **Clear API documentation**: Models are reflected in your OpenAPI docs.
@@ -12,7 +12,7 @@ Request models are the backbone of robust, secure, and well-documented APIs. In 
 
 ---
 
-## Defining Request Models
+## 🏗️ Defining Request Models
 
 Request models are standard Pydantic models that define the expected structure of incoming request data. You can use them for POST, PUT, and PATCH endpoints, or any route that expects a JSON body.
 
@@ -38,7 +38,7 @@ async def create_user(req, res):
 
 ---
 
-## Advanced Usage
+## ⚡ Advanced Usage
 
 - Use nested models for complex payloads.
 - Add field descriptions and examples for better docs:
@@ -56,7 +56,7 @@ class UserWithAddress(BaseModel):
 
 ---
 
-## Best Practices
+## ✅ Best Practices
 
 - Always validate incoming data with request models.
 - Document required and optional fields.

@@ -10,25 +10,50 @@ head:
       content: Learn how to use dependency injection utilities in Nexios
 ---
 
-#  Robust Dependency Injection in Nexios
+# 💉 Dependency Injection in Nexios
 
-Nexios provides a modern, flexible, and powerful dependency injection (DI) system inspired by the best of FastAPI and Starlette, but with its own unique features. This guide will help you master DI in Nexios, from simple use cases to advanced patterns.
+Nexios provides a modern, flexible, and powerful dependency injection (DI) system inspired by frameworks like FastAPI, but tailored for simplicity and performance in ASGI environments. Unlike more complex DI systems that rely heavily on runtime introspection or container scanning, Nexios emphasizes context-aware injection and declarative dependencies. This approach minimizes overhead, avoids unnecessary complexity, and leverages Python's context to pass request-specific data efficiently.
+
+
+## 🚀 Basic Example
+```py
+from nexios import NexiosApp, Depend
+
+app = NexiosApp()
+
+def get_settings():
+    return {"debug": True, "version": "1.0.0"}
+
+@app.get("/config")
+async def show_config(request, response, settings: dict = Depend(get_settings)):
+    return settings
+```
+
+- Use `Depend()` to mark a parameter as a dependency.
+- Dependencies can be sync or async functions, or even classes.
+
+```py
+
+
+
+```
+
+## ❓ What is Dependency Injection?
+
+Dependency Injection (DI) is a design pattern that allows decoupling components by injecting their dependencies rather than hardcoding them. In Nexios, this means declaring what your handlers need, and the framework handles the rest.
+
+Nexios' take is pragmatic: use DI for reusable logic (e.g., DB connections, auth), but keep it simple. Unlike complex DI containers that manage lifecycles via annotations or XML, Nexios uses Pythonic functions and context, reducing the 'magic' and making code more predictable.
+
+**Key Benefits in Nexios Context:**
+- **Simplicity Over Complexity**: No need for heavy scanning; dependencies are explicit.
+- **Context-Aware**: Access request data without global state or introspection.
+- **Test-Friendly**: Easy overrides for isolated testing.
+
+
 
 ---
 
-##  What is Dependency Injection?
-
-Dependency Injection is a design pattern that allows you to declare external resources, services, or logic ("dependencies") that your route handlers or other dependencies need. Nexios will automatically resolve and inject these dependencies for you.
-
-**Benefits:**
-- Separation of concerns
-- Reusability
-- Testability
-- Cleaner code
-
----
-
-##  Quick Start: Basic Dependency
+## ⚡ Quick Start: Basic Dependency
 
 ```python
 from nexios import NexiosApp, Depend
@@ -48,7 +73,7 @@ async def show_config(request, response, settings: dict = Depend(get_settings)):
 
 ---
 
-##  Chaining & Sub-Dependencies
+## 🔗 Chaining & Sub-Dependencies
 
 Dependencies can depend on other dependencies, forming a tree:
 
@@ -66,7 +91,7 @@ async def list_users(req, res, db: Database = Depend(get_db_connection)):
 
 ---
 
-##  Resource Management with Yield (Generators)
+## ♻️ Resource Management with Yield (Generators)
 
 For resources that need cleanup (e.g., DB sessions), use generator or async generator dependencies. Nexios will handle cleanup automatically:
 
@@ -102,7 +127,41 @@ async def use_async_resource(req, res, r=Depend(get_async_resource)):
 
 ---
 
-##  App-level and Router-level Dependencies
+## Context-Aware Dependencies
+
+Dependencies can access request context, which includes the request, user, and more. This is useful for logging, tracing, or user-specific logic.
+
+```python
+from nexios.dependencies import Context
+
+@app.get("/context-demo")
+async def context_demo(req, res, context: Context = None):
+    return {"path": context.request.url.path}
+```
+
+You can also use `context=Context()` as a parameter, and Nexios will inject the current context automatically.
+
+---
+
+## 🌊 Deep Context Propagation
+
+Nexios supports context propagation through deeply nested dependencies:
+
+```python
+async def dep_a(context=Context()):
+    return f"A: {context.request.url.path}"
+
+async def dep_b(a=Depend(dep_a), context=Context()):
+    return f"B: {a}, {context.request.url.path}"
+
+@app.get("/deep-context")
+async def deep_context(req, res, b=Depend(dep_b)):
+    return {"result": b}
+```
+
+---
+
+## 🏗️ App-level and Router-level Dependencies
 
 Nexios supports dependencies that apply to all routes in the app or in a router. This is useful for things like authentication, database sessions, or any logic you want to share across multiple routes.
 
@@ -157,7 +216,7 @@ app.mount_router(router)
 
 ---
 
-##  Using Classes as Dependencies
+## 🏛️ Using Classes as Dependencies
 
 Classes can act as dependencies through their `__call__` method:
 
@@ -177,67 +236,31 @@ async def protected_route(req, res, user = Depend(auth)):
 
 ---
 
-##  Context-Aware Dependencies
+## 🎨 Context-Aware Dependencies and Simplicity
 
-Dependencies can access request context, which includes the request, user, and more. This is useful for logging, tracing, or user-specific logic.
-
-```python
-from nexios.dependencies import Context
-
-@app.get("/context-demo")
-async def context_demo(req, res, context: Context = None):
-    return {"path": context.request.url.path}
-```
-
-You can also use `context=Context()` as a parameter, and Nexios will inject the current context automatically.
-
----
-
-##  Deep Context Propagation
-
-Nexios supports context propagation through deeply nested dependencies:
+Nexios DI shines in context-aware scenarios, where dependencies need request-specific data. By passing `Context()`, you access `request`, `response`, `user`, and more without introspection:
 
 ```python
-async def dep_a(context=Context()):
-    return f"A: {context.request.url.path}"
+# Deeper example: Context for logging and tracing
+async def log_request(context=Context()):
+    logger.info(f"Handling {context.request.method} {context.request.url.path}")
+    return context.request
 
-async def dep_b(a=Depend(dep_a), context=Context()):
-    return f"B: {a}, {context.request.url.path}"
+async def get_user_profile(req_info=Depend(log_request), context=Context()):
+    # Use context for user-specific logic
+    user_id = context.request.path_params.get("user_id")
+    return await fetch_user_profile(user_id)
 
-@app.get("/deep-context")
-async def deep_context(req, res, b=Depend(dep_b)):
-    return {"result": b}
+@app.get("/users/{user_id}")
+async def user_profile(req, res, profile=Depend(get_user_profile)):
+    return profile
 ```
 
----
+**Why This is Simpler**: Other frameworks might require scanning request objects or using middleware for every access. Nexios injects context directly, avoiding runtime overhead and boilerplate. It's not 'technically complex'—just explicit and efficient.
 
-##  Testing Dependencies
 
-You can override dependencies for testing:
 
-```python
-async def get_test_db():
-    return TestDatabase()
-
-app.dependency_overrides[get_db] = get_test_db
-```
-
----
-
-##  Best Practices
-
-- **Single Responsibility**: Each dependency should have one clear purpose
-- **Type Hints**: Use type hints for better IDE support and error detection
-- **Resource Management**: Use `yield` for resources that need cleanup
-- **Error Handling**: Handle dependency errors gracefully
-- **Documentation**: Document what each dependency provides
-- **Testing**: Design dependencies to be easily testable
-- **Performance**: Avoid expensive operations in dependencies
-- **Use Context**: Leverage context for request/user-specific logic
-
----
-
-##  Advanced Patterns
+## ⚙️ Advanced Patterns
 
 - **Dependency Caching**: Use `functools.lru_cache` for expensive dependencies
 - **Custom Scopes**: Implement your own scoping rules for advanced use cases

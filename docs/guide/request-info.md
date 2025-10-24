@@ -9,7 +9,7 @@ head:
     - property: og:description
       content: Nexios provides a comprehensive `Request` object that gives you access to all the information about the incoming HTTP request. This object is automatically passed to your route handlers and contains methods and properties to access request data.
 ---
-## Basic Request Properties
+# 📥 Request Information
 
 ```python
 @app.get("/example")
@@ -22,7 +22,7 @@ async def example_handler(req: Request, res):
     client_ip = req.client     # Client address (IP, port)
 ```
 
-## Query Parameters
+## ❓ Query Parameters
 
 Access URL query parameters (after the `?` in the URL):
 
@@ -35,7 +35,7 @@ async def search_handler(req: Request, res):
     all_params = dict(req.query_params)    # {'q': 'nexios', 'page': '2'}
 ```
 
-## Path Parameters
+## 🛣️ Path Parameters
 
 Access named parameters from the route path:
 
@@ -47,7 +47,7 @@ async def user_handler(req: Request, res):
     # Or directly as function parameter (shown above)
 ```
 
-##  Request Body
+## 📦 Request Body
 
 ### JSON Data
 
@@ -87,7 +87,7 @@ async def raw_handler(req: Request, res):
     body_text = await req.text  # Decoded text
 ```
 
-## Cookies
+## 🍪 Cookies
 
 ```python
 @app.get("/profile")
@@ -95,7 +95,7 @@ async def profile_handler(req: Request, res):
     session_id = req.cookies.get("session_id")
 ```
 
-## Client Information
+## 💻 Client Information
 
 ```python
 @app.get("/client-info")
@@ -105,7 +105,7 @@ async def client_info_handler(req: Request, res):
     origin = req.origin
 ```
 
-## State and Middleware Data
+## 📊 State and Middleware Data
 
 ```python
 @app.get("/auth")
@@ -116,7 +116,7 @@ async def auth_handler(req: Request, res):
     custom_data = req.state.get("custom_data")
 ```
 
-## URL Construction
+## 🔗 URL Construction
 
 ```python
 @app.get("/links")
@@ -126,7 +126,7 @@ async def links_handler(req: Request, res):
 ```
 
 
-## Request Type Detection
+## 🔍 Request Type Detection
 
 Nexios provides convenient properties to quickly check the type and characteristics of incoming requests:
 
@@ -137,16 +137,16 @@ Nexios provides convenient properties to quickly check the type and characterist
 async def handle_request(req: Request, res):
     # Check content type
     if req.is_json:
-        data = await req.json
+        data = await req.json()
         # Handle JSON data
     elif req.is_form:
-        data = await req.form
+        data = await req.form()
         # Handle form data
     elif req.is_multipart:
-        files = await req.files
+        files = await req.files()
         # Handle file uploads
     elif req.is_urlencoded:
-        data = await req.form
+        data = await req.form()
         # Handle URL-encoded form data
 ```
 
@@ -158,20 +158,20 @@ async def process_request(req: Request, res):
     # Check if request has various components
     if req.has_cookie:
         session_id = req.cookies.get("session")
-    
+
     if req.has_files:
-        files = await req.files
+        files = await req.files()
         # Process uploaded files
-    
+
     if req.has_body:
         # Request contains body data
         if req.content_length > 1000000:  # 1MB
             return res.status(413).text("File too large")
-    
+
     if req.is_authenticated:
         user_id = req.user.id
         # Handle authenticated request
-    
+
     if req.has_session:
         session_data = req.session
         # Access session data
@@ -201,13 +201,13 @@ async def responsive_handler(req: Request, res):
     # Check request characteristics
     if req.is_ajax:
         return res.json({"message": "AJAX request"})
-    
+
     if req.is_secure:
         return res.json({"protocol": "HTTPS"})
-    
+
     if req.accepts_json:
         return res.json({"format": "JSON preferred"})
-    
+
     if req.accepts_html:
         return res.html("<h1>HTML Response</h1>")
 ```
@@ -220,10 +220,10 @@ async def header_handler(req: Request, res):
     # Check for specific headers
     if req.has_header("authorization"):
         token = req.get_header("authorization")
-    
+
     # Get header with default value
     api_version = req.get_header("x-api-version", "v1")
-    
+
     # Check if header exists
     if req.has_header("x-custom-header"):
         custom_value = req.get_header("x-custom-header")
@@ -238,7 +238,7 @@ async def header_handler(req: Request, res):
 | `req.accepts_json` | True if client accepts JSON | API responses |
 | `req.accepts_html` | True if client accepts HTML | Web page responses |
 
-## Advanced Features
+## ⚡ Advanced Features
 
 ### Streaming Requests
 

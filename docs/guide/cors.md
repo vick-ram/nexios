@@ -9,13 +9,13 @@ head:
     - property: og:description
       content: Learn how to use cors utilities in Nexios
 ---
-# cors
+# 🌐 CORS in Nexios
 
 Got it! I’ll go through each CORS configuration setting in **Nexios**, explaining what it does and how it impacts requests.
 
 ***
 
-#### **Basic CORS Configuration in Nexios**
+### 🚀 Basic CORS Configuration in Nexios
 
 Before diving into individual settings, here’s a simple CORS setup using `MakeConfig`:
 
@@ -40,7 +40,7 @@ we can break it down further:
 
 ***
 
-### allow\_origins
+### 🔓 allow_origins
 
 * **Purpose:** Specifies which domains can access the API.
 *   **Example:**
@@ -54,7 +54,7 @@ we can break it down further:
 
 ***
 
-### blacklist\_origins
+### 🚫 blacklist_origins
 
 * **Purpose:** Specifies which origins should be **blocked**, even if they match `allow_origins`.
 *   **Example:**
@@ -66,7 +66,7 @@ we can break it down further:
 
 ***
 
-### allow\_methods
+### 🔧 allow_methods
 
 * **Purpose:** Defines which HTTP methods (GET, POST, etc.) are allowed in cross-origin requests.
 *   **Example:**
@@ -78,7 +78,7 @@ we can break it down further:
 
 ***
 
-### allow\_headers
+### 📝 allow_headers
 
 * **Purpose:** Specifies which request headers are permitted in cross-origin requests.
 *   **Example:**
@@ -90,7 +90,7 @@ we can break it down further:
 
 ***
 
-### blacklist\_headers
+### 🚫 blacklist_headers
 
 * **Purpose:** Defines headers that should **not** be allowed in requests.
 *   **Example:**
@@ -102,7 +102,7 @@ we can break it down further:
 
 ***
 
-### allow\_credentials
+### 🔑 allow_credentials
 
 * **Purpose:** Determines whether credentials (cookies, authorization headers) are allowed in requests.
 *   **Example:**
@@ -117,7 +117,7 @@ we can break it down further:
 
 ***
 
-### allow\_origin\_regex
+### 🎯 allow_origin_regex
 
 * **Purpose:** Uses a regex pattern to match allowed origins dynamically.
 *   **Example:**
@@ -129,7 +129,7 @@ we can break it down further:
 
 ***
 
-### expose\_headers
+### 👁️ expose_headers
 
 * **Purpose:** Specifies which response headers the client is allowed to access.
 *   **Example:**
@@ -141,7 +141,7 @@ we can break it down further:
 
 ***
 
-### max\_age
+### ⏱️ max_age
 
 * **Purpose:** Defines how long the preflight (OPTIONS) response can be cached.
 *   **Example:**
@@ -153,7 +153,7 @@ we can break it down further:
 
 ***
 
-### strict\_origin\_checking
+### 🔍 strict_origin_checking
 
 * **Purpose:** If enabled, requests **must** include an `Origin` header.
 *   **Example:**
@@ -165,7 +165,7 @@ we can break it down further:
 
 ***
 
-### debug
+### 🐛 debug
 
 * **Purpose:** Enables logging to troubleshoot CORS issues.
 *   **Example:**
@@ -179,7 +179,7 @@ we can break it down further:
 
 ***
 
-### custom\_error\_status & custom\_error\_messages
+### ❌ custom_error_status & custom_error_messages
 
 * **Purpose:** Allows custom error handling for CORS failures.
 *   **Example:**

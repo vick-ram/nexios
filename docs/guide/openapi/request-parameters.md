@@ -1,10 +1,10 @@
-# Documenting Request Parameters in Nexios
+# 📝 Documenting Request Parameters in Nexios
 
 Request parameters are essential for making your API flexible, filterable, and powerful. Nexios supports three main types of request parameters: path parameters, query parameters, and headers. This guide explains how to document each type in your OpenAPI docs, with clear examples and best practices.
 
 ---
 
-## Path Parameters
+## 🛣️ Path Parameters
 
 Path parameters are part of the URL and are used to identify specific resources. Nexios automatically detects and documents path parameters in your routes.
 
@@ -27,7 +27,7 @@ Always use type hints for path parameters. This ensures correct OpenAPI document
 
 ---
 
-## Query Parameters
+## ❓ Query Parameters
 
 Query parameters are used for filtering, sorting, or pagination. Nexios does not auto-detect query parameters, but you can explicitly document them using the `parameters` argument.
 
@@ -57,7 +57,7 @@ async def list_users(req, res):
 
 ---
 
-## Header Parameters
+## 📋 Header Parameters
 
 Headers are used for authentication tokens, custom client information, and more. Document them using the `Header` model.
 
@@ -81,7 +81,7 @@ async def list_users(req, res):
 
 ---
 
-## Best Practices
+## ✅ Best Practices
 
 - Always document every parameter your endpoint expects.
 - Use descriptive names and provide clear descriptions.

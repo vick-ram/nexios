@@ -9,7 +9,7 @@ head:
     - property: og:description
       content: Nexios provides a flexible and customizable pagination system that makes managing large datasets a breeze. With support for dynamic page sizes, custom query parameters, and seamless API integration, you can create efficient, user-friendly paginated experiences with minimal code.
 ---
-## Simple Pagination
+# 📄 Pagination
 
 Here's a quick example of how to paginate a list of items using `response.paginate()`:
 
@@ -135,7 +135,7 @@ Output:
 ```
 
 
-## Pagination Strategies
+## 🗂️ Pagination Strategies
 
 You can also use other pagination strategies based on your requirements
 
@@ -198,7 +198,7 @@ Cursor-based pagination for consistent pagination with changing datasets.
 
 **Example URL:** `/items?cursor=eyJpZCI6IDEwfQ%3D%3D&page_size=10`
 
-## Data Handlers
+## 🔄 Data Handlers
 
 Nexios provides both synchronous and asynchronous data handlers:
 This is an abstract base class that defines the interface for fetching data. You must implement two methods:
@@ -223,7 +223,7 @@ Base class for asynchronous data handlers with two required methods:
 
 by default `.paginate()` uses the `AsyncListDataHandler` for async functions and `SyncListDataHandler` for sync functions.
 
-## Custom Data Handler
+## 🏗️ Custom Data Handler
 
 You can also create your own data handler by subclassing the `SyncDataHandler` or `AsyncDataHandler` classes.
 
@@ -243,7 +243,7 @@ async def get_items(request, response):
 
 In this example , we use `DatabaseDataHandler` to fetch data from a database using TortoiseORM.
 
-## Custom Pagination Strategy
+## ⚙️ Custom Pagination Strategy
 
 You can also create your own pagination strategy by subclassing the `BasePaginationStrategy` class.
 
@@ -266,7 +266,7 @@ You can override the following methods:
 - `calculate_offset_limit(self, page, page_size)`
 
 
-## Manual Integration 
+## 🔧 Manual Integration 
 
 While Nexios provides a convenient way to use pagination, you can also manually integrate pagination into your app.
 

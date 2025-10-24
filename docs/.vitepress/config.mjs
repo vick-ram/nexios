@@ -38,10 +38,11 @@ export default defineConfig({
       { text: "Discussions", link:"https://github.com/orgs/nexios-labs/discussions"},
       { text: 'Team', link: 'team' },
       {
-        text: '2.11.*',
+        text: 'v3.0.0-beta.1  (Latest)',
         items: [
-          { text: 'v3', link: '/v3/' },
-          { text: 'Changelog', link: 'https://github.com/nexios-labs/nexios/blob/v3/CHANGELOG.md' },
+          { text: 'v3.0.0-beta.1', link: '/guide/getting-started' },
+          { text: 'v2.11.1', link: '/v2/guide/getting-started' },
+          { text: 'Changelog', link: 'https://github.com/nexios-labs/nexios/blob/CHANGELOG.md' },
           { text: 'Contributing', link: '/community/contribution-guide' },
         ]
       }
@@ -63,6 +64,82 @@ export default defineConfig({
         { text : "Contribution Guide", link:"/community/contribution-guide"},
         { text: 'Discussions', link: 'https://github.com/orgs/nexios-labs/discussions' },
         { text: 'Team', link: '/team' },
+      ],
+      '/v2/guide/': [
+        
+        { text: 'Getting Started', link: '/guide/getting-started' },
+        { text: 'CLI', link: '/guide/cli' },
+        { text : "Why Nexios?", link: '/guide/why-nexios' },
+        {
+          text: 'Core Concepts',
+          collapsed: false,
+          items: [
+            { text: 'Routing', link: '/v2/guide/routing' },
+            { text: 'Handlers', link: '/v2/guide/handlers' },
+            { text: 'Startups and Shutdowns', link: '/v2/guide/startups-and-shutdowns' },
+            { text: 'Request Inputs', link: '/v2/guide/request-inputs' },
+            { text: 'Configuration', link: '/v2/guide/configuration' },
+            { text: 'Sending Responses', link: '/v2/guide/sending-responses' },
+            { text: 'Routers and Subapps', link: '/v2/guide/routers-and-subapps' },
+            { text: 'Middleware', link: '/v2/guide/middleware' },
+          ] 
+        },
+        {
+          text: 'Request Lifecycle',
+          collapsed: false,
+          items: [
+            { text: 'Cookies', link: '/v2/guide/cookies' },
+            { text: 'Headers', link: '/v2/guide/headers' },
+            { text: 'Sessions', link: '/v2/guide/sessions' },
+            { text: 'Request Info', link: '/v2/guide/request-info' },
+          ]
+        },
+        {
+          text: 'Advanced Topics',
+          collapsed: false,
+          items: [
+            { text: 'Error Handling', link: '/v2/guide/error-handling' },
+            { text: 'Pagination', link: '/v2/guide/pagination' },
+            { text: 'Authentication', link: '/v2/guide/authentication' },
+            { text: "Handler Hooks", link: '/v2/guide/handler-hooks' },
+            { text: 'Class Based Handlers', link: '/v2/guide/class-based-handlers' },
+            { text: 'Events', link: '/v2/guide/events' },
+            { text: 'Streaming Response',  link: '/v2/guide/streaming-response' },
+            { text: 'Dependency Injection', link: '/v2/guide/dependency-injection' },
+            { text : "Templating", link:"/v2/guide/templating/index"},
+            { text: 'Static Files', link: '/v2/guide/static-files' },
+            { text: 'File Upload', link: '/v2/guide/file-upload' },
+            { text: 'Cors', link: '/v2/guide/cors' },
+            { text: 'CSRF', link: '/v2/guide/csrf' },  
+            { text: 'File Router', link: '/v2/guide/file-router' },
+            { text: 'Concurrency Utilities', link: '/v2/guide/concurrency' },
+            { text: 'Security', link: '/v2/guide/security' },
+            { text: 'Pydantic Integration', link: '/v2/guide/pydantic-integration' },
+          ]
+        },
+        {
+          text: 'Websockets',
+          collapsed: false,
+          items: [
+            { text: 'Overview', link: '/v2/guide/websockets/index' },
+            { text: 'Channels', link: '/v2/guide/websockets/channels' },
+            { text: 'Groups', link: '/v2/guide/websockets/groups' },
+            { text: 'Events', link: '/v2/guide/websockets/events' },
+            { text: 'Consumer', link: '/v2/guide/websockets/consumer' },
+          ]
+        },
+        {
+          text: 'OpenAPI',
+          collapsed: false,
+          items: [
+            { text: 'Overview', link: '/v2/guide/openapi/index' },
+            { text: 'Response Models with Pydantic', link: '/v2/guide/openapi/response-models' },
+            { text: 'Request Schemas', link: '/v2/guide/openapi/request-schemas' },
+            { text: 'Request Parameters', link: '/v2/guide/openapi/request-parameters' },
+            { text: 'Customizing OpenAPI Config', link: '/v2/guide/openapi/customizing-openapi-configuration' },
+            { text: 'Authentication Docs', link: '/v2/guide/openapi/authentication-documentation' },
+          ]
+        }
       ],
       '/guide/': [
         
@@ -110,7 +187,6 @@ export default defineConfig({
             { text: 'File Upload', link: '/guide/file-upload' },
             { text: 'Cors', link: '/guide/cors' },
             { text: 'CSRF', link: '/guide/csrf' },
-            { text: 'File Router', link: '/guide/file-router' },
             { text: 'Concurrency Utilities', link: '/guide/concurrency' },
             { text: 'Security', link: '/guide/security' },
             { text: 'Pydantic Integration', link: '/guide/pydantic-integration' },
@@ -137,81 +213,6 @@ export default defineConfig({
             { text: 'Request Parameters', link: '/guide/openapi/request-parameters' },
             { text: 'Customizing OpenAPI Config', link: '/guide/openapi/customizing-openapi-configuration' },
             { text: 'Authentication Docs', link: '/guide/openapi/authentication-documentation' },
-          ]
-        }
-      ],
-      '/v3/guide/': [
-        
-        { text: 'Getting Started', link: '/v3/guide/getting-started' },
-        { text: 'CLI', link: '/v3/guide/cli' },
-        { text : "Why Nexios?", link: '/v3/guide/why-nexios' },
-        {
-          text: 'Core Concepts',
-          collapsed: false,
-          items: [
-            { text: 'Routing', link: '/v3/guide/routing' },
-            { text: 'Handlers', link: '/v3/guide/handlers' },
-            { text: 'Startups and Shutdowns', link: '/v3/guide/startups-and-shutdowns' },
-            { text: 'Request Inputs', link: '/v3/guide/request-inputs' },
-            { text: 'Configuration', link: '/v3/guide/configuration' },
-            { text: 'Sending Responses', link: '/v3/guide/sending-responses' },
-            { text: 'Routers and Subapps', link: '/v3/guide/routers-and-subapps' },
-            { text: 'Middleware', link: '/v3/guide/middleware' },
-          ] 
-        },
-        {
-          text: 'Request Lifecycle',
-          collapsed: false,
-          items: [
-            { text: 'Cookies', link: '/v3/guide/cookies' },
-            { text: 'Headers', link: '/v3/guide/headers' },
-            { text: 'Sessions', link: '/v3/guide/sessions' },
-            { text: 'Request Info', link: '/v3/guide/request-info' },
-          ]
-        },
-        {
-          text: 'Advanced Topics',
-          collapsed: false,
-          items: [
-            { text: 'Error Handling', link: '/v3/guide/error-handling' },
-            { text: 'Pagination', link: '/v3/guide/pagination' },
-            { text: 'Authentication', link: '/v3/guide/authentication' },
-            { text: "Handler Hooks", link: '/v3/guide/handler-hooks' },
-            { text: 'Class Based Handlers', link: '/v3/guide/class-based-handlers' },
-            { text: 'Events', link: '/v3/guide/events' },
-            { text: 'Streaming Response',  link: '/v3/guide/streaming-response' },
-            { text: 'Dependency Injection', link: '/v3/guide/dependency-injection' },
-            { text : "Templating", link:"/v3/guide/templating/index"},
-            { text: 'Static Files', link: '/v3/guide/static-files' },
-            { text: 'File Upload', link: '/v3/guide/file-upload' },
-            { text: 'Cors', link: '/v3/guide/cors' },
-            { text: 'CSRF', link: '/v3/guide/csrf' },
-            { text: 'Concurrency Utilities', link: '/v3/guide/concurrency' },
-            { text: 'Security', link: '/v3/guide/security' },
-            { text: 'Pydantic Integration', link: '/v3/guide/pydantic-integration' },
-          ]
-        },
-        {
-          text: 'Websockets',
-          collapsed: false,
-          items: [
-            { text: 'Overview', link: '/v3/guide/websockets/index' },
-            { text: 'Channels', link: '/v3/guide/websockets/channels' },
-            { text: 'Groups', link: '/v3/guide/websockets/groups' },
-            { text: 'Events', link: '/v3/guide/websockets/events' },
-            { text: 'Consumer', link: '/v3/guide/websockets/consumer' },
-          ]
-        },
-        {
-          text: 'OpenAPI',
-          collapsed: false,
-          items: [
-            { text: 'Overview', link: '/v3/guide/openapi/index' },
-            { text: 'Response Models with Pydantic', link: '/v3/guide/openapi/response-models' },
-            { text: 'Request Schemas', link: '/v3/guide/openapi/request-schemas' },
-            { text: 'Request Parameters', link: '/v3/guide/openapi/request-parameters' },
-            { text: 'Customizing OpenAPI Config', link: '/v3/guide/openapi/customizing-openapi-configuration' },
-            { text: 'Authentication Docs', link: '/v3/guide/openapi/authentication-documentation' },
           ]
         }
       ]
