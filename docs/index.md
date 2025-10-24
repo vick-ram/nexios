@@ -69,10 +69,7 @@ features:
       - JWT authentication
       - Session management
       - CSRF protection
-      - Rate limiting
-      - Input validation
-      - SQL injection prevention
-      - XSS protection
+     
 
   - icon: 📝
     title: Developer Experience
@@ -264,12 +261,10 @@ from nexios.auth.middleware import AuthenticationMiddleware
 from nexios.auth.backends.jwt import JWTAuthBackend
 from nexios.auth.decorator import auth
 
-async def get_user_from_payload(**payload):
-  ...
+
 auth = AuthenticationMiddleware(
-      backend = JWTAuthBackend(
-        get_user_from_payload
-      )
+    backend = JWTAuthBackend(),
+    user_model = UserModel
 )
 
 app.add_middleware(auth)
@@ -317,11 +312,11 @@ async def list_users(
     return response.json(users)
 ```
 
-```python [With Auth]
+```python [With Context]
+from nexios.dependecies import Context
 async def get_current_user(
-    request,
-    auth=Depend(get_auth)
-):
+    ctx = Context()
+):  request = ctx.request
     token = request.headers.get("Authorization")
     return await auth.get_user(token)
 
