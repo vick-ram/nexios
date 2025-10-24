@@ -50,7 +50,11 @@ jobs:
       - name: Install git-changelog
         run: uv pip install git-changelog
 
-      - name: Generate changelog
-        run: uv run git-changelog -o CHANGELOG.md
-
+      - name: Commit and push CHANGELOG
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "📝 Update CHANGELOG for ${{ github.ref_name }}" || echo "No changes to commit"
+          git push
       
