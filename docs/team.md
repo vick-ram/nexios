@@ -33,6 +33,26 @@ const maintainers = [
       { icon: 'github', link: 'https://github.com/struckchure' },
       { icon: 'twitter', link: 'https://x.com/struckchure' }
     ]
+  },
+  {
+    avatar: 'https://avatars.githubusercontent.com/u/30089712?v=4',
+    name:'Dao Malick BENIN',
+    title:'Contributor',
+    desc:'',
+    links: [
+      { icon: 'github', link: 'https://github.com/dmb225' },
+      { icon: 'linkedin', link: 'https://www.linkedin.com/in/dao-malick-benin' }
+    ]
+  },
+  {
+    avatar: 'https://avatars.githubusercontent.com/u/102381259?v=4',
+    name:'ivan',
+    title:'Contributor',
+    desc:'',
+    links: [
+      { icon: 'github', link: 'https://github.com/iamlostshe' },
+      { icon: 'youtube', link: 'https://www.youtube.com/@iamlostshe' }
+    ]
   }
 ]
 
