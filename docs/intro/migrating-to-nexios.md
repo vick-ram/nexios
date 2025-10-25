@@ -20,18 +20,20 @@ app = NexiosApp()
 
 @app.get("/hello")
 async def hello(request, response):
-    return {"message": "Hello from Nexios"}
+    return response.json({"message": "Hello from Nexios"})
 ```
 
 ```python [Nexios (without decorator)]
 from nexios import NexiosApp
+from nexios.routing import Routes
 
 app = NexiosApp()
 
 async def hello(request, response):
-    return {"message": "Hello from Nexios"}
+    return response.json({"message": "Hello from Nexios"})
 
-app.add_route("/hello", hello)
+route = Routes("/hello", hello, methods=["GET"])
+app.add_route(route)
 ```
 
 ```python [Flask]
