@@ -1,27 +1,27 @@
-# Quick Start
+# 🚀 Quick Start
 
-Get up and running with Nexios in minutes. This guide will walk you through creating your first Nexios application.
+Get up and running with Nexios in minutes ⏱️. This guide will walk you through creating your first Nexios application.
 
-## Prerequisites
+## 📋 Prerequisites
 
-- Python 3.8+
+- Python 3.8+ 🐍
 - pip (Python package manager)
 
-## Installation
+## 📦 Installation
 
-1. Create a new virtual environment (recommended):
+1. Create a new virtual environment (recommended) 🏠:
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
    ```
 
-2. Install Nexios:
+2. Install Nexios 📥:
    ```bash
    pip install nexios
    ```
 
-## Your First Application
-A simple Nexios one file  application will look like this:
+## 🎯 Your First Application
+A simple Nexios one file application will look like this:
 
 ```python
 from nexios import Nexios
@@ -38,15 +38,15 @@ if __name__ == "__main__":
        uvicorn.run(app, host="0.0.0.0", port=8000)
    ```
 
-2. Run your application:
+2. Run your application ▶️:
    ```bash
    python main.py
    ```
 
-3. Open your browser and visit `http://localhost:8000`
+3. Open your browser and visit `http://localhost:8000` 🌐
    You should see: `{"message": "Welcome to Nexios!"}`
 
-## Adding More Routes
+## 🛣️ Adding More Routes
 
 ```python
 from nexios import Nexios
@@ -68,21 +68,21 @@ async def create_data(request:Request,response:Response):
     return response.json({"received": data, "status": "success"})
 ```
 
-## Interactive API Documentation
+## 📖 Interactive API Documentation
 
 Nexios automatically generates interactive API documentation:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+- Swagger UI: `http://localhost:8000/docs` 📋
+- ReDoc: `http://localhost:8000/redoc` 📄
 
-## Next Steps
+## 👣 Next Steps
 
-- [What is Nexios?](../intro) - Learn more about Nexios
-- [Nexios and FastAPI](./nexios-and-fastapi) - Understand the relationship
-- [Nexios and ASGI](./nexios-and-asgi) - Learn about the ASGI foundation
-- [Async Python](./nexios-and-async-python) - Master async/await in Nexios
+- [What is Nexios?](../intro) - Learn more about Nexios 🤔
+- [Nexios and FastAPI](./nexios-and-fastapi) - Understand the relationship ⚖️
+- [Nexios and ASGI](./nexios-and-asgi) - Learn about the ASGI foundation 🌐
+- [Async Python](./nexios-and-async-python) - Master async/await in Nexios 🔄
 
-## Need Help?
+## 🆘 Need Help?
 
-- Check out the [GitHub repository](https://github.com/nexios-labs/nexios)
-- Join our [Discussions](https://github.com/orgs/nexios-labs/discussions)
-- Report issues on [GitHub Issues](https://github.com/nexios-labs/nexios/issues)
+- Check out the [GitHub repository](https://github.com/nexios-labs/nexios) 🔗
+- Join our [Discussions](https://github.com/orgs/nexios-labs/discussions) 💬
+- Report issues on [GitHub Issues](https://github.com/nexios-labs/nexios/issues) 🚨
