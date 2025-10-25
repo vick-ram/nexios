@@ -54,25 +54,9 @@ security = SecurityMiddleware(
 )
 ```
 
-### 2. Cross-Origin Resource Sharing (CORS)
 
-::: warning CORS Configuration
-Carefully configure CORS settings to balance security and functionality.
-:::
 
-```python
-security = SecurityMiddleware(
-    cors_enabled=True,
-    allowed_origins=["https://example.com"],
-    allowed_methods=["GET", "POST"],
-    allowed_headers=["Content-Type", "Authorization"],
-    expose_headers=["X-Custom-Header"],
-    max_age=3600,
-    allow_credentials=True
-)
-```
-
-### 3. HTTP Strict Transport Security (HSTS)
+### 2. HTTP Strict Transport Security (HSTS)
 
 ```python
 security = SecurityMiddleware(
@@ -83,7 +67,7 @@ security = SecurityMiddleware(
 )
 ```
 
-### 4. XSS Protection
+### 3. XSS Protection
 
 ```python
 security = SecurityMiddleware(
@@ -92,7 +76,7 @@ security = SecurityMiddleware(
 )
 ```
 
-### 5. Frame Options
+### 4. Frame Options
 
 ```python
 security = SecurityMiddleware(
@@ -102,7 +86,7 @@ security = SecurityMiddleware(
 )
 ```
 
-### 6. SSL/HTTPS Redirect
+### 5. SSL/HTTPS Redirect
 
 ```python
 security = SecurityMiddleware(
@@ -112,7 +96,7 @@ security = SecurityMiddleware(
 )
 ```
 
-### 7. Cross-Origin Policies
+### 6. Cross-Origin Policies
 
 ```python
 security = SecurityMiddleware(
@@ -122,7 +106,7 @@ security = SecurityMiddleware(
 )
 ```
 
-### 8. Permissions Policy
+### 7. Permissions Policy
 
 ```python
 security = SecurityMiddleware(
@@ -135,7 +119,7 @@ security = SecurityMiddleware(
 )
 ```
 
-### 9. Cache Control
+### 8. Cache Control
 
 ```python
 security = SecurityMiddleware(
@@ -144,7 +128,7 @@ security = SecurityMiddleware(
 )
 ```
 
-### 10. Expect-CT
+### 9. Expect-CT
 
 ```python
 security = SecurityMiddleware(
