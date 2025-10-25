@@ -1,9 +1,4 @@
-## `NEXIOS`
-
-> warning ⚠️ **IMPORTANT NOTICE: v3 Branch is Experimental**
-The `v3` branch contains experimental features and is **NOT yet stable** for production use. For stable releases, please use the `v2` branch or the latest stable release from PyPI.
-
-- **v2 Branch**: [Switch to v2 branch](https://github.com/nexios-labs/nexios/tree/v2) for production-ready features
+## `NEXIOS` <sup>beta</sup>
 
 
 Breaking changes may occur in v3 until it reaches stable release. Use at your own risk!
@@ -15,7 +10,7 @@ Breaking changes may occur in v3 until it reaches stable release. Use at your ow
 <p align="center">
     <img alt=Support height="350" src="https://nexios-docs.netlify.app/logo.png">
     </p>
-    <h1 align="center">Nexios 3.0.0-alpha<br></h1>
+    <h1 align="center">Nexios 3.0.0<sup>beta</sup><br></h1>
 
    </a>
 </p>
@@ -119,7 +114,7 @@ async def get_user(request: Request, response: Response, user: Depend(get_user))
     return {"user": user}
 ```
 
-Visit http://localhost:4000/docs to view the Swagger API documentation.
+Visit http://localhost:8000/docs to view the Swagger API documentation.
 
 
 
