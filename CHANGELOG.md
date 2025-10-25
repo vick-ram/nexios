@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- fix docs inconsistencies #197 ([091f536](https://github.com/nexios-labs/Nexios/commit/091f53601421e3ffff8eda1ddfba7d87f0420036) by dunamix 🦄).
+- fix: correct the use of process.nextTick ([964dd41](https://github.com/nexios-labs/Nexios/commit/964dd41bf62a1a8d38677d84c450b3cc4a199277) by techwithdunamix).
 - fix(pagination): enhance cursor decoding and error handling ([c557a9c](https://github.com/nexios-labs/Nexios/commit/c557a9c7514bca3b79221187a2d2bb8172c0e0c6) by techwithdunamix).
 - fix(auth): replace delete_session with del for session management ([329ad1f](https://github.com/nexios-labs/Nexios/commit/329ad1f8411dee1a7e42e084486c6b0166d8291c) by techwithdunamix).
 - fix(session);: fix session clear method ([ac0277a](https://github.com/nexios-labs/Nexios/commit/ac0277a530c736c0db4c4cec5d0a19ad29edadfd) by techwithdunamix).
