@@ -56,7 +56,7 @@ python --version
 pip install nexios
 
 # Or install with specific version
-pip install nexios==3.0.0a1
+pip install nexios==3.0.0b1
 ```
 
 ## Features ✨
