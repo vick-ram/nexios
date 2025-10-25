@@ -2,9 +2,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from nexios import NexiosApp
+from nexios.http import Request, Response
 from nexios.static import StaticFiles
 from nexios.testclient import TestClient
-from nexios.http import Response, Request
 
 if TYPE_CHECKING:
     from nexios.http import Request, Response
@@ -147,7 +147,9 @@ def test_static_file_allowed_extensions():
     """Test allowed extensions filtering"""
     app = NexiosApp()
     static_dir = Path(__file__).parent / "static"
-    app.register(StaticFiles(directory=static_dir, allowed_extensions=["txt", "css"]), "/static")
+    app.register(
+        StaticFiles(directory=static_dir, allowed_extensions=["txt", "css"]), "/static"
+    )
 
     with TestClient(app) as client:
         # These should work
@@ -169,7 +171,10 @@ def test_static_file_forbidden_extensions():
     """Test that dangerous extensions are blocked"""
     app = NexiosApp()
     static_dir = Path(__file__).parent / "static"
-    app.register(StaticFiles(directory=static_dir, allowed_extensions=["txt", "css", "html"]), "/static")
+    app.register(
+        StaticFiles(directory=static_dir, allowed_extensions=["txt", "css", "html"]),
+        "/static",
+    )
 
     with TestClient(app) as client:
         # Create a forbidden file for testing
@@ -187,15 +192,17 @@ def test_static_file_forbidden_extensions():
 
 def test_static_file_custom_404_handler():
     """Test custom 404 handler functionality"""
+
     def custom_404(request: Request, response: Response) -> Response:
         return response.html(
-            "<html><body><h1>Custom Not Found</h1></body></html>",
-            status_code=404
+            "<html><body><h1>Custom Not Found</h1></body></html>", status_code=404
         )
 
     app = NexiosApp()
     static_dir = Path(__file__).parent / "static"
-    app.register(StaticFiles(directory=static_dir, custom_404_handler=custom_404), "/static")
+    app.register(
+        StaticFiles(directory=static_dir, custom_404_handler=custom_404), "/static"
+    )
 
     with TestClient(app) as client:
         resp = client.get("/static/nonexistent.txt")
@@ -208,7 +215,10 @@ def test_static_file_cache_control():
     """Test cache control headers"""
     app = NexiosApp()
     static_dir = Path(__file__).parent / "static"
-    app.register(StaticFiles(directory=static_dir, cache_control="public, max-age=3600"), "/static")
+    app.register(
+        StaticFiles(directory=static_dir, cache_control="public, max-age=3600"),
+        "/static",
+    )
 
     with TestClient(app) as client:
         resp = client.get("/static/example.txt")
@@ -246,7 +256,9 @@ def test_static_file_extension_case_insensitive():
     (static_dir / "test.txt").write_text("lowercase extension")
 
     try:
-        app.register(StaticFiles(directory=static_dir, allowed_extensions=["txt"]), "/static")
+        app.register(
+            StaticFiles(directory=static_dir, allowed_extensions=["txt"]), "/static"
+        )
 
         with TestClient(app) as client:
             # Both should work since filtering is case insensitive
@@ -262,9 +274,6 @@ def test_static_file_extension_case_insensitive():
         for test_file in test_files:
             if test_file.exists():
                 test_file.unlink()
-
-
-
 
 
 def test_static_file_empty_extension_list():

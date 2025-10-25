@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Optional, Union, Callable, Any
+from typing import Any, Callable, List, Optional, Union
 
 from nexios.http import Request, Response
 from nexios.routing import BaseRouter
@@ -19,7 +19,9 @@ class StaticFiles(BaseRouter):
         if not directories:
             directories = [directory] if directory else []
         self.directories = [self._ensure_directory(d) for d in directories or []]
-        self.allowed_extensions = set(ext.lower().lstrip('.') for ext in (allowed_extensions or []))
+        self.allowed_extensions = set(
+            ext.lower().lstrip(".") for ext in (allowed_extensions or [])
+        )
         self.custom_404_handler = custom_404_handler
         self.cache_control = cache_control
 
@@ -47,7 +49,7 @@ class StaticFiles(BaseRouter):
         """Check if the file extension is in the allowed list"""
         if not self.allowed_extensions:
             return True
-        return file_path.suffix.lower().lstrip('.') in self.allowed_extensions
+        return file_path.suffix.lower().lstrip(".") in self.allowed_extensions
 
     async def _handle(self, request: Request, response: Response):
         path = request.scope.get("path", "").lstrip("/")
@@ -56,7 +58,11 @@ class StaticFiles(BaseRouter):
         for directory in self.directories:
             try:
                 file_path = (directory / path).resolve()
-                if self._is_safe_path(file_path) and file_path.is_file() and self._is_extension_allowed(file_path):
+                if (
+                    self._is_safe_path(file_path)
+                    and file_path.is_file()
+                    and self._is_extension_allowed(file_path)
+                ):
                     # Apply cache control if specified
                     if self.cache_control:
                         response.set_header("cache-control", self.cache_control)
@@ -82,7 +88,7 @@ class StaticFiles(BaseRouter):
 
         # If handler returned a custom response, use it directly
         if handler_result is not None:
-            if hasattr(handler_result, 'get_response'):
+            if hasattr(handler_result, "get_response"):
                 # It's a NexiosResponse, get the BaseResponse
                 final_response = handler_result.get_response()
                 await final_response(scope, receive, send)
