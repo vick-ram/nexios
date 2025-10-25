@@ -78,7 +78,6 @@ static_files = StaticFiles(
     directory="static",
     prefix="/static",
     cache_control="public, max-age=3600",
-    gzip=True,
     allowed_extensions=["css", "js", "png", "jpg"]
 )
 
@@ -88,4 +87,103 @@ app.register(static_files)
 app.add_middleware(StaticFileLogger())
 ```
 
-This setup provides a secure, performant, and flexible way to serve static files in your Nexios application.
+## 🔒 Security & Extension Filtering
+
+For security reasons, you can restrict which file extensions are allowed to be served:
+
+```python
+# Only allow specific file extensions
+static_files = StaticFiles(
+    directory="static",
+    allowed_extensions=["css", "js", "png", "jpg", "jpeg", "gif", "svg", "ico"]
+)
+app.register(static_files, prefix="/static")
+```
+
+This prevents serving potentially dangerous files like `.php`, `.py`, or other executable files.
+
+## 🚫 Custom 404 Handler
+
+You can provide a custom handler for when static files are not found:
+
+```python
+def custom_404_handler(request, response):
+    """Custom 404 handler for static files"""
+    return response.html(
+        """
+        <html>
+            <head><title>Custom 404</title></head>
+            <body>
+                <h1>Custom 404 - File Not Found</h1>
+                <p>The requested file could not be found.</p>
+                <p><a href="/">Go back home</a></p>
+            </body>
+        </html>
+        """,
+        status_code=404
+    )
+
+static_files = StaticFiles(
+    directory="static",
+    custom_404_handler=custom_404_handler
+)
+app.register(static_files, prefix="/static")
+```
+
+## ⚡ Performance & Caching
+
+### Cache Control
+
+Configure caching headers for better performance:
+
+```python
+static_files = StaticFiles(
+    directory="static",
+    cache_control="public, max-age=3600"  # Cache for 1 hour
+)
+app.register(static_files, prefix="/static")
+```
+
+## 📋 Advanced Configuration
+
+You can combine all these features for a fully configured static file server:
+
+```python
+def custom_not_found(request, response):
+    """Custom 404 page with styling"""
+    return response.html(
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Page Not Found</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                .container { max-width: 600px; margin: 0 auto; }
+                h1 { color: #333; }
+                a { color: #007bff; text-decoration: none; }
+                a:hover { text-decoration: underline; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🚫 File Not Found</h1>
+                <p>The requested file could not be found on this server.</p>
+                <p><a href="/">Return to Home</a></p>
+            </div>
+        </body>
+        </html>
+        """,
+        status_code=404
+    )
+
+# Advanced static file configuration
+static_files = StaticFiles(
+    directories=["static", "assets", "uploads"],
+    allowed_extensions=["css", "js", "png", "jpg", "jpeg", "gif", "svg", "ico", "txt", "pdf"],
+    custom_404_handler=custom_not_found,
+    cache_control="public, max-age=86400",  # Cache for 24 hours
+)
+
+app.register(static_files, prefix="/static")
+```
