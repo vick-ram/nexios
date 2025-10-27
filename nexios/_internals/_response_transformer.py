@@ -68,6 +68,7 @@ async def request_response(
         finally:
             current_context.reset(token)
         response = _process_response(response_manager, func_result)
+        response_manager.set_body(response.body)
         return await response(scope, receive, send)
 
     return app

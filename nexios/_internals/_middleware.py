@@ -148,13 +148,12 @@ class ASGIRequestResponseBridge:
 
         request = _CachedRequest(scope, receive)
         response = Response(request=request)
-
         wrapped_receive = request.wrapped_receive
         response_sent = anyio.Event()
 
         async def call_next(
             *_,
-        ) -> Response:  # Why cant this be flexible , i mean ☺️🤷‍♀️
+        ) -> Response:  
             app_exc: Exception | None = None
 
             async def receive_or_disconnect() -> Message:
@@ -200,25 +199,25 @@ class ASGIRequestResponseBridge:
                     raise app_exc
                 raise RuntimeError("Client disconnected before response was sent")
             assert message["type"] == "http.response.start"
-
+            buffered_body = b""
             async def body_stream() -> typing.AsyncGenerator[bytes, None]:
+                nonlocal buffered_body
                 async for message in recv_stream:
                     assert message["type"] == "http.response.body"
                     body = message.get("body", b"")
                     if body:
+                        buffered_body+=body 
                         yield body
                     if not message.get("more_body", False):
                         break
                 if app_exc is not None:
                     raise app_exc
-
             response_ = response.stream(
                 iterator=body_stream(),
                 status_code=message["status"],  # type: ignore
             )  # type: ignore
             response_._response._headers = message["headers"]  # type: ignore
-
-            return response
+            return response_._response #type:ignore
 
         streams: anyio.create_memory_object_stream[Message] = (  # type: ignore
             anyio.create_memory_object_stream()
