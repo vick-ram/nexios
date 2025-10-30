@@ -86,6 +86,18 @@ class URL:
     def path(self) -> str:
         return self.components.path
 
+    
+    @path.setter
+    def path(self, value: str) -> None:
+        self._url = URL(
+            scheme=self.scheme,
+            netloc=self.netloc,
+            path=value,
+            query=self.query,
+            fragment=self.fragment,
+        ).components.geturl()
+    
+
     @property
     def query(self) -> str:
         return self.components.query
