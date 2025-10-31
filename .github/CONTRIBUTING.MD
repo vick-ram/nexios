@@ -178,7 +178,7 @@ If you find a bug or have a feature request, please [open an issue](https://gith
 
 For questions and discussions, please:
 
-1. Check the [documentation](https://nexios-docs.netlify.app/)
+1. Check the [documentation](https://nexios-labs.github.io/nexios/)
 2. Search the [existing issues](https://github.com/nexios-labs/nexios/issues)
 3. If you still can't find an answer, open a new discussion or issue
 

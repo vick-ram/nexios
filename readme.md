@@ -8,7 +8,7 @@ Breaking changes may occur in v3 until it reaches stable release. Use at your ow
 <a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&pause=1000&color=4CAF50&center=true&width=435&lines=Nexios+ASGI+Framework;Fast%2C+Simple%2C+Flexible" alt="Typing SVG" /></a>
 
 <p align="center">
-    <img alt=Support height="350" src="https://nexios-docs.netlify.app/logo.png">
+    <img alt=Support height="350" src="https://nexios-labs.github.io/nexios/logo.png">
     </p>
     <h1 align="center">Nexios 3.0.0<sup>beta</sup><br></h1>
 
