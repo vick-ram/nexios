@@ -60,7 +60,30 @@ export default defineConfig({
         {text: 'Migrating To Nexios',link: '/intro/migrating-to-nexios'},
       ],
       '/community/': [
-        { text: 'Welcome', link: '/community' },
+        { text: 'Overview', link: '/community' },
+        { text: 'Installation', link: '/community/installation' },
+        {
+          text: 'Middleware',
+          collapsed: false,
+          items: [
+            { text: 'ETag', link: '/community/middleware/etag' },
+            { text: 'Trusted Host', link: '/community/middleware/trusted-host' },
+            { text: 'URL Normalization', link: '/community/middleware/slashes' },
+            { text: 'Proxy', link: '/community/middleware/proxy' },
+            { text: 'Request ID', link: '/community/middleware/request-id' },
+            { text: 'Timeout', link: '/community/middleware/timeout' },
+            { text: 'Accepts', link: '/community/middleware/accepts' },
+          ]
+        },
+        {
+          text: 'Integrations',
+          collapsed: false,
+          items: [
+            { text: 'Redis', link: '/community/integrations/redis' },
+            { text: 'JSON-RPC', link: '/community/integrations/jrpc' },
+            { text: 'Background Tasks', link: '/community/integrations/tasks' },
+          ]
+        },
         { text: 'FAQ', link: '/community/faq' },
         { text : "Contribution Guide", link:"/community/contribution-guide"},
         { text: 'Discussions', link: 'https://github.com/orgs/nexios-labs/discussions' },

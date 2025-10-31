@@ -10,6 +10,33 @@ head:
     - property: og:description
       content: Frequently Asked Questions
 ---
+## Open Source & Community
+
+### Is Nexios really free and open source?
+Yes! Nexios is 100% open source and released under the MIT License. This means:
+- You can use it for any purpose, including commercial projects
+- You can modify and distribute the code
+- No licensing fees or restrictions
+- Full access to the source code on GitHub
+
+### What is the nexios-contrib package?
+The nexios-contrib package is a community-driven collection of extensions and middleware for Nexios. It includes:
+- Middleware for common web development needs (ETag, URL normalization, security)
+- Integrations with popular services and tools
+- Community-contributed packages that extend Nexios functionality
+- All packages are independently versioned and can be installed separately
+
+### How can I contribute to Nexios?
+There are many ways to contribute:
+- **Code contributions**: Submit bug fixes, features, or improvements to the core framework
+- **Community packages**: Create middleware or extensions for nexios-contrib
+- **Documentation**: Help improve our docs, tutorials, and examples
+- **Community support**: Answer questions and help other developers
+- **Testing**: Report bugs and test new features
+
+### Can I create commercial products with Nexios?
+Absolutely! The MIT License allows you to use Nexios in commercial products without any restrictions. Many companies use Nexios to build their APIs and web services.
+
 ## Framework Design
 
 ### Why isn't Nexios built on Starlette?
