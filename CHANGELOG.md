@@ -6,12 +6,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 <!-- insertion marker -->
-## Unreleased
+## [v3.0.0](https://github.com/nexios-labs/Nexios/releases/tag/v3.0.0) - 2025-11-01
 
-<small>[Compare with latest](https://github.com/nexios-labs/Nexios/compare/v2.11.13...HEAD)</small>
+<small>[Compare with v2.11.13](https://github.com/nexios-labs/Nexios/compare/v2.11.13...v3.0.0)</small>
 
 ### Fixed
 
+- fix(response):  return the streamed response instead of nexios response manager for the call_next function manager ([9c7bb62](https://github.com/nexios-labs/Nexios/commit/9c7bb62e140f497382d5768abbcfef1b2400b230) by techwithdunamix).
 - fix docs inconsistencies #197 ([091f536](https://github.com/nexios-labs/Nexios/commit/091f53601421e3ffff8eda1ddfba7d87f0420036) by dunamix 🦄).
 - fix: correct the use of process.nextTick ([964dd41](https://github.com/nexios-labs/Nexios/commit/964dd41bf62a1a8d38677d84c450b3cc4a199277) by techwithdunamix).
 - fix(pagination): enhance cursor decoding and error handling ([c557a9c](https://github.com/nexios-labs/Nexios/commit/c557a9c7514bca3b79221187a2d2bb8172c0e0c6) by techwithdunamix).
@@ -26,7 +27,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - fix: fix url_for nested routes tests: add tests for routing ([afa3dae](https://github.com/nexios-labs/Nexios/commit/afa3daec0f06c588e9192b4bbd8d3d447270d1f9) by techwithdunamix).
 - fix(auth): resolve import issues and improve authentication handling ([78034ec](https://github.com/nexios-labs/Nexios/commit/78034ec49d86f894b41f574c867e4f1ccd65050f) by techwithdunamix).
 
-<!-- insertion marker -->
 ## [v2.11.13](https://github.com/nexios-labs/Nexios/releases/tag/v2.11.13) - 2025-10-07
 
 <small>[Compare with v2.11.12](https://github.com/nexios-labs/Nexios/compare/v2.11.12...v2.11.13)</small>
@@ -422,7 +422,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - fix(router): remove debug print statement from Router class ([16f0708](https://github.com/nexios-labs/Nexios/commit/16f0708e03dadacc6361e1edb5f06fec8e2d9380) by dunamix).
 - fix(router): store reference to the Router instance in scope for better access ([7538676](https://github.com/nexios-labs/Nexios/commit/7538676c30d39ed55a61b04f444dde8a433e9ba6) by dunamix).
 - fix: update documentation URL to point to the correct Netlify site ([99d774f](https://github.com/nexios-labs/Nexios/commit/99d774f6eb72342d2fad89d67dc7a0c76a3d6d1f) by dunamix).
-- fix(cli): update warning message for clarity on Granian integration ([19458f2](https://github.com/nexios-labs/Nexios/commit/19458f27bdf51afc30ee54b4fe87865a3d108b56) by dunamix). Related issues/PRs: [#123](https://github.com/nexios-labs/Nexios/issues/123)
+- fix(cli): update warning message for clarity on Granian integration ([19458f2](https://github.com/nexios-labs/Nexios/commit/19458f27bdf51afc30ee54b4fe87865a3d108b56) by dunamix).
 - fix: update version number to 2.4.0 and enhance README for consistency ([673b3b5](https://github.com/nexios-labs/Nexios/commit/673b3b58bfb0cf2ca95593d443928526199626de) by dunamix).
 
 ## [v2.4.0](https://github.com/nexios-labs/Nexios/releases/tag/v2.4.0) - 2025-05-11
@@ -443,7 +443,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - fix: set base path in VitePress configuration ([681a9c4](https://github.com/nexios-labs/Nexios/commit/681a9c4554d189f9fcd9acbb9c8ac4f18a8d5db5) by dunamix).
 - fix: update install command to prevent frozen lockfile during dependency installation ([d932457](https://github.com/nexios-labs/Nexios/commit/d932457d25f3084f558eeb43cda6130a4c014e15) by dunamix).
 - fix: correct whitespace in hero name in index.md ([8a27f9e](https://github.com/nexios-labs/Nexios/commit/8a27f9ecb6c086016afeb0c6fa1a405099ce06c6) by dunamix).
-- fix: update install command in GitHub Actions workflow for consistency ([c39f1d9](https://github.com/nexios-labs/Nexios/commit/c39f1d99e9185af6ec2d266e8605a3248885ff76) by dunamix). Related issues/PRs: [#123](https://github.com/nexios-labs/Nexios/issues/123)
+- fix: update install command in GitHub Actions workflow for consistency ([c39f1d9](https://github.com/nexios-labs/Nexios/commit/c39f1d99e9185af6ec2d266e8605a3248885ff76) by dunamix).
 - fix: update step name for clarity in GitHub Pages deployment ([cb13f80](https://github.com/nexios-labs/Nexios/commit/cb13f8045f38d765b9f1136f31c5dedd893cd0d5) by dunamix).
 - fix: remove .nojekyll creation step from deploy workflow ([43c419e](https://github.com/nexios-labs/Nexios/commit/43c419ea00085efae93724a5764ac655fd7d5fbf) by dunamix).
 - fix: update install command in deploy-docs workflow to use pnpm install ([66ab0d9](https://github.com/nexios-labs/Nexios/commit/66ab0d9878c50a3f39996635d78f0f60f797e43a) by dunamix).
@@ -454,7 +454,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - fix(config): Initialize configuration in NexiosApp constructor ([3e89ae6](https://github.com/nexios-labs/Nexios/commit/3e89ae6330ed491d332e8e232cef7e9cfc09e53e) by dunamix).
 - fix: Correct order of sections in SUMMARY.md for better clarity ([124a354](https://github.com/nexios-labs/Nexios/commit/124a3543ae661fae379ac2a96fed1cf1506ba1f6) by dunamix).
 - fix(openapi): set default type for Schema and update model references ([e546910](https://github.com/nexios-labs/Nexios/commit/e5469107d19d6caf2183d4ea47f1fe8c50d21b84) by dunamix).
-- fix(static): improve directory handling and validation in StaticFilesHandler fix(structs): add default value support to RouteParam.get method ([b6cef3d](https://github.com/nexios-labs/Nexios/commit/b6cef3deb1e79093f5e9163c344d9608676b9478) by dunamix). Related issues/PRs: [#96](https://github.com/nexios-labs/Nexios/issues/96)
+- fix(static): improve directory handling and validation in StaticFilesHandler fix(structs): add default value support to RouteParam.get method ([b6cef3d](https://github.com/nexios-labs/Nexios/commit/b6cef3deb1e79093f5e9163c344d9608676b9478) by dunamix).
 - fix(import): handle ImportError for Jinja2 with a clear installation message ([b7dd792](https://github.com/nexios-labs/Nexios/commit/b7dd7924f92ff532c0e90f87be620828e61de596) by dunamix).
 - fix(routing): remove unused response_model parameter and handle empty path case ([b43df18](https://github.com/nexios-labs/Nexios/commit/b43df185336237ecf8aef08ec615df436de1ccf9) by dunamix).
 - fix(application): set default config if none provided and clean up type ignores fix(exception_handler): refine exception handler type annotations refactor(formparsers): remove unnecessary type ignores and improve readability refactor(request): simplify Request class definition refactor(routing): enhance type annotations and clean up type ignores fix(types): correct response type alias for consistency ([39c062a](https://github.com/nexios-labs/Nexios/commit/39c062a70eea8686edea684083d0ab57a505016c) by dunamix).
