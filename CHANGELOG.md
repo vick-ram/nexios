@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 <!-- insertion marker -->
+## [v3.1.0](https://github.com/nexios-labs/Nexios/releases/tag/v3.1.0) - 2025-11-03
+
+<small>[Compare with v3.0.0](https://github.com/nexios-labs/Nexios/compare/v3.0.0...v3.1.0)</small>
+
+### Fixed
+
+- fix(auth): improve scope checking in auth decorator  (#205) ([ede042e](https://github.com/nexios-labs/Nexios/commit/ede042ef1233e5eca74ec445989db53ce3ac0917) by dunamix 🦄).
+- fix(auth): improve scope checking in auth decorator (#205) ([ceff089](https://github.com/nexios-labs/Nexios/commit/ceff089b2080f140d17952094a32c9c241d02ba9) by techwithdunamix).
+- fix(response): return streamed response in call_next manager ([30ffb16](https://github.com/nexios-labs/Nexios/commit/30ffb16eedaa6b0d4554ba1993051302f94b37d2) by techwithdunamix).
+
 ## [v3.0.0](https://github.com/nexios-labs/Nexios/releases/tag/v3.0.0) - 2025-11-01
 
 <small>[Compare with v2.11.13](https://github.com/nexios-labs/Nexios/compare/v2.11.13...v3.0.0)</small>
