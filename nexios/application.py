@@ -154,7 +154,6 @@ class NexiosApp(object):
         )
 
         self.openapi = APIDocumentation(
-            app=self,
             config=self.openapi_config,
             swagger_url=openapi_config.get("swagger_url", "/docs"),
             redoc_url=openapi_config.get("redoc_url", "/redoc"),
