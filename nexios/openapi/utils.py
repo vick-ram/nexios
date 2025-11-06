@@ -1,6 +1,7 @@
-from typing import List, Union, Any
-from nexios.routing.http import Routes, Router
+from typing import Any, List, Union
+
 from nexios.routing.grouping import Group
+from nexios.routing.http import Router, Routes
 
 
 def get_openapi(route: Union[Routes, Router, Group, Any]) -> List[Routes]:
@@ -16,19 +17,17 @@ def get_openapi(route: Union[Routes, Router, Group, Any]) -> List[Routes]:
         for sub_route in route.routes:
             routes_list.extend(get_openapi(sub_route))
 
-        
-
         return routes_list
 
     if isinstance(route, Group):
-        if hasattr(route, '_base_app') and isinstance(route._base_app, Router):
+        if hasattr(route, "_base_app") and isinstance(route._base_app, Router):
             routes_list.extend(get_openapi(route._base_app))
-        elif hasattr(route, 'routes'):
+        elif hasattr(route, "routes"):
             for sub_route in route.routes:
                 routes_list.extend(get_openapi(sub_route))
         return routes_list
 
-    if hasattr(route, 'routes'):
+    if hasattr(route, "routes"):
         for sub_route in route.routes:
             routes_list.extend(get_openapi(sub_route))
 
