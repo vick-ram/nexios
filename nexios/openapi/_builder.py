@@ -7,6 +7,11 @@ from uuid import uuid4
 from pydantic import BaseModel
 
 from nexios.http import Request, Response
+from typing import List, Union, Any
+from nexios.routing.http import Routes, Router
+from nexios.routing.grouping import Group
+
+
 
 from .config import OpenAPIConfig
 from .models import (
@@ -130,6 +135,38 @@ class APIDocumentation:
         </body>
         </html>
         """
+
+    def get_openapi(self,route: Union[Routes, Router, Group, Any]) -> List[Routes]:
+        """
+        Recursively extract all Routes from a route structure, handling nested Groups and Routers.
+        """
+        routes_list: List[Routes] = []
+
+        if isinstance(route, Routes):
+            return [route]
+
+        if isinstance(route, Router):
+            for sub_route in route.routes:
+                routes_list.extend(self.get_openapi(sub_route))
+
+            
+
+            return routes_list
+
+        if isinstance(route, Group):
+            if hasattr(route, '_base_app') and isinstance(route._base_app, Router):
+                routes_list.extend(self.get_openapi(route._base_app))
+            elif hasattr(route, 'routes'):
+                for sub_route in route.routes:
+                    routes_list.extend(self.get_openapi(sub_route))
+            return routes_list
+
+        if hasattr(route, 'routes'):
+            for sub_route in route.routes:
+                routes_list.extend(self.get_openapi(sub_route))
+
+        return routes_list
+
 
     def document_endpoint(
         self,
