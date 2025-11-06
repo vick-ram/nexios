@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 
 class APIDocumentation:
- 
+  
 
     def __init__(  # type: ignore
         self,
@@ -532,4 +532,5 @@ class APIDocumentation:
             }
         )
 
-   
+
+
