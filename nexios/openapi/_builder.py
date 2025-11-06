@@ -50,8 +50,9 @@ class APIDocumentation:
 
     
 
-    def _generate_redoc_ui(self) -> str:
+    def _generate_redoc_ui(self, openapi_url: str = None) -> str:
         """Generate ReDoc UI HTML"""
+        url = openapi_url or self.openapi_url
         return f"""
         <!DOCTYPE html>
         <html>
@@ -71,7 +72,7 @@ class APIDocumentation:
             <div id="redoc"></div>
             <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
             <script>
-                Redoc.init('{self.openapi_url}', {{
+                Redoc.init('{url}', {{
                     scrollYOffset: 50
                 }}, document.getElementById('redoc'))
             </script>
@@ -79,8 +80,9 @@ class APIDocumentation:
         </html>
         """
 
-    def _generate_swagger_ui(self) -> str:
+    def _generate_swagger_ui(self, openapi_url: str = None) -> str:
         """Generate Swagger UI HTML"""
+        url = openapi_url or self.openapi_url
         return f"""
         <!DOCTYPE html>
         <html>
@@ -94,7 +96,7 @@ class APIDocumentation:
             <script>
                 window.onload = function() {{
                     SwaggerUIBundle({{
-                        url: '{self.openapi_url}',
+                        url: '{url}',
                         dom_id: '#swagger-ui',
                         presets: [
                             SwaggerUIBundle.presets.apis,
@@ -155,10 +157,13 @@ class APIDocumentation:
             group_path = route.path or ""
             new_prefix = self._normalize_path(current_prefix + group_path)
             
+            print(route._base_app)
+            
             if hasattr(route, '_base_app') and isinstance(route._base_app, Router):
                 # Don't add the router's prefix since it's already in the group path
                 for sub_route in route._base_app.routes:
                     routes_with_paths.extend(self._collect_routes_with_paths(sub_route, new_prefix))
+
             elif hasattr(route, 'routes'):
                 for sub_route in route.routes:
                     routes_with_paths.extend(self._collect_routes_with_paths(sub_route, new_prefix))
