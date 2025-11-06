@@ -32,7 +32,7 @@ Websocket routing follows the same pattern as other http routes making it easy t
 5. **Cleanup**: Resources are cleaned up
    :::
 
-Websocket also pocessed a `WebsocketRoutes` class for more complex routing needs
+Websocket also pocessed a `WebsocketRoute` class for more complex routing needs
 
 You can use it like this
 
@@ -42,39 +42,39 @@ app = NexiosApp()
 async def ws_handler(ws):
     await ws.accept()
     ...
-app.add_ws_route(WebsocketRoutes("/ws", ws_handler))
+app.add_ws_route(WebsocketRoute("/ws", ws_handler))
 ```
 
 ## 🛣️ Websocket Router
 
-The `WSRouter` operate similar to the `Router` but for websockets
+The `WebsocketRouter` operate similar to the `Router` but for websockets
 
 ```python
-from nexios.routing import WSRouter
-router = WSRouter()
+from nexios.routing import WebsocketRouter
+router = WebsocketRouter()
 router.add_ws_route("/ws", ws_handler)
 app.mount_ws_router(router, "/ws")
 ```
 
 ::: tip 💡Tip
-You can also pass a list of `WebsocketRoutes` to the `WSRouter` constructor similar to `Router`
+You can also pass a list of `WebsocketRoute` to the `WebsocketRouter` constructor similar to `Router`
 
 ```python
-from nexios.routing import WSRouter
-router = WSRouter([
-    WebsocketRoutes("/ws", ws_handler),
-    WebsocketRoutes("/ws2", ws_handler2),
+from nexios.routing import WebsocketRouter
+router = WebsocketRouter([
+    WebsocketRoute("/ws", ws_handler),
+    WebsocketRoute("/ws2", ws_handler2),
 ])
 ```
 
 :::
 
 ::: tip 💡Tip
-You can also add prefix to the `WSRouter` similar to `Router`
+You can also add prefix to the `WebsocketRouter` similar to `Router`
 
 ```python
-from nexios.routing import WSRouter
-router = WSRouter(prefix="/ws")
+from nexios.routing import WebsocketRouter
+router = WebsocketRouter(prefix="/ws")
 router.add_ws_route("/ws", ws_handler)
 router.add_ws_route("/ws2", ws_handler2)
 app.mount_ws_router(router, "/ws-overide") #this will override /ws
