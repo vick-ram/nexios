@@ -48,8 +48,7 @@ class APIDocumentation:
         self.swagger_url = swagger_url
         self.redoc_url = redoc_url
         self.openapi_url = openapi_url
-        if app:
-            self._setup_doc_routes()
+        
 
     def _setup_doc_routes(self):
         """Set up routes for serving OpenAPI specification"""

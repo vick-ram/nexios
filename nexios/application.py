@@ -9,6 +9,7 @@ from typing import (
     Optional,
     Type,
     Union,
+    TYPE_CHECKING
 )
 
 from pydantic import BaseModel
@@ -45,7 +46,8 @@ from .types import (
     WsHandlerType,
     WsMiddlewareType,
 )
-
+if TYPE_CHECKING:
+    from nexios.http import Request,Response
 allowed_methods_default = ["get", "post", "delete", "put", "patch", "options"]
 
 logger = create_logger("nexios")
@@ -151,7 +153,7 @@ class NexiosApp(object):
             "bearerAuth", HTTPBearer(type="http", scheme="bearer", bearerFormat="JWT")
         )
 
-        self.docs = APIDocumentation(
+        self.openapi = APIDocumentation(
             app=self,
             config=self.openapi_config,
             swagger_url=openapi_config.get("swagger_url", "/docs"),
@@ -161,6 +163,22 @@ class NexiosApp(object):
 
         self.events = AsyncEventEmitter()
         self.title = title or "Nexios API"
+        self.setup()
+
+    def setup(self):
+        
+        @self.get(self.openapi.openapi_url, exclude_from_schema=True)  # type:ignore
+        async def serve_openapi(request: "Request", response: "Response"):
+            
+            return response.json(self.openapi.get_openapi(self.router))
+
+        @self.get(self.openapi.swagger_url, exclude_from_schema=True)  # type:ignore
+        async def swagger_ui(request: "Request", response: "Response"):
+            return response.html(self.openapi._generate_swagger_ui())
+
+        @self.get(self.openapi.redoc_url, exclude_from_schema=True)  # type:ignore
+        async def redoc_ui(request: "Request", response: "Response"):
+            return response.html(self.openapi._generate_redoc_ui())
 
     def on_startup(self, handler: Callable[[], Awaitable[None]]) -> None:
         """
