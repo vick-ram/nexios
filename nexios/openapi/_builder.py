@@ -33,12 +33,7 @@ if TYPE_CHECKING:
 
 
 class APIDocumentation:
-    _instance = None
-
-    def __new__(cls, *args: list[Any], **kwargs: dict[str, Any]):
-        if not cls._instance:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+ 
 
     def __init__(  # type: ignore
         self,
@@ -136,36 +131,263 @@ class APIDocumentation:
         </html>
         """
 
-    def get_openapi(self,route: Union[Routes, Router, Group, Any]) -> List[Routes]:
+    def get_openapi(self, route: Union[Routes, Router, Group, Any], current_prefix: str = "") -> Dict[str, Any]:
         """
-        Recursively extract all Routes from a route structure, handling nested Groups and Routers.
+        Recursively extract all Routes with their full paths, automatically add them to OpenAPI spec,
+        and return the complete OpenAPI specification as a dictionary.
         """
-        routes_list: List[Routes] = []
+        # First, collect all routes with their full paths
+        routes_with_paths = self._collect_routes_with_paths(route, current_prefix)
+        
+        # Process each route and add to OpenAPI spec
+        for full_path, route_obj in routes_with_paths:
+            if isinstance(route_obj, Routes) and not getattr(route_obj, 'exclude_from_schema', False):
+                self._add_route_to_openapi_spec(full_path, route_obj)
+        
+        # Return the complete OpenAPI spec as dictionary
+        return self.config.openapi_spec.model_dump(by_alias=True, exclude_none=True)
+
+    def _collect_routes_with_paths(self, route: Union[Routes, Router, Group, Any], current_prefix: str = "") -> List[Tuple[str, Routes]]:
+        """
+        Recursively collect all Routes with their full paths, tracking prefixes through nested structures.
+        """
+        routes_with_paths: List[Tuple[str, Routes]] = []
 
         if isinstance(route, Routes):
-            return [route]
+            # Combine current prefix with route's raw_path
+            full_path = self._normalize_path(current_prefix + route.raw_path)
+            return [(full_path, route)]
 
         if isinstance(route, Router):
+            # Add router's prefix to current prefix
+            router_prefix = current_prefix + (route.prefix or "")
             for sub_route in route.routes:
-                routes_list.extend(self.get_openapi(sub_route))
-
-            
-
-            return routes_list
+                routes_with_paths.extend(self._collect_routes_with_paths(sub_route, router_prefix))
+            return routes_with_paths
 
         if isinstance(route, Group):
+            # Add group's path to current prefix
+            group_prefix = current_prefix + route.path
+            
             if hasattr(route, '_base_app') and isinstance(route._base_app, Router):
-                routes_list.extend(self.get_openapi(route._base_app))
+                routes_with_paths.extend(self._collect_routes_with_paths(route._base_app, group_prefix))
             elif hasattr(route, 'routes'):
                 for sub_route in route.routes:
-                    routes_list.extend(self.get_openapi(sub_route))
-            return routes_list
+                    routes_with_paths.extend(self._collect_routes_with_paths(sub_route, group_prefix))
+            return routes_with_paths
 
+        # Handle other route containers
         if hasattr(route, 'routes'):
             for sub_route in route.routes:
-                routes_list.extend(self.get_openapi(sub_route))
+                routes_with_paths.extend(self._collect_routes_with_paths(sub_route, current_prefix))
 
-        return routes_list
+        return routes_with_paths
+
+    def _normalize_path(self, path: str) -> str:
+        """
+        Normalize path by ensuring it starts with / and removing duplicate slashes.
+        """
+        if not path.startswith('/'):
+            path = '/' + path
+        # Remove duplicate slashes but preserve parameter patterns
+        import re
+        path = re.sub(r'/+', '/', path)
+        return path
+
+    def _add_route_to_openapi_spec(self, full_path: str, route: Routes) -> None:
+        """
+        Add a route to the OpenAPI specification without using the decorator pattern.
+        """
+        # Convert path parameters to OpenAPI format
+        openapi_path = self._convert_path_to_openapi_format(full_path)
+        
+        # Process each HTTP method for this route
+        for method in route.methods:
+            # Prepare request body specification
+            request_body_spec = self._build_request_body_spec(route, method)
+            
+            # Prepare response specifications
+            responses_spec = self._build_responses_spec(route)
+            
+            # Prepare parameters (path, query, header)
+            parameters = self._build_parameters_spec(route)
+            
+            # Create the operation object
+            operation = Operation(
+                summary=route.summary or f"{method.upper()} {openapi_path}",
+                description=route.description,
+                responses=responses_spec,
+                tags=route.tags or [],
+                parameters=parameters,
+                requestBody=request_body_spec,
+                security=route.security,
+                operationId=route.operation_id or f"{method.lower()}_{openapi_path.replace('/', '_').replace('{', '').replace('}', '')}",
+                deprecated=route.deprecated,
+                externalDocs=getattr(route, 'external_docs', None),
+            )
+            
+            # Add operation to the OpenAPI specification
+            if openapi_path not in self.config.openapi_spec.paths:
+                self.config.openapi_spec.paths[openapi_path] = PathItem()
+            
+            setattr(self.config.openapi_spec.paths[openapi_path], method.lower(), operation)
+            
+            # Add schemas to components if needed
+            if route.request_model:
+                self.add_schema(route.request_model)
+            
+            if route.responses:
+                self._add_response_schemas(route.responses)
+
+    def _convert_path_to_openapi_format(self, path: str) -> str:
+        """
+        Convert Nexios path format to OpenAPI format.
+        Example: /users/{id:int} -> /users/{id}
+        """
+        import re
+        return re.sub(r'\{(\w+):[^}]+\}', r'{\1}', path)
+
+    def _build_request_body_spec(self, route: Routes, method: str) -> Optional[RequestBody]:
+        """
+        Build request body specification for the route.
+        """
+        if route.request_model:
+            return RequestBody(
+                content={
+                    getattr(route, 'request_content_type', 'application/json'): MediaType(
+                        schema=Schema(**route.request_model.model_json_schema())
+                    )
+                }
+            )
+        elif method.upper() not in ["GET", "DELETE", "HEAD", "OPTIONS"]:
+            # Default request body for methods that typically have bodies
+            return RequestBody(
+                content={
+                    "application/json": MediaType(
+                        schema=Schema(
+                            example={"example": "This is an example request body"},
+                            type="object"
+                        )
+                    )
+                }
+            )
+        return None
+
+    def _build_responses_spec(self, route: Routes) -> Dict[str, OpenAPIResponse]:
+        """
+        Build response specifications for the route.
+        """
+        responses_spec = {}
+        
+        if route.responses:
+            if isinstance(route.responses, dict):
+                for status_code, model in route.responses.items():
+                    responses_spec[str(status_code)] = self._create_response_spec(model, status_code)
+            else:
+                # Single response model
+                responses_spec["200"] = self._create_response_spec(route.responses, 200)
+        else:
+            # Default response
+            responses_spec["200"] = OpenAPIResponse(
+                description="Successful Response",
+                content={
+                    "application/json": MediaType(
+                        schema=Schema(
+                            example={"example": "This is an example response"},
+                            type="object"
+                        )
+                    )
+                }
+            )
+        
+        return responses_spec
+
+    def _create_response_spec(self, model: Any, status_code: int) -> OpenAPIResponse:
+        """
+        Create a response specification from a model.
+        """
+        if isinstance(model, type) and issubclass(model, BaseModel):
+            return OpenAPIResponse(
+                description=f"Response for status code {status_code}",
+                content={
+                    "application/json": MediaType(
+                        schema=Schema(**model.model_json_schema())
+                    )
+                }
+            )
+        elif hasattr(model, "__origin__") and model.__origin__ is list:
+            # Handle List[Model]
+            item_model = model.__args__[0]
+            if issubclass(item_model, BaseModel):
+                return OpenAPIResponse(
+                    description=f"Response for status code {status_code}",
+                    content={
+                        "application/json": MediaType(
+                            schema=Schema(
+                                type="array",
+                                items=Schema(**item_model.model_json_schema())
+                            )
+                        )
+                    }
+                )
+        elif isinstance(model, dict):
+            # Handle dict response (like {"description": "Error message"})
+            return OpenAPIResponse(
+                description=model.get("description", f"Response for status code {status_code}"),
+                content={
+                    "application/json": MediaType(
+                        schema=Schema(type="object")
+                    )
+                }
+            )
+        
+        # Fallback
+        return OpenAPIResponse(
+            description=f"Response for status code {status_code}",
+            content={
+                "application/json": MediaType(
+                    schema=Schema(type="object")
+                )
+            }
+        )
+
+    def _build_parameters_spec(self, route: Routes) -> List[Parameter]:
+        """
+        Build parameter specifications for the route.
+        """
+        parameters = []
+        
+        # Add path parameters
+        for param_name in route.param_names:
+            parameters.append(
+                Parameter(
+                    name=param_name,
+                    in_="path",
+                    required=True,
+                    schema=Schema(type="string")
+                )
+            )
+        
+        # Add any additional parameters defined on the route
+        if hasattr(route, 'parameters') and route.parameters:
+            parameters.extend(route.parameters)
+        
+        return parameters
+
+    def _add_response_schemas(self, responses: Any) -> None:
+        """
+        Add response model schemas to components.
+        """
+        if isinstance(responses, dict):
+            for model in responses.values():
+                if isinstance(model, type) and issubclass(model, BaseModel):
+                    self.add_schema(model)
+                elif hasattr(model, "__origin__") and model.__origin__ is list:
+                    item_model = model.__args__[0]
+                    if issubclass(item_model, BaseModel):
+                        self.add_schema(item_model)
+        elif isinstance(responses, type) and issubclass(responses, BaseModel):
+            self.add_schema(responses)
 
 
     def document_endpoint(
