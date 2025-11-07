@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 <!-- insertion marker -->
+## [v3.2.1](https://github.com/nexios-labs/Nexios/releases/tag/v3.2.1) - 2025-11-07
+
+<small>[Compare with v3.2.0](https://github.com/nexios-labs/Nexios/compare/v3.2.0...v3.2.1)</small>
+
 ## [v3.2.0](https://github.com/nexios-labs/Nexios/releases/tag/v3.2.0) - 2025-11-07
 
 <small>[Compare with v3.1.0](https://github.com/nexios-labs/Nexios/compare/v3.1.0...v3.2.0)</small>
