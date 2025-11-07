@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 <!-- insertion marker -->
+## [v3.2.0](https://github.com/nexios-labs/Nexios/releases/tag/v3.2.0) - 2025-11-07
+
+<small>[Compare with v3.1.0](https://github.com/nexios-labs/Nexios/compare/v3.1.0...v3.2.0)</small>
+
+### Fixed
+
+- fix(: respect root_path in Swagger UI and ReDoc UI (#212) ([bc614a7](https://github.com/nexios-labs/Nexios/commit/bc614a703d4ed1487e7520fe708ee64c7aed690b) by dunamix 🦄).
+- fix(openapi): improve route path handling and specification generation ([f5e7d6e](https://github.com/nexios-labs/Nexios/commit/f5e7d6e76227358625e3a61a50fcc267de1d47b5) by techwithdunamix).
+
 ## [v3.1.0](https://github.com/nexios-labs/Nexios/releases/tag/v3.1.0) - 2025-11-03
 
 <small>[Compare with v3.0.0](https://github.com/nexios-labs/Nexios/compare/v3.0.0...v3.1.0)</small>
