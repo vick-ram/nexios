@@ -1,4 +1,5 @@
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncContextManager,
     Awaitable,
@@ -9,7 +10,6 @@ from typing import (
     Optional,
     Type,
     Union,
-    TYPE_CHECKING
 )
 
 from pydantic import BaseModel
@@ -34,7 +34,7 @@ from nexios.openapi.models import HTTPBearer, Parameter
 from nexios.routing.base import BaseRoute
 from nexios.structs import URLPath
 
-from .routing import Router, Route, WebsocketRoute, WSRouter
+from .routing import Route, Router, WebsocketRoute, WSRouter
 from .types import (
     ASGIApp,
     HandlerType,
@@ -46,8 +46,9 @@ from .types import (
     WsHandlerType,
     WsMiddlewareType,
 )
+
 if TYPE_CHECKING:
-    from nexios.http import Request,Response
+    from nexios.http import Request, Response
 allowed_methods_default = ["get", "post", "delete", "put", "patch", "options"]
 
 logger = create_logger("nexios")
@@ -165,11 +166,12 @@ class NexiosApp(object):
         self.setup()
 
     def setup(self):
-        
         @self.get(self.openapi.openapi_url, exclude_from_schema=True)  # type:ignore
         async def serve_openapi(request: "Request", response: "Response"):
             root_path = request.scope.get("root_path", "")
-            return response.json(self.openapi.get_openapi(self.router,current_prefix=root_path))
+            return response.json(
+                self.openapi.get_openapi(self.router, current_prefix=root_path)
+            )
 
         @self.get(self.openapi.swagger_url, exclude_from_schema=True)  # type:ignore
         async def swagger_ui(request: "Request", response: "Response"):

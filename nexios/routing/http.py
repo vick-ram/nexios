@@ -36,7 +36,7 @@ from nexios.events import AsyncEventEmitter
 from nexios.exceptions import NotFoundException
 from nexios.http import Request, Response
 from nexios.http.response import JSONResponse
-from nexios.openapi.models import Parameter, Path, Schema
+from nexios.openapi.models import Parameter
 from nexios.structs import RouteParam, URLPath
 from nexios.types import ASGIApp, HandlerType, MiddlewareType, Receive, Scope, Send
 
@@ -590,19 +590,6 @@ class Router(BaseRouter):
         self.routes.append(route)
         if getattr(route, "exclude_from_schema", False):
             return
-        for method in route.methods:
-            parameters = [
-                Path(name=x, schema=Schema(type="string"), schema_=None)  # type: ignore
-                for x in route.param_names
-            ]
-            parameters.extend(route.parameters)  #  type: ignore
-            # Construct full path including router prefix and root_path
-            full_path = (
-                self.prefix
-                + self.root_path
-                + re.sub(r"\{(\w+):\w+\}", r"{\1}", route.raw_path)
-            )
-            
 
     def add_middleware(self, middleware: MiddlewareType) -> None:
         """Add middleware to the router"""
@@ -2441,4 +2428,5 @@ class Router(BaseRouter):
 
         self.add_route(Group(app=app, path=prefix))
 
-Routes = Route #for backward compatibilty 
+
+Routes = Route  # for backward compatibilty
