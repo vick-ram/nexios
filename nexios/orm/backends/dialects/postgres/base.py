@@ -1,27 +1,32 @@
 # This module calls out all the specific implementations for Postgres dialect.
 # including asyncpg, pg8000, psycopg2, psycopg3, and others.
-import asyncio
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional
 
 import asyncpg
 import psycopg
 import psycopg2
 
+from nexios.orm.backends.dialects.postgres.async_psycopg_ import AsyncPsycopgConnection
+from nexios.orm.backends.dialects.postgres.asyncpg_ import AsyncPgConnection
+from nexios.orm.backends.dialects.postgres.psycopg2_ import Psycopg2Connection
+from nexios.orm.backends.dialects.postgres.psycopg_ import PsycopgConnection
+from nexios.orm.connection import AsyncDatabaseConnection, SyncDatabaseConnection
 
 class PostgresConnection:
-    def __init__(self, connection: Union[psycopg.Connection, psycopg.AsyncConnection, psycopg2.extensions.connection, asyncpg.Connection]) -> None:
-        self._connection = connection
     
-    def connect(self):
-        if isinstance(self._connection, psycopg2.extensions.connection):
-            # Handle psycopg2 connection
-            psycopg2.connect(**self.kwargs)
-        elif isinstance(self._connection, psycopg.Connection):
-            # Handle psycopg3 connection
-            self._connection.connect(**self.kwargs)
-        elif isinstance(self._connection, psycopg.AsyncConnection):
-            # Handle asyncpg connection
-            asyncio.run(self._connection.connect(**self.kwargs))
-        elif isinstance(self._connection, asyncpg.Connection):
-            # Handle asyncpg connection
-            asyncio.run(asyncpg.connect(**self.kwargs))
+    @staticmethod
+    def connect(connection: Any) -> Optional["SyncDatabaseConnection"]:
+        if isinstance(connection, psycopg2.extensions.connection):
+            return Psycopg2Connection(connection)
+        elif isinstance(connection, psycopg.Connection):
+            return PsycopgConnection(connection)
+        else:
+            return None
+        
+    @staticmethod
+    async def connect_async(connection: Any) -> Optional["AsyncDatabaseConnection"]:
+        if isinstance(connection, psycopg.AsyncConnection):
+            return AsyncPsycopgConnection(connection)
+        elif isinstance(connection, asyncpg.Connection):
+            return AsyncPgConnection(connection)
+        return None

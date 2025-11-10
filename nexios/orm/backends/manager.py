@@ -1,7 +1,8 @@
 from typing_extensions import Any, Optional, cast
 from nexios.orm.backends.config import DatabaseDetector, DatabaseDialect, MySQLDriver, PostgreSQLDriver
+from nexios.orm.backends.dialects.mysql.base import MySQLConnection_
 from nexios.orm.backends.dialects.postgres.base import PostgresConnection
-from nexios.orm.backends.dialects.postgres.psycopg2_ import Psycopg2Connection
+from nexios.orm.backends.dialects.sqlite.aiosqlite_ import AioSQLiteConnection
 from nexios.orm.backends.dialects.sqlite.sqlite_ import SQLiteConnection
 from nexios.orm.connection import (
     AsyncCursor,
@@ -34,7 +35,6 @@ class DatabaseManager:
             if self.driver == PostgreSQLDriver.PSYCOPG2:
                 import psycopg2
                 raw_conn = psycopg2.connect(**self.connection_params)
-                self._connection = Psycopg2Connection()
             elif self.driver == PostgreSQLDriver.PSYCOPG3:
                 import psycopg
                 raw_conn = psycopg.connect(**self.connection_params)
@@ -44,10 +44,9 @@ class DatabaseManager:
             else:
                 raise ValueError(f"Unsupported Postgres driver: {self.driver}")
             
-            self._connection = PostgresConnection(raw_conn, )
+            self._connection = PostgresConnection.connect(raw_conn)
 
         elif self.db_type == DatabaseDialect.MYSQL:
-            from mysql.connector.connection import MySQLConnection
             if self.driver == MySQLDriver.MYSQL_CONNECTOR:
                 import mysql.connector
                 raw_conn = mysql.connector.connect(**self.connection_params)
@@ -57,8 +56,7 @@ class DatabaseManager:
             else:
                 raise ValueError(f"Unsupported MySQL driver: {self.driver}")
             
-            typed_conn = cast(MySQLConnection, raw_conn)
-            self._connection = MySQLConnectionWrapper(typed_conn)
+            self._connection = MySQLConnection_.connection(raw_conn)
 
 
         return self._connection  # type: ignore
@@ -91,7 +89,7 @@ class AsyncDatabaseManager:
             from aiosqlite import connect
 
             raw_conn = await connect(**self.connection_params)
-            self._connection = AsyncSQLiteConnectionWrapper(raw_conn)
+            self._connection = AioSQLiteConnection(raw_conn)
         elif self.db_type == DatabaseDialect.POSTGRES:
             if self.driver == PostgreSQLDriver.PSYCOPG3:
                 import psycopg
@@ -101,13 +99,15 @@ class AsyncDatabaseManager:
                 raw_conn = await connect(**self.connection_params)
             else:
                 raise ValueError(f"Unsupported Postgres driver: {self.driver}")
-            self._connection = AsyncPostgreSQLConnectionWrapper(raw_conn)
+            
+            self._connection = await PostgresConnection.connect_async(raw_conn)
+
         elif self.db_type == DatabaseDialect.MYSQL:
             if self.driver == "aiomysql":
-                from aiomysql import create_pool
+                from aiomysql import connect
 
-                pool = await create_pool(**self.connection_params)
-                self._connection = AsyncMySQLConnectionWrapper(pool)
+                pool = await connect(**self.connection_params)
+                self._connection = await MySQLConnection_.connection_async(pool)
             else:
                 raise ValueError(f"Unsupported MySQL driver: {self.driver}")
         else:

@@ -50,3 +50,6 @@ class Psycopg2Connection(SyncDatabaseConnection):
     
     def rollback(self) -> None:
         self._connection.rollback()
+    
+    def close(self) -> None:
+        self._connection.close()
