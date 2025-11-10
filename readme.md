@@ -91,11 +91,7 @@ from nexios import NexiosApp
 from nexios.http import Request, Response
 
 # Create app with built-in utilities
-app = NexiosApp(
-    title="My Utility API",
-    debug=True,  # Enables debug toolbar and dev utilities
-    auto_reload=True  # Hot reload during development
-)
+app = NexiosApp(title="My Utility API")
 
 @app.get("/")
 async def basic(request: Request, response: Response):
