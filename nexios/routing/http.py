@@ -2350,13 +2350,7 @@ class Router(BaseRouter):
         scope["app"] = self
         url = get_route_path(scope)
 
-        for mount_path, sub_app in self.sub_routers.items():
-            if url.startswith(mount_path):
-                # scope["path"] = url[len(mount_path) :]
-                # scope["root_path"] = scope.get("root_path", "") + mount_path
-                await sub_app(scope, receive, send)
-
-                return
+        
 
         path_matched = False
         allowed_methods_: typing.List[str] = []
