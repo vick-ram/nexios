@@ -106,7 +106,7 @@ class StaticFiles(BaseRouter):
             return False
 
     async def _handle(self, request: Request, response: Response):
-        path = request.scope.get("path", "").lstrip("/")
+        path = str(request.scope.get("path", "")).lstrip("/")
         for directory in self.directories:
             try:
                 file_path = (directory / path).resolve()

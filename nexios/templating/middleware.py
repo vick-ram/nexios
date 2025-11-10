@@ -37,7 +37,7 @@ class TemplateContextMiddleware(BaseMiddleware):
                 request_context = self.context_processor(request)
             else:
                 request_context = await self.context_processor(request)
-            context.update(request_context)
+            context.update(request_context) # type: ignore
 
         context.update(
             {

@@ -73,10 +73,10 @@ def inject_dependencies(handler: Callable[..., Any]) -> Callable[..., Any]:
         # Store cleanup in context if possible
         if ctx is not None:
             if not hasattr(ctx, "_dependency_cleanup"):
-                ctx._dependency_cleanup = []
-            cleanup_callbacks = ctx._dependency_cleanup
-        if ctx.base_app:
-            app_dependencies = get_app_dependencies(ctx.base_app.router)
+                ctx._dependency_cleanup = [] # type: ignore
+            cleanup_callbacks = ctx._dependency_cleanup # type: ignore
+        if ctx.base_app: # type: ignore
+            app_dependencies = get_app_dependencies(ctx.base_app.router) # type: ignore
             for dep in app_dependencies:
                 dependency_func = dep.dependency
                 if dependency_func is None:
@@ -198,7 +198,7 @@ def get_app_dependencies(router: "Router") -> List[Depend]:
     dependencies = []
     if hasattr(router, "sub_routers"):
         for child_router in router.sub_routers.values():
-            dependencies.extend(get_app_dependencies(child_router))
+            dependencies.extend(get_app_dependencies(child_router)) # type: ignore
     if hasattr(router, "dependencies"):
         dependencies.extend(router.dependencies)
     return dependencies

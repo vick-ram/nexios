@@ -78,8 +78,9 @@ def create_logger(
     logger.setLevel(log_level)
 
     console_handler = StreamHandler(sys.stderr)
+    formatter = "[%(asctime)s] %(levelname)s in %(module)s: %(message)s"
     console_handler.setFormatter(
-        Formatter("[%(asctime)s] %(levelname)s in %(module)s: %(message)s")
+        Formatter(formatter)
     )
 
     handlers: Tuple[Handler, ...] = (console_handler,)
@@ -89,7 +90,7 @@ def create_logger(
             log_file, maxBytes=max_bytes, backupCount=backup_count
         )
         file_handler.setFormatter(
-            Formatter("[%(asctime)s] %(levelname)s in %(module)s: %(message)s")
+            Formatter(formatter)
         )
         handlers += (file_handler,)
 

@@ -16,6 +16,7 @@ from typing import (
     TypeVar,
     Union,
 )
+task_group = asyncio.TaskGroup
 
 T = TypeVar("T")
 
