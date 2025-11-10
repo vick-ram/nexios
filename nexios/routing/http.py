@@ -2352,8 +2352,6 @@ class Router(BaseRouter):
         scope["app"] = self
         url = get_route_path(scope)
 
-        
-
         path_matched = False
         allowed_methods_: typing.List[str] = []
         for route in self.routes:
