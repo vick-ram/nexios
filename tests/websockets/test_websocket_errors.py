@@ -10,7 +10,7 @@ import pytest
 
 from nexios import NexiosApp
 from nexios.exceptions import WebSocketException
-from nexios.routing import WSRouter
+from nexios.routing import Router
 from nexios.testclient import TestClient
 from nexios.types import ASGIApp, Receive, Scope, Send
 from nexios.websockets.base import WebSocket
@@ -201,14 +201,14 @@ class TestWebSocketErrorIntegration:
 
     def test_router_with_error_middleware(self, test_client_factory):
         """Test that router properly applies error middleware"""
-        router = WSRouter(prefix="/api")
+        router = Router(prefix="/api")
 
         @router.ws_route("/error")
         async def router_error_endpoint(websocket: WebSocket):
             raise WebSocketException(code=1009, reason="Router error")
 
         app = NexiosApp()
-        app.mount_ws_router(router)
+        app.mount_router(router)
 
         with test_client_factory(app) as client:
             with pytest.raises(Exception):

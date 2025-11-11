@@ -8,7 +8,7 @@ from typing import Any, Callable, List
 import pytest
 
 from nexios import NexiosApp
-from nexios.routing import WSRouter
+from nexios.routing import Router
 from nexios.testclient import TestClient
 from nexios.websockets import WebSocket, WebSocketConsumer
 from nexios.websockets.channels import ChannelBox
@@ -381,11 +381,11 @@ def test_broadcast_with_history(test_client_factory: Callable[[NexiosApp], TestC
 def test_group_with_router(test_client_factory: Callable[[NexiosApp], TestClient]):
     """Test groups with mounted router"""
     app = NexiosApp()
-    router = WSRouter(prefix="/api")
+    router = Router(prefix="/api")
 
     route = GroupChatConsumer.as_route("/chat")
     router.add_ws_route(route)
-    app.mount_ws_router(router)
+    app.mount_router(router)
 
     with test_client_factory(app) as client:
         with client.websocket_connect("/api/chat") as websocket:

@@ -7,7 +7,7 @@ from typing import Callable
 import pytest
 
 from nexios import NexiosApp
-from nexios.routing import WSRouter
+from nexios.routing import Router
 from nexios.testclient import TestClient
 from nexios.websockets import WebSocket
 
@@ -123,7 +123,7 @@ def test_websocket_router_mounting(
 ):
     """Test WebSocket router mounting"""
     app = NexiosApp()
-    ws_router = WSRouter(prefix="/api/ws")
+    ws_router = Router(prefix="/api/ws")
 
     @ws_router.ws_route("/echo")
     async def echo_endpoint(websocket: WebSocket):
@@ -132,7 +132,7 @@ def test_websocket_router_mounting(
         await websocket.send_text(f"Router echo: {data}")
         await websocket.close()
 
-    app.mount_ws_router(ws_router)
+    app.mount_router(ws_router)
 
     with test_client_factory(app) as client:
         with client.websocket_connect("/api/ws/echo") as websocket:
@@ -147,7 +147,7 @@ def test_websocket_multiple_routers(
     """Test multiple WebSocket routers"""
     app = NexiosApp()
 
-    chat_router = WSRouter(prefix="/chat")
+    chat_router = Router(prefix="/chat")
 
     @chat_router.ws_route("/room")
     async def chat_room(websocket: WebSocket):
@@ -155,7 +155,7 @@ def test_websocket_multiple_routers(
         await websocket.send_text("Chat room")
         await websocket.close()
 
-    api_router = WSRouter(prefix="/api")
+    api_router = Router(prefix="/api")
 
     @api_router.ws_route("/status")
     async def api_status(websocket: WebSocket):
@@ -163,8 +163,8 @@ def test_websocket_multiple_routers(
         await websocket.send_json({"status": "online"})
         await websocket.close()
 
-    app.mount_ws_router(chat_router)
-    app.mount_ws_router(api_router)
+    app.mount_router(chat_router)
+    app.mount_router(api_router)
 
     with test_client_factory(app) as client:
         with client.websocket_connect("/chat/room") as websocket:
@@ -181,7 +181,7 @@ def test_websocket_nested_routers(
     """Test nested WebSocket routers"""
     app = NexiosApp()
 
-    inner_router = WSRouter(prefix="/v1")
+    inner_router = Router(prefix="/v1")
 
     @inner_router.ws_route("/endpoint")
     async def inner_endpoint(websocket: WebSocket):
@@ -189,10 +189,10 @@ def test_websocket_nested_routers(
         await websocket.send_text("Nested endpoint")
         await websocket.close()
 
-    outer_router = WSRouter(prefix="/api")
+    outer_router = Router(prefix="/api")
     outer_router.mount_router(inner_router)
 
-    app.mount_ws_router(outer_router)
+    app.mount_router(outer_router)
 
     with test_client_factory(app) as client:
         with client.websocket_connect("/api/v1/endpoint") as websocket:
@@ -224,7 +224,7 @@ def test_websocket_isolation(test_client_factory: Callable[[NexiosApp], TestClie
     """Test that WebSocket routes are isolated"""
     app = NexiosApp()
 
-    router1 = WSRouter(prefix="/ws1")
+    router1 = Router(prefix="/ws1")
 
     @router1.ws_route("/test")
     async def ws1_test(websocket: WebSocket):
@@ -232,7 +232,7 @@ def test_websocket_isolation(test_client_factory: Callable[[NexiosApp], TestClie
         await websocket.send_text("Router 1")
         await websocket.close()
 
-    router2 = WSRouter(prefix="/ws2")
+    router2 = Router(prefix="/ws2")
 
     @router2.ws_route("/test")
     async def ws2_test(websocket: WebSocket):
@@ -240,8 +240,8 @@ def test_websocket_isolation(test_client_factory: Callable[[NexiosApp], TestClie
         await websocket.send_text("Router 2")
         await websocket.close()
 
-    app.mount_ws_router(router1)
-    app.mount_ws_router(router2)
+    app.mount_router(router1)
+    app.mount_router(router2)
 
     with test_client_factory(app) as client:
         with client.websocket_connect("/ws1/test") as websocket:

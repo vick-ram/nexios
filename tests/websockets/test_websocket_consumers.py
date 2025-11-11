@@ -7,7 +7,7 @@ from typing import Any, Callable
 import pytest
 
 from nexios import NexiosApp
-from nexios.routing import WSRouter
+from nexios.routing import Router
 from nexios.testclient import TestClient
 from nexios.websockets import WebSocket, WebSocketConsumer
 
@@ -164,12 +164,12 @@ def test_stateful_consumer(test_client_factory: Callable[[NexiosApp], TestClient
 def test_consumer_with_router(test_client_factory: Callable[[NexiosApp], TestClient]):
     """Test consumer mounted on router"""
     app = NexiosApp()
-    router = WSRouter(prefix="/api")
+    router = Router(prefix="/api")
 
     route = EchoConsumer.as_route("/echo")
     router.add_ws_route(route)
 
-    app.mount_ws_router(router)
+    app.mount_router(router)
 
     with test_client_factory(app) as client:
         with client.websocket_connect("/api/echo") as websocket:
