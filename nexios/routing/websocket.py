@@ -19,6 +19,7 @@ from nexios.websockets.errors import WebSocketErrorMiddleware
 
 from ._utils import get_route_path
 from .base import BaseRouter
+from .grouping import Group
 
 
 class WebsocketRoute:
@@ -201,6 +202,8 @@ class WebsocketRouter(BaseRouter):
 
     async def app(self, scope: Scope, receive: Receive, send: Send) -> None:
         url = get_route_path(scope)
+        
+        # Handle legacy sub_routers (for backward compatibility)
         for mount_path, sub_app in self.sub_routers.items():
             if url.startswith(mount_path):
                 scope["path"] = url[len(mount_path) :]
@@ -208,12 +211,24 @@ class WebsocketRouter(BaseRouter):
 
                 await sub_app(scope, receive, send)
                 return
+        
+        # Handle routes (including Group routes from mount_ws_router)
         for route in self.routes:
-            match, params = route.match(scope)
-            if match:
-                scope["route_params"] = params
-                await route.handle(scope, receive, send)
-                return
+            if isinstance(route, Group):
+                # Handle Group routes (mounted routers)
+                match, params, method_allowed = route.match(scope)
+                if match:
+                    scope["route_params"] = params
+                    await route.handle(scope, receive, send)
+                    return
+            else:
+                # Handle regular WebSocket routes
+                match, params = route.match(scope)
+                if match:
+                    scope["route_params"] = params
+                    await route.handle(scope, receive, send)
+                    return
+        
         await send({"type": "websocket.close", "code": 404})
 
     def wrap_asgi(
@@ -243,9 +258,22 @@ class WebsocketRouter(BaseRouter):
         """
         self.app = middleware_cls(self.app)
 
+    def mount_ws_router(self, app: "WebsocketRouter", name: Optional[str] = None) -> None:
+        """
+        Mount a WebSocket router using its prefix, following the same pattern as HTTP router.
+
+        Args:
+            app: The WebSocket router to mount.
+            name: Optional name for the mounted router.
+        """
+        path = app.prefix
+        self.routes.append(Group(app=app, path=path, name=name))
+
     def mount_router(self, app: "WSRouter") -> None:  # type:ignore
         """
         Mount an ASGI application (e.g., another Router) using its prefix.
+        
+        Deprecated: Use mount_ws_router instead for better consistency.
 
         Args:
             app: The ASGI application (e.g., another Router) to mount.

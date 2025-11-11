@@ -70,7 +70,7 @@ class Group(BaseRoute):
                 if value is not None:
                     matched_params[key] = self.route_info.convertor[key].convert(value)
 
-            return match, {"path": path_remainder, **matched_params}, True
+            return match, matched_params, True
         return None, None, False
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
