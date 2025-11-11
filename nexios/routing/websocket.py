@@ -64,14 +64,22 @@ class WebsocketRoute:
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         """
-        Handles the WebSocket connection by calling the route's handler.
-
-        Args:
-            websocket: The WebSocket connection.
-            params: The extracted route parameters.
+        Handles the WebSocket connection by calling the route's handler with middleware.
         """
-        websocket_session = WebSocket(scope, receive=receive, send=send)
-        await self.handler(websocket_session)
+        # Create the base handler
+        async def handler_app(scope: Scope, receive: Receive, send: Send) -> None:
+            websocket_session = WebSocket(scope, receive=receive, send=send)
+            await self.handler(websocket_session)
+        
+        app = handler_app
+        
+        for middleware_cls in reversed(self.middleware):
+            app = middleware_cls(app)
+        
+        app = WebSocketErrorMiddleware(app)
+        
+        await app(scope, receive, send)
+
 
     def __repr__(self) -> str:
         return f"<WSRoute {self.raw_path}>"
@@ -197,7 +205,6 @@ class WebsocketRouter(BaseRouter):
         if scope["type"] != "websocket":
             return
         app = self.build_middleware_stack(scope, receive, send)
-        app = WebSocketErrorMiddleware(app)
         await app(scope, receive, send)
 
     async def app(self, scope: Scope, receive: Receive, send: Send) -> None:

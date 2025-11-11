@@ -43,6 +43,7 @@ from nexios.types import ASGIApp, HandlerType, MiddlewareType, Receive, Scope, S
 from ._utils import get_route_path,MatchStatus
 from .base import BaseRoute, BaseRouter
 from .grouping import Group
+from .websocket import WebsocketRoute
 
 allowed_methods_default = ["get", "post", "delete", "put", "patch", "options"]
 
@@ -221,6 +222,8 @@ class Route(BaseRoute):
             Optional[Dict[str, Any]]: A dictionary of captured parameters if the path matches,
             otherwise None.
         """
+        if scope.get("type") != "http":
+           return MatchStatus.NONE, {}
         path = get_route_path(scope)
         method = scope["method"]
         match = self.pattern.match(path)
@@ -2256,6 +2259,95 @@ class Router(BaseRouter):
         if handler is None:
             return decorator
         return decorator(handler)
+    def add_ws_route(
+        self,
+        route: Optional[
+            Annotated[
+                WebsocketRoute,
+                Doc("An instance of the Route class representing a WebSocket route."),
+            ]
+        ] = None,
+        path: Optional[str] = None,
+        handler: Optional[WsHandlerType] = None,
+        middleware: List[WsMiddlewareType] = [],
+    ) -> None:
+        """
+        Adds a WebSocket route to the application.
+
+        This method registers a WebSocket route, allowing the application to handle WebSocket connections.
+
+        Args:
+            route: Either a pre-constructed WebsocketRoute instance or None
+            path: The URL path for the WebSocket route (required if route is None)
+            handler: The WebSocket handler function (required if route is None)
+            middleware: List of middleware for this route
+
+        Returns:
+            None
+
+        Example:
+            ```python
+            # Using with a pre-constructed route
+            route = WebsocketRoute("/ws/chat", chat_handler)
+            app.add_ws_route(route)
+
+            # Or directly with path and handler
+            app.add_ws_route(path="/ws/chat", handler=chat_handler)
+            ```
+        """
+        if route is not None:
+            self.routes.append(route)
+        elif path is not None and handler is not None:
+            self.routes.append(WebsocketRoute(path, handler, middleware=middleware))
+        else:
+            raise ValueError("Either route or both path and handler must be provided")
+
+
+    def ws_route(
+        self,
+        path: Annotated[
+            str, Doc("The WebSocket route path. Must be a valid URL pattern.")
+        ],
+        handler: Annotated[
+            Optional[WsHandlerType],
+            Doc("The WebSocket handler function. Must be an async function."),
+        ] = None,
+        middleware: Annotated[
+            List[WsMiddlewareType],
+            Doc("List of middleware to be executes before the router handler"),
+        ] = [],
+    ) -> Any:
+        """
+        Registers a WebSocket route.
+
+        This decorator is used to define WebSocket routes in the application, allowing handlers
+        to manage WebSocket connections. When a WebSocket client connects to the given path,
+        the specified handler function will be executed.
+
+        Returns:
+            Callable: The original WebSocket handler function.
+
+        Example:
+            ```python
+
+            @app.ws_route("/ws/chat")
+            async def chat_handler(websocket):
+                await websocket.accept()
+                while True:
+                    message = await websocket.receive_text()
+                    await websocket.send_text(f"Echo: {message}")
+            ```
+        """
+        if handler:
+            return self.add_ws_route(
+                WebsocketRoute(path, handler, middleware=middleware)
+            )
+
+        def decorator(handler: WsHandlerType) -> WsHandlerType:
+            self.add_ws_route(WebsocketRoute(path, handler, middleware=middleware))
+            return handler
+
+        return decorator
 
     def url_for(self, _name: str, **path_params: Any) -> URLPath:
         """
@@ -2378,6 +2470,11 @@ class Router(BaseRouter):
             scope["route_params"] = RouteParam(matched_params)
             await partial.handle(scope, receive, send)
             return
+        if scope.get("type") == "http":
+            raise NotFoundException
+        else:
+            await send({"type": "websocket.close", "code": 4404})
+            
 
 
     def mount_router(self, app: "Router", name: Optional[str] = None):

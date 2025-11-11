@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 from pydantic import BaseModel
 
 from nexios.routing.grouping import Group
-from nexios.routing.http import Route, Router
+from nexios.routing import Route, Router
 
 from .config import OpenAPIConfig
 from .models import (

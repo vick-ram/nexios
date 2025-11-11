@@ -409,7 +409,7 @@ class NexiosApp(object):
             if (not path or path == route.raw_path) and (
                 not handler or handler == route.handler
             ):
-                self.ws_router.add_ws_route(route)
+                self.router.add_ws_route(route)
                 return
 
         if path is None or handler is None:
@@ -479,12 +479,12 @@ class NexiosApp(object):
             app.mount_ws_router(chat_router)  # Mounts the websocket routes into the main app
             ```
         """
-        self.ws_router.mount_router(router)
+        self.router.mount_router(router)
 
     async def handle_websocket(
         self, scope: Scope, receive: Receive, send: Send
     ) -> None:
-        app = self.ws_router
+        app = self.router
         for mdw in reversed(self.ws_middleware):
             app = mdw(app)  # type:ignore
         await app(scope, receive, send)
@@ -549,11 +549,12 @@ class NexiosApp(object):
 
         if scope["type"] == "lifespan":
             await self.handle_lifespan(receive, send)
-        elif scope["type"] == "http":
+        # print("scope ->>",scope)
+        elif scope["type"] in ["http","websocket"]:
             await self.handle_http_request(scope, receive, send)
 
-        else:
-            await self.handle_websocket(scope, receive, send)
+        # else:
+        #     await self.handle_websocket(scope, receive, send)
 
     def get(
         self,
@@ -2315,7 +2316,7 @@ class NexiosApp(object):
         Returns:
             Callable: A decorator to register the WebSocket route.
         """
-        return self.ws_router.ws_route(
+        return self.router.ws_route(
             path=path,
             handler=handler,
         )
