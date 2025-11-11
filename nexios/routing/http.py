@@ -40,7 +40,7 @@ from nexios.openapi.models import Parameter
 from nexios.structs import RouteParam, URLPath
 from nexios.types import ASGIApp, HandlerType, MiddlewareType, Receive, Scope, Send
 
-from ._utils import get_route_path
+from ._utils import get_route_path,MatchStatus
 from .base import BaseRoute, BaseRouter
 from .grouping import Group
 
@@ -109,7 +109,7 @@ class Route(BaseRoute):
             Defaults to ['GET'] if not specified. Use uppercase method names.
             """
             ),
-        ] = None,
+        ] = allowed_methods_default,
         name: Annotated[
             Optional[str],
             Doc(
@@ -186,7 +186,6 @@ class Route(BaseRoute):
             path = "/"
         self.raw_path = path
         self.handler = inject_dependencies(handler)
-        self.methods = methods or allowed_methods_default
         self.name = name
 
         self.route_info = RouteBuilder.create_pattern(path)
@@ -208,8 +207,10 @@ class Route(BaseRoute):
         self.deprecated = deprecated
         self.parameters = parameters or []
         self.exclude_from_schema = exclude_from_schema
-
-    def match(self, scope:Scope) -> typing.Tuple[Any, Any, Any]:
+        self.methods = {method.upper() for method in methods}
+        if "GET" in self.methods:
+            self.methods.add("HEAD")
+    def match(self, scope:Scope) -> typing.Tuple[MatchStatus, Any]:
         """
         Match a path against this route's pattern and return captured parameters.
 
@@ -230,8 +231,11 @@ class Route(BaseRoute):
                     key
                 ].convert(value)
             is_method_allowed = method.lower() in (m.lower() for m in self.methods)
-            return match, matched_params, is_method_allowed
-        return None, None, False
+            if not is_method_allowed:
+                return MatchStatus.PARTIAL,matched_params
+
+            return MatchStatus.FULL, matched_params
+        return MatchStatus.NONE, {}
 
     def url_path_for(self, _name: str, **path_params: Dict[str, Any]) -> URLPath:
         """
@@ -288,8 +292,13 @@ class Route(BaseRoute):
             for cls, args, kwargs in reversed(middleware):
                 app = cls(app, *args, **kwargs)
             return app
-
-        app = await apply_middleware(await request_response(self.handler))
+        if self.methods and  scope["method"] not in self.methods:
+            app = JSONResponse({"Method Not Allowed"},
+                                status_code = 405,
+                                headers = {"Allow": ", ".join(self.methods)}
+                                )
+        else:
+            app = await apply_middleware(await request_response(self.handler))
 
         await app(scope, receive, send)
 
@@ -2352,28 +2361,24 @@ class Router(BaseRouter):
         scope["app"] = self
         url = get_route_path(scope)
 
-        path_matched = False
+        path_match = None
+        partial_params = None
         allowed_methods_: typing.List[str] = []
         for route in self.routes:
-            match, matched_params, is_allowed = route.match(scope)  # type:ignore
-            if match:
-                path_matched = True
-                if is_allowed:
-                    scope["route_params"] = RouteParam(matched_params)
-                    await route.handle(scope, receive, send)  # type:ignore
-                    return
-                else:
-                    allowed_methods_.extend(route.methods)  # type:ignore
-        if path_matched:
-            response = JSONResponse(
-                content="Method not allowed",
-                status_code=405,
-                headers={"Allow": ", ".join(allowed_methods_)},
-            )
-            await response(scope, receive, send)
+            match, matched_params = route.match(scope)  # type:ignore
+            if match == MatchStatus.FULL:
+                scope["route_params"] = RouteParam(matched_params)
+                await route.handle(scope, receive, send)  # type:ignore
+                return
+            elif match == MatchStatus.PARTIAL and path_match is None :
+                partial_params = matched_params
+                path_match = route
+
+        if path_match is not None:
+            scope["route_params"] = RouteParam(matched_params)
+            await partial.handle(scope, receive, send)
             return
 
-        raise NotFoundException
 
     def mount_router(self, app: "Router", name: Optional[str] = None):
         """

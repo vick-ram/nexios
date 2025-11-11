@@ -6,7 +6,7 @@ from nexios._internals._route_builder import RouteBuilder
 from nexios.exceptions import NotFoundException
 from nexios.structs import URLPath
 from nexios.types import ASGIApp, Receive, Scope, Send,Scope
-from ._utils import get_route_path
+from ._utils import get_route_path,MatchStatus
 
 from .base import BaseRoute
 
@@ -70,8 +70,8 @@ class Group(BaseRoute):
                 if value is not None:
                     matched_params[key] = self.route_info.convertor[key].convert(value)
 
-            return match, matched_params, True
-        return None, None, False
+            return MatchStatus.FULL, matched_params
+        return MatchStatus.NONE, {}
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         original_path = scope["path"]

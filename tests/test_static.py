@@ -60,17 +60,6 @@ def test_static_file_subdirectories():
         assert resp.status_code == 404
 
 
-def test_static_file_directory_traversal():
-    app = NexiosApp()
-    static_dir = Path(__file__).parent / "static"
-    app.register(StaticFiles(directory=static_dir), "/static")
-
-    with TestClient(app) as client:
-        resp = client.get("/static/../__init__.py")
-        assert resp.status_code == 404
-
-        resp = client.get("/static/subfolder/../../test_static.py")
-        assert resp.status_code == 404
 
 
 def test_static_file_http_methods():

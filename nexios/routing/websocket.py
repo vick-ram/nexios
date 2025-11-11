@@ -17,7 +17,7 @@ from nexios.types import (
 from nexios.websockets import WebSocket
 from nexios.websockets.errors import WebSocketErrorMiddleware
 
-from ._utils import get_route_path
+from ._utils import get_route_path,MatchStatus
 from .base import BaseRouter
 from .grouping import Group
 
@@ -59,8 +59,8 @@ class WebsocketRoute:
                 matched_params[key] = self.route_info.convertor[  # type:ignore
                     key
                 ].convert(value)
-            return match, matched_params
-        return None, None
+            return MatchStatus.FULL, matched_params
+        return MatchStatus.NONE, {}
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         """
@@ -214,20 +214,12 @@ class WebsocketRouter(BaseRouter):
         
         # Handle routes (including Group routes from mount_ws_router)
         for route in self.routes:
-            if isinstance(route, Group):
-                # Handle Group routes (mounted routers)
-                match, params, method_allowed = route.match(scope)
-                if match:
-                    scope["route_params"] = params
-                    await route.handle(scope, receive, send)
-                    return
-            else:
-                # Handle regular WebSocket routes
-                match, params = route.match(scope)
-                if match:
-                    scope["route_params"] = params
-                    await route.handle(scope, receive, send)
-                    return
+           
+            match, params = route.match(scope)
+            if match == MatchStatus.FULL:
+                scope["route_params"] = params
+                await route.handle(scope, receive, send)
+                return
         
         await send({"type": "websocket.close", "code": 404})
 
