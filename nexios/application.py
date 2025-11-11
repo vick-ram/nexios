@@ -34,7 +34,7 @@ from nexios.openapi.models import HTTPBearer, Parameter
 from nexios.routing.base import BaseRoute
 from nexios.structs import URLPath
 
-from .routing import Route, Router, WebsocketRoute, WSRouter
+from .routing import Route, Router, WebsocketRoute
 from .types import (
     ASGIApp,
     HandlerType,
@@ -123,10 +123,7 @@ class NexiosApp(object):
         self.config.update(
             get_nexios_config(),
         )
-        self.ws_router = WSRouter()
-        self.ws_routes: List[WebsocketRoute] = []
         self.http_middleware: List[Middleware] = []
-        self.ws_middleware: List[ASGIApp] = []
         self.startup_handlers: List[Callable[[], Awaitable[None]]] = []
         self.shutdown_handlers: List[Callable[[], Awaitable[None]]] = []
         self.server_error_handler = server_error_handler
@@ -140,14 +137,51 @@ class NexiosApp(object):
         self.state: Dict[str, Any] = {}
 
         openapi_config: Dict[str, Any] = self.config.to_dict().get("openapi", {})  # type:ignore
+        
+        # Handle license - ensure it's a License model instance
+        license_data = openapi_config.get("license")
+        license_instance = None
+        if license_data:
+            if isinstance(license_data, dict):
+                from nexios.openapi.models import License
+                license_instance = License(**license_data)
+            else:
+                license_instance = license_data
+        
+        # Handle contact - ensure it's a Contact model instance  
+        contact_data = openapi_config.get("contact")
+        contact_instance = None
+        if contact_data:
+            if isinstance(contact_data, dict):
+                from nexios.openapi.models import Contact
+                contact_instance = Contact(**contact_data)
+            else:
+                contact_instance = contact_data
+        
+        # Handle servers - ensure they are Server model instances
+        servers_data = openapi_config.get("servers")
+        servers_instances = None
+        if servers_data:
+            if isinstance(servers_data, list):
+                from nexios.openapi.models import Server
+                servers_instances = []
+                for server in servers_data:
+                    if isinstance(server, dict):
+                        servers_instances.append(Server(**server))
+                    else:
+                        servers_instances.append(server)
+            else:
+                servers_instances = servers_data
+        
         self.openapi_config = OpenAPIConfig(
             title=openapi_config.get("title", title or "Nexios API"),
             version=openapi_config.get("version", version or "1.0.0"),
             description=openapi_config.get(
                 "description", description or "Nexios API Documentation"
             ),
-            license=openapi_config.get("license"),
-            contact=openapi_config.get("contact"),
+            license=license_instance,
+            contact=contact_instance,
+            servers=servers_instances,
         )
 
         self.openapi_config.add_security_scheme(
@@ -448,48 +482,9 @@ class NexiosApp(object):
         """
         self.router.mount_router(router, name=name)
 
-    def mount_ws_router(
-        self,
-        router: Annotated[
-            WSRouter,
-            Doc("An instance of Router containing multiple routes to be mounted."),
-        ],
-    ) -> None:
-        """
-        Mounts a websocket router and all its routes to the application using the router's prefix.
+  
 
-        This method allows integrating another `WSRouter` instance, registering all its
-        defined routes into the current application. It is useful for modularizing routes
-        and organizing large applications.
-
-        Args:
-            router (WSRouter): The `WSRouter` instance whose routes will be added.
-
-        Returns:
-            None
-
-        Example:
-            ```python
-            chat_router = WSRouter(prefix="/chat")
-
-            @chat_router.ws("/room")
-            def get_users(ws):
-                ...
-
-            app.mount_ws_router(chat_router)  # Mounts the websocket routes into the main app
-            ```
-        """
-        self.router.mount_router(router)
-
-    async def handle_websocket(
-        self, scope: Scope, receive: Receive, send: Send
-    ) -> None:
-        app = self.router
-        for mdw in reversed(self.ws_middleware):
-            app = mdw(app)  # type:ignore
-        await app(scope, receive, send)
-
-    def add_ws_middleware(
+    def add_asgi_middleware(
         self,
         middleware: Annotated[
             ASGIApp,
@@ -518,12 +513,12 @@ class NexiosApp(object):
                     ...
                 return next_handler(ws)
 
-            app.add_ws_middleware(ws_auth_middleware)
+            app.add_asgi_middleware(ws_auth_middleware)
             ```
         """
         self.ws_middleware.append(middleware)
 
-    def handle_http_request(self, scope: Scope, receive: Receive, send: Send):
+    def handle_request(self, scope: Scope, receive: Receive, send: Send):
         app = self.app
         middleware = (
             [
@@ -549,12 +544,10 @@ class NexiosApp(object):
 
         if scope["type"] == "lifespan":
             await self.handle_lifespan(receive, send)
-        # print("scope ->>",scope)
         elif scope["type"] in ["http","websocket"]:
-            await self.handle_http_request(scope, receive, send)
+            await self.handle_request(scope, receive, send)
 
-        # else:
-        #     await self.handle_websocket(scope, receive, send)
+
 
     def get(
         self,
