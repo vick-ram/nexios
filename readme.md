@@ -8,7 +8,7 @@
 
 
 <p align="center">
-    <img alt=Support height="350" src="https://nexios-labs.github.io/nexios/logo.png">
+    <img alt=Support height="350" src="https://nexioslabs.com/logo.png">
     </p>
     <h1 align="center">Nexios 3.x.x</h1>
 
@@ -128,7 +128,7 @@ Visit http://localhost:8000/docs to view the Swagger API documentation.
 
 ## See the full docs
 
-👉 <a href="https://nexios-labs.github.io/nexios">https://nexios-labs.github.io/nexios</a>
+👉 <a href="https://nexioslabs.com">https://nexioslabs.com</a>
 
 ## Contributors:
 
@@ -150,7 +150,7 @@ Nexios thrives on community contributions and collaboration. We believe the best
 - **Help Others**: Answer questions and help fellow developers
 
 ### Community Resources
-- 📚 **Documentation**: [https://nexios-labs.github.io/nexios](https://nexios-labs.github.io/nexios)
+- 📚 **Documentation**: [https://nexioslabs.com](https://nexioslabs.com)
 - 🛠️ **Community Extensions**: [nexios-contrib package](https://github.com/nexios-labs/contrib)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/nexios-labs/nexios/discussions)
 - 🐛 **Issues**: [Report bugs and request features](https://github.com/nexios-labs/nexios/issues)
