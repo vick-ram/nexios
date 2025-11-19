@@ -1,172 +1,210 @@
-import re
-from typing import TYPE_CHECKING
+from __future__ import annotations
 from typing_extensions import (
     Type,
     TypeVar,
     Any,
-    Self,
     Tuple,
     List,
     Union,
     Awaitable,
-    Callable,
     Optional,
     Generic,
     Literal,
+    Self,
 )
+from nexios.orm.backends.config import DatabaseDialect
 from nexios.orm.model import Model
 from nexios.orm.backends.sessions import Session, AsyncSession
 
 T = TypeVar("T", bound="Model")
-R = TypeVar("R")
-
-operator_map = {
-    "eq": "=",
-    "ne": "!=",
-    "lt": "<",
-    "lte": "<=",
-    "gt": ">",
-    "gte": ">=",
-    "in": "IN",
-    "not_in": "NOT IN",
-    "like": "LIKE",
-    "ilike": "ILIKE",  # Postgres specific
-    "is_null": "IS NULL",
-    "is_not_null": "IS NOT NULL",
-    "contains": "LIKE",
-}
 
 
-class Query(Generic[T]):
-    def __init__(self, session: Union["Session", "AsyncSession"], model_class: Type[T]) -> None:
-        self.model_class: Type[T] = model_class
-        self.session = session
-        self._where: List[str] = []
+class BinaryExpression:
+    def __init__(self, column_expr: "ColumnExpression", operator: str, value: Any):
+        self.column = column_expr
+        self.operator = operator
+        self.value = value
+
+    def to_sql(self, placeholder):
+        col = self.column.field_name
+        if self.value is None:
+            if self.operator == "=":
+                return f"{col} IS NULL", []
+            if self.operator == "!=":
+                return f"{col} IS NOT NULL", []
+        return f"{col} {self.operator} {placeholder}", [self.value]
+
+
+class ColumnExpression(Generic[T]):
+    """Represents a column in a select expression"""
+
+    def __init__(self, model_cls: Type[T], field_name: str):
+        self.model_cls = model_cls
+        self.field_name = field_name
+
+    def _binary(self, operator: str, value: Any) -> BinaryExpression:
+        return BinaryExpression(self, operator, value)
+
+    def __eq__(self, other: Any) -> BinaryExpression:  # type: ignore
+        return self._binary("=", other)
+
+    def __ne__(self, other: Any) -> BinaryExpression:  # type: ignore
+        return self._binary("!=", other)
+
+    def __lt__(self, other: Any) -> BinaryExpression:
+        return self._binary("<", other)
+
+    def __le__(self, other: Any) -> BinaryExpression:
+        return self._binary("<=", other)
+
+    def __gt__(self, other: Any) -> BinaryExpression:
+        return self._binary(">", other)
+
+    def __ge__(self, other: Any) -> BinaryExpression:
+        return self._binary(">=", other)
+
+    def like(self, value: str):
+        return self._binary("LIKE", value)
+
+    def ilike(self, value):
+        return self._binary("ILIKE", value)
+
+    def label(self, alias: str) -> "ColumnExpression[T]":
+        """Create an aliased column expression"""
+        # For simplicity, we'll handle aliasing in the SQL builder
+        self._alias = alias
+        return self
+
+    def __str__(self) -> str:
+        if hasattr(self, "_alias"):
+            return f'"{self.field_name}" AS "{self._alias}"'
+        return f'"{self.field_name}"'
+
+
+class Select(Generic[T]):
+    def __init__(self, *entities: Any):
+        self.entities = entities  # fields or models
+        self._where: List[BinaryExpression] = []
         self._params: List[Any] = []
-        self._order_by: List[str] = []
+        self._order_by: List[Union[ColumnExpression[T], str]] = []
         self._limit: Optional[int] = None
         self._offset: Optional[int] = None
+        self._session: Optional[Union["Session", "AsyncSession"]] = None
         self._joins: List[str] = []
         self._distinct: bool = False
         self._group_by: List[str] = []
         self._having: List[str] = []
-        self._select_fields: List[str] = []
+        self._having_params: List[Any] = []
 
-    def filter(self, **kwargs) -> Self:
-        """Add WHERE condition to the query"""
-        for key, value in kwargs.items():
-            if "__" in key:
-                field_name, operator = key.split("__", 1)
-
-                sql_operator = self._get_operator_sql(operator)
-
-                if operator in ("is_null", "is_not_null"):
-                    self._where.append(f"{field_name} {sql_operator}")
-                elif operator in ("in", "not_in"):
-                    if not value:
-                        # Handle empty IN clauses
-                        self._where.append("1=0" if operator == "in" else "1=1")
-                    else:
-                        placeholder = ", ".join(["?"] * len(value))
-                        self._where.append(
-                            f"{field_name} {sql_operator} ({placeholder})"
-                        )
-                        self._params.extend(value)
-                elif operator == "contains":
-                    self._where.append(f"{field_name} {sql_operator} ?")
-                    self._params.append(f"%{value}%")
-                else:
-                    self._where.append(f"{field_name} {sql_operator} ?")
-                    self._params.append(value)
-            else:
-                # Handle simple equality
-                if value is None:
-                    self._where.append(f"{key} IS NULL")
-                else:
-                    self._where.append(f"{key} = ?")
-                    self._params.append(value)
+    def bind(self, session: Union["Session", "AsyncSession"]) -> Self:
+        """Bind a session to this query"""
+        self._session = session
         return self
 
-    def order_by(self, *fields: str) -> Self:
-        """Add ORDER BY clause to the query"""
-        for field in fields:
-            if field.startswith("-"):
-                self._order_by.append(f"{field[1:]} DESC")
-            else:
-                self._order_by.append(field)
+    def where(self, *conditions: BinaryExpression) -> Self:
+        self._where.extend(conditions)
         return self
 
-    def limit(self, count: int) -> Self:
-        """Set LIMIT for the query"""
-        self._limit = count
+    def order_by(self, *fields: Union[ColumnExpression[T], str]) -> Self:
+        self._order_by.extend(fields)
         return self
 
-    def offset(self, count: int) -> Self:
-        """Set OFFSET for the query"""
-        self._offset = count
+    def limit(self, n: int) -> Self:
+        self._limit = n
         return self
 
-    def join(
-        self,
-        table: str,
-        on: str,
-        type: Literal["inner", "left", "right", "full", "cross"] = "left",
-    ) -> Self:
-        """Add JOIN clause on the query"""
-        query = self._clone()
-        _join: str = 'inner'
-
-        if type == 'inner':
-            _join = 'INNER JOIN'
-        elif type == 'left':
-            _join = 'LEFT JOIN'
-        elif type == 'right':
-            _join = 'RIGHT JOIN'
-        elif type == 'full':
-            _join = 'FULL JOIN'
-        elif type == 'cross':
-            _join = 'CROSS JOIN'
-        else:
-            _join = 'INNER JOIN'
-
-        # self._joins.append(f"JOIN {table} ON {on}")
-        query._joins.append(f"{_join} {table} ON {on}")
-        return query
-
-    def select(self, *fields: str) -> Self:
-        """Select specific fields instead of all"""
-        self._select_fields.extend(fields)
+    def offset(self, n: int) -> Self:
+        self._offset = n
         return self
 
     def count(self) -> Union[int, Awaitable[int]]:
         """Return count of records matching the query"""
-        count_query = self._clone()
-        count_query._select_fields = ["COUNT(*)"]
-        count_query._order_by = []  # Remove ordering for count
+        count_select = self._clone()
+        count_select.entities = ("COUNT(*)",)
+        count_select._order_by = []  # Remove ordering for count
+        count_select._limit = None
+        count_select._offset = None
 
         def transform_count(rows: List[Tuple[Any, ...]]) -> int:
             return rows[0][0] if rows else 0
 
-        return self._execute(transform_count)
+        if isinstance(self._session, AsyncSession):
+
+            async def async_count() -> int:
+                rows = await count_select._execute_async()
+                return transform_count(rows)
+
+            return async_count()
+        else:
+            rows = count_select._execute_sync()
+            return transform_count(rows)
+
+        return self
 
     def exists(self) -> Union[bool, Awaitable[bool]]:
-        """Check if any recors match the query"""
-        exist_query = self._clone()
-        exist_query._limit = 1
+        """Check if any records match the query"""
+        exists_select = self._clone()
+        exists_select._limit = 1
+        exists_select.entities = "1"
 
         def transform_exists(rows: List[Tuple[Any, ...]]) -> bool:
             return len(rows) > 0
 
-        return self._execute(transform_exists)
+        if isinstance(self._session, AsyncSession):
+
+            async def async_exists() -> bool:
+                rows = await exists_select._execute_async()
+                return transform_exists(rows)
+
+            return async_exists()
+        else:
+            rows = exists_select._execute_sync()
+            return transform_exists(rows)
+
+    def join(
+        self,
+        right_model: Type["Model"],
+        on_condition: Union[BinaryExpression, str, None] = None,
+        type: Literal["inner", "left", "right", "full", "cross"] = "left",
+        alias: Optional[str] = None,
+    ) -> Self:
+        """Add JOIN clause on the query"""
+        join_map = {
+            "inner": "INNER JOIN",
+            "left": "LEFT JOIN",
+            "right": "RIGHT JOIN",
+            "full": "FULL JOIN",
+            "cross": "CROSS JOIN",
+        }
+        join_type = join_map.get(type, "LEFT JOIN")
+        table_name = right_model.get_table_name()
+        table_ref = ""
+        if alias:
+            table_ref = f'"{table_name}" AS "{alias}"'
+        else:
+            table_ref = f'"{table_name}"'
+
+        # Build on condition
+        on_sql = ""
+        if on_condition is None:
+            # Try infer foreign key relationship
+            on_condition = self._infer_join_condition(right_model)
+        elif isinstance(on_condition, BinaryExpression):
+            # Convert Binary expression to sql
+            on_sql, on_params = on_condition.to_sql("%s")
+            self._params.extend(on_params)
+        elif isinstance(on_condition, str):
+            on_sql = on_condition
+        else:
+            raise ValueError("on_condition must be BinaryExpression, str, or None")
+
+        self._joins.append(f"{join_type} {table_ref} ON {on_sql}")
+        return self
 
     def distinct(self) -> Self:
-        """Add DISTINCT"""
-        query = self._clone()
-
-        if query._select_fields == ["*"]:
-            query._select_fields = list(query.model_class._fields.keys())
-        query._distinct = True
-        return query
+        """Add DISTINCT clause"""
+        self._distinct = True
+        return self
 
     def group_by(self, *fields: str) -> Self:
         """Add GROUP BY clause"""
@@ -175,153 +213,284 @@ class Query(Generic[T]):
 
     def having(self, condition: str, *params: Any) -> Self:
         """Add HAVING clause"""
-        query = self._clone()
-        query._having.append(condition)
-        query._params.extend(params)
-        return query
-
-    def paginate(self, page: int = 1, per_page: int = 20) -> Self:
-        """Pagination to the query"""
-        if page < 1:
-            raise ValueError("Page number must be >= 1")
-        if per_page < 1:
-            raise ValueError("Per page must be >= 1")
-
-        query = self._clone()
-        query._limit = per_page
-        query._offset = (page - 1) * per_page
+        self._having.append(condition)
+        self._having_params.extend(params)
         return self
 
-    def all(self) -> Union[List[T], Awaitable[List[T]]]:
-        """Execute query to return all results"""
-        return self._execute(self._rows_to_models)
+    def left_join(
+        self,
+        right_model: Type["Model"],
+        on_condition: Union[BinaryExpression, str, None] = None,
+    ) -> Self:
+        return self.join(right_model, on_condition, type="left")
 
-    def first(self) -> Union[Optional[T], Awaitable[Optional[T]]]:
-        query = self._clone()
-        query._limit = 1
+    def inner_join(
+        self,
+        right_model: Type["Model"],
+        on_condition: Union[BinaryExpression, str, None] = None,
+    ) -> Self:
+        """Convenience method for INNER JOIN"""
+        return self.join(right_model, on_condition, type="inner")
 
-        def transform_first(rows: List[Tuple[Any, ...]]) -> Optional[T]:
-            models = query._rows_to_models(rows)
-            return models[0] if models else None
+    def right_join(
+        self,
+        right_model: Type["Model"],
+        on_condition: Union[BinaryExpression, str, None] = None,
+    ) -> Self:
+        """Convenience method for RIGHT JOIN"""
+        return self.join(right_model, on_condition, type="right")
 
-        return self._execute(transform_first)
+    def _infer_join_condition(self, right_model: Type["Model"]) -> str:
+        """Try to infer condition based on field names"""
+        # Get primary model from select
+        primary_model = self._get_primary_model()
+        if not primary_model:
+            raise ValueError("Cannot infer join condition: no primary model found")
 
-    def _execute(
-        self, result_transformer: Callable[[List[Tuple[Any, ...]]], R]
-    ) -> Union[R, Awaitable[R]]:
-        """Generic executon method that transforms results."""
-        sql, params = self._build_sql()
+        possible_fks = [
+            f"{primary_model.__name__.lower()}_id",
+            f"{primary_model.get_table_name()}_id",
+            "user_id",
+            "parent_id",
+        ]
 
-        params_tuple = tuple(params)
+        # Look for matching fields
+        for fk_field in possible_fks:
+            if fk_field in right_model._fields:
+                # Found potential foreign key
+                primary_pk = self._get_primary_key(primary_model)
+                if primary_pk:
+                    return f'"{primary_model.get_table_name()}"."{primary_pk}" = "{right_model.get_table_name()}"."{fk_field}"'
+        raise ValueError(
+            f"Cannot infer join condition between {primary_model.__name__} and {right_model.__name__}. Please provide explicit on_condition."
+        )
 
-        if isinstance(self.session, AsyncSession):
+    def _get_primary_model(self) -> Optional[Type["Model"]]:
+        """Get the primary model from selected entities"""
+        for entity in self.entities:
+            if isinstance(entity, type) and issubclass(entity, Model):
+                return entity
+            elif isinstance(entity, ColumnExpression):
+                return entity.model_cls
+        return None
 
-            async def async_exec() -> R:
-                await self.session.execute(sql, params_tuple)
-                rows = await self.session.fetchall() # type: ignore
-                return result_transformer(rows)
+    def _get_primary_key(self, model: Type["Model"]) -> Optional[str]:
+        """Get the primary key field for model"""
+        for field_name, field_info in model._fields.items():
+            if getattr(field_info, "primary_key", False):
+                return field_name
 
-            return async_exec()
+            # Fallback to primary key names
+            common_pks = ["id", f"{model.__name__.lower()}_id", "pk"]
+            for pk in common_pks:
+                if pk in model._fields:
+                    return pk
+            return None
+
+    def _build_sql(self, dialect: "DatabaseDialect") -> Tuple[Any, ...]:
+        placeholder = (
+            "%s"
+            if dialect in (DatabaseDialect.POSTGRES, DatabaseDialect.MYSQL)
+            else "?"
+        )
+
+        # Determine table and what we're selecting
+        if (
+            len(self.entities) == 1
+            and isinstance(self.entities[0], type)
+            and issubclass(self.entities[0], Model)
+        ):
+            model = self.entities[0]
+            fields = list(model._fields.keys())
+            select_str = ", ".join(f'"{f}"' for f in fields)
+            map_to_model = True
         else:
-            self.session.execute(sql, params_tuple)
-            rows = self.session.fetchall()
-            return result_transformer(rows)
+            map_to_model = False
+            select_parts = []
+            model = None
 
-    def _build_sql(self) -> Tuple[str, List[Any]]:
-        """Build the SQL Query string and parameters."""
-        query = self._clone()
-        tablename = query.model_class.get_table_name()
+            for ent in self.entities:
+                if isinstance(ent, ColumnExpression):
+                    select_parts.append(str(ent))
+                    if model is None:
+                        model = ent.model_cls
+                elif isinstance(ent, type) and issubclass(ent, Model):
+                    # Multiple models selected
+                    fields = [f'"{f}"' for f in ent._fields.keys()]
+                    select_parts.extend(fields)
+                    if model is None:
+                        model = ent
+                elif isinstance(ent, str):
+                    select_parts.append(ent)
 
-        # Validate table name
-        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", tablename):
-            raise ValueError(f"Invalid table name: {tablename}")
+            select_str = ", ".join(select_parts)
 
-        # Build SELECT with DISTINCT
-        select_clause = "SELECT"
-        if query._distinct:
-            select_clause += "DISTINCT"
+            if model is None:
+                raise ValueError("Could not determine model from selected entities")
 
-        if query._select_fields:
-            escaped_fields = [f'"{field}"' for field in query._select_fields]
-            selected_fields = ", ".join(escaped_fields)
-        else:
-            selected_fields = "*"
+        # Build SELECT clause with distinct
+        distinct_clause = "DISTINCT " if self._distinct else ""
+        select_str = f"SELECT {distinct_clause}{select_str}"
 
-        # Build base query
-        sql = f"{select_clause} {selected_fields} FROM {tablename}" 
+        table = model.get_table_name()
+        sql = f"SELECT {select_str} FROM {table}"
 
-        if query._joins:
-            sql += " " + " ".join(query._joins)
-        if query._where:
-            sql += " WHERE " + " AND ".join(query._where)
-        if query._group_by:
-            sql += " GROUP BY " + ", ".join(query._group_by)
-        if query._having:
-            sql += " HAVING " + " AND ".join(query._having)
-        if query._order_by:
-            sql += " ORDER BY " + ", ".join(query._order_by)
-        if query._limit is not None:
+        # JOIN clauses
+        if self._joins:
+            sql += " " + " ".join(self._joins)
+
+        # WHERE
+        params = []
+        if self._where:
+            parts = []
+            for cond in self._where:
+                sql_part, p = cond.to_sql(placeholder)
+                parts.append(sql_part)
+                params.extend(p)
+            sql += " WHERE " + " AND ".join(parts)
+
+        # GROUP BY clause
+        if self._group_by:
+            sql += " GROUP BY " + ", ".join(self._group_by)
+
+        # HAVING clause
+        if self._having:
+            sql += " HAVING " + " AND ".join(self._having)
+            params.extend(self._having_params)
+
+        # ORDER BY
+        if self._order_by:
+            order_sql = []
+            for f in self._order_by:
+                if isinstance(f, ColumnExpression):
+                    order_sql.append(str(f))
+                else:
+                    order_sql.append(f)
+            sql += " ORDER BY " + ", ".join(order_sql)
+
+        # LIMIT and OFFSET
+        if self._limit is not None:
             sql += f" LIMIT {self._limit}"
-        if query._offset is not None:
+        if self._offset is not None:
             sql += f" OFFSET {self._offset}"
 
-        return sql, query._params
+        return sql, params, model, map_to_model
 
-    def _rows_to_models(self, rows: List[Tuple[Any, ...]]) -> List[T]:
-        """Convert database rows to model instances."""
-        results: List[T] = []
-        query = self._clone()
+    def _execute_sync(self) -> List[Tuple[Any, ...]]:
+        """Execute query synchronously"""
+        if not self._session or not isinstance(self._session, Session):
+            raise ValueError("No sync session bound to this query")
 
-        # Get field mapping considering selected fields
-        if query._select_fields and query._select_fields != ["*"]:
-            field_names = query._select_fields
-            # Validate that selected field exists in model
-            for field in field_names:
-                if field != "*" and field not in query.model_class._fields:
-                    raise ValueError(
-                        f"Field '{field}' does not exist in model '{query.model_class.__name__}'"
-                    )
+        sql, params, model, map_to_model = self._build_sql(self._session.engine.dialect)
+        self._session.execute(sql, tuple(params))
+        return self._session.fetchall()
+
+    async def _execute_async(self) -> List[Tuple[Any, ...]]:
+        """Execute query asynchronously"""
+        if not self._session or not isinstance(self._session, AsyncSession):
+            raise ValueError("No async session bound to this query")
+
+        sql, params, model, map_to_model = self._build_sql(self._session.engine.dialect)
+        await self._session.execute(sql, tuple(params))
+        return await self._session.fetchall()
+
+    def _rows_to_models(
+        self, rows: List[Tuple[Any, ...]], model: Type[T], map_to_model: bool
+    ) -> List[T]:
+        """Convert rows to model instances or tuples"""
+        if map_to_model:
+            # Selecting entire model(s)
+            results = []
+            for row in rows:
+                kwargs = {}
+                field_names = list(model._fields.keys())
+                for i, field_name in enumerate(field_names):
+                    if i < len(row):
+                        field_obj = model._fields.get(field_name)
+                        value = row[i]
+                        if field_obj and value is not None:
+                            value = field_obj.to_python(value)
+                        kwargs[field_name] = value
+                results.append(model(**kwargs))
+            return results
         else:
-            field_names = list(query.model_class._fields.keys())
+            # Selecting specific columns - return tuples for now
+            return rows  # type: ignore
 
-        for row in rows:
-            if len(row) != len(field_names):
-                raise ValueError(
-                    f"Row length {len(row)} doesn't match model fields {len(field_names)}"
-                )
+    # Sync methods
+    def all(self) -> List[T]:
+        """Execute and return all results"""
+        rows = self._execute_sync()
+        if self._session:
+            sql, params, model, map_to_model = self._build_sql(
+                self._session.engine.dialect
+            )  # type: ignore
+            return self._rows_to_models(rows, model, map_to_model)
+        raise ValueError("Session not bound to query.")
 
-            kwargs = {}
-            for field_name, value in zip(field_names, row):
-                # Handle field type conversion
-                field_obj = query.model_class._fields.get(field_name) # type: ignore
-                if field_obj and value is not None: # type: ignore
-                    value = field_obj.to_python(value) # type: ignore
-        
-                kwargs[field_name] = value
+    def first(self) -> Optional[T]:
+        """Execute and return first result - OPTIMIZED"""
+        original_limit = self._limit
+        self._limit = 1
 
-            model = query.model_class(**kwargs)
-            results.append(model)
+        try:
+            rows = self._execute_sync()
+            if not self._session:
+                raise ValueError("Session not bound to query.")
+            sql, params, model, map_to_model = self._build_sql(
+                self._session.engine.dialect
+            )  # type: ignore
 
-        return results
+            results = self._rows_to_models(rows, model, map_to_model)
+            return results[0] if results else None
+        finally:
+            self._limit = original_limit
 
-    @staticmethod
-    def _get_operator_sql(operator: str) -> str:
-        """Convert a high-level operator to its SQL equivalent."""
-        if operator not in operator_map:
-            raise ValueError(f"Unsupported operator: {operator}")
-        return operator_map[operator]
+    # Async methods
+    async def all_async(self) -> List[T]:
+        """Execute and return all results asynchronously"""
+        rows = await self._execute_async()
+        if self._session:
+            sql, params, model, map_to_model = self._build_sql(
+                self._session.engine.dialect
+            )  # type: ignore
+            return self._rows_to_models(rows, model, map_to_model)
+        raise ValueError("Session not bound to query.")
 
-    def _clone(self) -> Self:
-        """Create a copy of the current Query instance for immutability."""
-        new_query = self.__class__(self.session, self.model_class)
-        new_query._where = self._where[:]
-        new_query._params = self._params[:]
-        new_query._order_by = self._order_by[:]
-        new_query._limit = self._limit
-        new_query._offset = self._offset
-        new_query._joins = self._joins[:]
-        new_query._distinct = self._distinct
-        new_query._group_by = self._group_by[:]
-        new_query._having = self._having[:]
-        new_query._select_fields = self._select_fields[:]
-        return new_query
+    async def first_async(self) -> Optional[T]:
+        """Execute and return first result asynchronously - OPTIMIZED"""
+        original_limit = self._limit
+        self._limit = 1
+
+        try:
+            rows = await self._execute_async()
+            if not self._session:
+                raise ValueError("Session not bound to query.")
+            sql, params, model, map_to_model = self._build_sql(
+                self._session.engine.dialect
+            )  # type: ignore
+
+            results = self._rows_to_models(rows, model, map_to_model)
+            return results[0] if results else None
+        finally:
+            self._limit = original_limit
+
+    def _clone(self) -> "Select[T]":
+        """Create a copy of the current Select instance"""
+        new_select = Select(*self.entities)
+        new_select._where = self._where[:]
+        new_select._params = self._params[:]
+        new_select._order_by = self._order_by[:]
+        new_select._limit = self._limit
+        new_select._offset = self._offset
+        new_select._session = self._session
+        new_select._joins = self._joins[:]
+        new_select._distinct = self._distinct
+        new_select._group_by = self._group_by[:]
+        new_select._having = self._having[:]
+        new_select._having_params = self._having_params[:]
+        return new_select
+
+
+def select(*entities):
+    return Select(*entities)

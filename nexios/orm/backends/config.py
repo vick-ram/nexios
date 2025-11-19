@@ -11,7 +11,6 @@ class DatabaseDialect(str, Enum):
 class PostgreSQLDriver(str, Enum):
     ASYNCPG = "asyncpg"
     PG8000 = "pg8000"
-    PSYCOPG2 = "psycopg2"
     PSYCOPG3 = "psycopg3"
 
 class MySQLDriver(str, Enum):
@@ -27,7 +26,7 @@ class DatabaseDetector:
     """Automatically detects database type and driver from connection parameters."""
     
     @staticmethod
-    def detect_from_url(url: str) -> Tuple[DatabaseDialect, str, Dict[str, Any]]:
+    def detect_from_url(url: str, is_async: bool = False) -> Tuple[DatabaseDialect, str, Dict[str, Any]]:
         """Detect database type from connection URL."""
         parsed = urlparse(url)
         
@@ -35,12 +34,12 @@ class DatabaseDetector:
         scheme = parsed.scheme
         if scheme == 'sqlite':
             db_type = DatabaseDialect.SQLITE
-            driver = 'sqlite3'
+            driver = DatabaseDetector._detect_sqlite_driver(is_async)
             kwargs = {'database': parsed.path.lstrip('/') or ':memory:'}
             
         elif scheme in ['postgres', 'postgresql']:
             db_type = DatabaseDialect.POSTGRES
-            driver = DatabaseDetector._detect_postgres_driver()
+            driver = DatabaseDetector._detect_postgres_driver(is_async)
             kwargs = {
                 'host': parsed.hostname or 'localhost',
                 'port': parsed.port or 5432,
@@ -57,7 +56,7 @@ class DatabaseDetector:
                     
         elif scheme in ['mysql', 'mariadb']:
             db_type = DatabaseDialect.MYSQL
-            driver = DatabaseDetector._detect_mysql_driver()
+            driver = DatabaseDetector._detect_mysql_driver(is_async)
             kwargs = {
                 'host': parsed.hostname or 'localhost',
                 'port': parsed.port or 3306,
@@ -79,41 +78,62 @@ class DatabaseDetector:
         return db_type, driver, kwargs
     
     @staticmethod
-    def detect_from_kwargs(kwargs: Dict[str, Any]) -> Tuple[DatabaseDialect, str]:
+    def detect_from_kwargs(kwargs: Dict[str, Any], is_async: bool = False) -> Tuple[DatabaseDialect, str]:
         """Detect database type from connection kwargs."""
         # Check for explicit database type
         if 'database' in kwargs and isinstance(kwargs['database'], str):
             if kwargs['database'].startswith((':memory:', 'file:')) or '.db' in kwargs['database']:
-                return DatabaseDialect.SQLITE, 'sqlite3'
+                driver = DatabaseDetector._detect_sqlite_driver(is_async)
+                return DatabaseDialect.SQLITE, driver
         
         # Check for PostgreSQL indicators
         if any(key in kwargs for key in ['port', 'user', 'password', 'host']):
-            if kwargs.get('port') == 5432 or 'postgres' in str(kwargs.get('database', '')):
-                return DatabaseDialect.POSTGRES, DatabaseDetector._detect_postgres_driver()
+            if kwargs.get('port') == 5432 or 'postgres' in str(kwargs.get('dbname', '')):
+                driver = DatabaseDetector._detect_postgres_driver(is_async)
+                return DatabaseDialect.POSTGRES, driver
         
         # Check for MySQL indicators  
         if kwargs.get('port') == 3306 or any(key in kwargs for key in ['unix_socket', 'auth_plugin']):
-            return DatabaseDialect.MYSQL, DatabaseDetector._detect_mysql_driver()
+            driver = DatabaseDetector._detect_mysql_driver(is_async)
+            return DatabaseDialect.MYSQL, driver
         
         # Default to SQLite if no clear indicators
-        return DatabaseDialect.SQLITE, 'sqlite3'
+        driver = DatabaseDetector._detect_sqlite_driver(is_async)
+        return DatabaseDialect.SQLITE, driver
     
     @staticmethod
-    def _detect_sqlite_driver() -> str:
+    def _detect_sqlite_driver(is_async: bool = False):
         """Detect which SQLite driver is available."""
-        try:
-            import aiosqlite # noqa
-            return SQLiteDriver.AIOSQLITE
-        except ImportError:
-            return SQLiteDriver.SQLITE3
+        if is_async:
+            try:
+                import aiosqlite # noqa
+                return SQLiteDriver.AIOSQLITE
+            except ImportError:
+                raise ImportError("aiosqlite is required for async SQLite operations")
+        else:
+            try:
+                import sqlite3 # noqa
+                return SQLiteDriver.SQLITE3
+            except ImportError:
+                raise ImportError("sqlite3 is required for sync SQLite operations")
     
     @staticmethod
-    def _detect_postgres_driver() -> str:
+    def _detect_postgres_driver(is_async: bool = False):
         """Detect which PostgreSQL driver is available."""
-        try:
-            import psycopg2 # noqa
-            return PostgreSQLDriver.PSYCOPG2
-        except ImportError:
+        if is_async:
+            try:
+                import psycopg # noqa
+                return PostgreSQLDriver.PSYCOPG3
+            except ImportError:
+                try:
+                    import asyncpg # noqa
+                    return PostgreSQLDriver.ASYNCPG
+                except ImportError:
+                    raise ImportError(
+                        "No async PostgreSQL driver found. Please install one of: "
+                        "psycopg3 or asyncpg"
+                    )
+        else:
             try:
                 import psycopg # noqa
                 return PostgreSQLDriver.PSYCOPG3
@@ -123,49 +143,29 @@ class DatabaseDetector:
                     return PostgreSQLDriver.PG8000
                 except ImportError:
                     raise ImportError(
-                        "No PostgreSQL driver found. Please install one of: "
-                        "psycopg2, psycopg3, or pg8000"
-                    )
+                            "No PostgreSQL driver found. Please install one of: "
+                            "psycopg3, or pg8000"
+                        )
     
     @staticmethod
-    def _detect_mysql_driver() -> str:
+    def _detect_mysql_driver(is_async: bool = False):
         """Detect which MySQL driver is available."""
-        try:
-            import mysql.connector # noqa
-            return MySQLDriver.MYSQL_CONNECTOR
-        except ImportError:
+        if is_async:
             try:
-                import pymysql # noqa
-                return MySQLDriver.PYMySQL
+                import aiomysql # noqa
+                return MySQLDriver.AIOMYSQL
             except ImportError:
-                raise ImportError(
-                    "No MySQL driver found. Please install one of: "
-                    "mysql-connector-python or pymysql"
-                )
-    
-    @staticmethod
-    def _detect_async_postgres_driver() -> str:
-        """Detect which async PostgreSQL driver is available."""
-        try:
-            import psycopg # noqa
-            return PostgreSQLDriver.PSYCOPG3
-        except ImportError:
+                raise ImportError("aiomysql is required for async MySQL operations")
+        else:
             try:
-                import asyncpg # noqa
-                return PostgreSQLDriver.ASYNCPG
+                import mysql.connector # noqa
+                return MySQLDriver.MYSQL_CONNECTOR
             except ImportError:
-                raise ImportError(
-                    "No async PostgreSQL driver found. Please install one of: "
-                    "psycopg3 or asyncpg"
-                )
-    
-    @staticmethod
-    def _detect_async_mysql_driver() -> str:
-        """Detect which async MySQL driver is available."""
-        try:
-            import aiomysql # noqa
-            return MySQLDriver.AIOMYSQL
-        except ImportError:
-            raise ImportError(
-                "No async MySQL driver found. Please install aiomysql"
-            )
+                try:
+                    import pymysql # noqa
+                    return MySQLDriver.PYMySQL
+                except ImportError:
+                    raise ImportError(
+                        "No MySQL driver found. Please install one of: "
+                        "mysql-connector-python or pymysql"
+                    )

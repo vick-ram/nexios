@@ -11,6 +11,7 @@ class BaseCursor(ABC):
     def rowcount(self) -> int: ...
 
 
+
 class SyncCursor(BaseCursor):
     @abstractmethod
     def execute(self, sql: str, parameters: Tuple[Any, ...] = ...) -> Any: ...
@@ -43,8 +44,6 @@ class AsyncCursor(BaseCursor):
     @abstractmethod
     async def fetchmany(self, size: int = ...) -> List[Tuple[Any, ...]]: ...
 
-Cursor = Union[SyncCursor, AsyncCursor]
-
 class SyncDatabaseConnection(ABC):
     @abstractmethod
     def cursor(self) -> SyncCursor: ...
@@ -58,6 +57,10 @@ class SyncDatabaseConnection(ABC):
     @abstractmethod
     def close(self) -> None: ...
 
+    @property
+    @abstractmethod
+    def raw_connection(self) -> Any: ...
+
 class AsyncDatabaseConnection(ABC):
     @abstractmethod
     async def cursor(self) -> AsyncCursor: ...
@@ -70,4 +73,8 @@ class AsyncDatabaseConnection(ABC):
 
     @abstractmethod
     async def close(self) -> None: ...
+
+    @property
+    @abstractmethod
+    def raw_connection(self) -> Any: ...
 

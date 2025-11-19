@@ -71,3 +71,8 @@ class MySQLAioMySQLConnection(AsyncDatabaseConnection):
 
     async def close(self) -> None:
         self._connection.close()
+    
+    @property
+    def raw_connection(self) -> aiomysql.Connection:
+        return self._connection
+    

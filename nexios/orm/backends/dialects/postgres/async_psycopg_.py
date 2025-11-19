@@ -51,3 +51,7 @@ class AsyncPsycopgConnection(AsyncDatabaseConnection):
     
     async def close(self) -> None:
         await self._connection.close()
+    
+    @property
+    def raw_connection(self) -> psycopg.AsyncConnection:
+        return self._connection

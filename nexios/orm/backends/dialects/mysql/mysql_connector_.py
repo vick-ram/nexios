@@ -54,3 +54,7 @@ class MySQLConnectorConnection(SyncDatabaseConnection):
 
     def close(self) -> None:
         self._connection.close()
+    
+    @property
+    def raw_connection(self) -> mysql.connector.connection.MySQLConnection:
+        return self._connection

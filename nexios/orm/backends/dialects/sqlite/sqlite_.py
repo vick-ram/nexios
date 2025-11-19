@@ -52,3 +52,7 @@ class SQLiteConnection(SyncDatabaseConnection):
 
     def close(self) -> None:
         self._connection.close()
+    
+    @property
+    def raw_connection(self) -> sqlite3.Connection:
+        return self._connection

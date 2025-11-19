@@ -53,3 +53,7 @@ class AioSQLiteConnection(AsyncDatabaseConnection):
 
     async def close(self) -> None:
         await self._connection.close()
+    
+    @property
+    def raw_connection(self) -> aiosqlite.Connection:
+        return self._connection

@@ -112,6 +112,17 @@ class FieldInfo(PydanticFieldInfo):
             sql_constraints.append(check.to_sql())
 
         return sql_constraints
+    
+    def to_python(self, value):
+        if value is None:
+            return None
+
+        if self.python_type is None:
+            return value
+        try:
+            return self.python_type(value)
+        except Exception:
+            return value
 
     def get_default_value(self) -> Any:
         """Get the actual default value, handling callables and special cases"""
@@ -153,10 +164,6 @@ class FieldInfo(PydanticFieldInfo):
 
         if self.unique:
             parts.append("UNIQUE")
-
-        # if self.default is not None and self.default is not ...:
-        #     default_value = self._format_default_value()
-        #     parts.append(f"DEFAULT {default_value}")
 
         # Add custom constraints
         if self.constraints or self.check_constraints:

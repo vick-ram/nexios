@@ -2,7 +2,7 @@ import asyncio
 from uuid import uuid4
 from nexios.orm.backends.engine import create_engine
 from nexios.orm.backends.sessions import Session, AsyncSession
-from nexios.orm.field import Field
+from nexios.orm.field import Field, ForeignConstraint
 from nexios.orm.model import Model
 
 
@@ -14,50 +14,47 @@ class User(Model):
     email: str
     password: str
 
-user = User(id=str(uuid4()), name='Vickram Odero', email='vickram@gmail.com', password='Password1234')
+class Address(Model):
+    # user_id: Field(foreign_key='User')
+    county: str
+    city: str
+    state: str
+    postal_code: str
+    zip_code: str
+
+user = User(
+    id=str(uuid4()),
+      name='Vickram Odero', 
+      email='vickram@gmail.com', 
+      password='Password1234'
+      )
+user2 = User(
+    id=str(uuid4()),
+      name='Brian Johnson', 
+      email='brian@gmail.com', 
+      password='Password1234'
+      )
 
 postgres_config = {
     'host': 'localhost',
     'dbname': 'p_orm',
     'user': 'vickram',
-    'password': 'Vickram9038'
+    'password': 'Vickram9038',
+    'port': 5432
 }
 
-postgres_engine = create_engine(dialect='postgres', echo=True, **postgres_config)
-
-database = "example.db"
-# url="sqlite:///example.db"
-
-engine = create_engine(dialect="sqlite", database=database, echo=True)
-
-async def async_main():
-    async with AsyncSession(engine) as session:
-        await session.create_all([User])
-        await session.add(user)
-        await session.commit()
-    # import aiosqlite
-    # async with aiosqlite.connect(":memory") as db:
-    #     async with db.execute("SELECT 1") as cursor:
-    #         cu = db.cursor()
-    #         print(f"Is Cursor instance of cusor: {isinstance(cursor,aiosqlite.Cursor)}")
-    #         print(f"Row count: {cursor.rowcount}")
+postgres_engine = create_engine(**postgres_config, echo=True)
 
 if __name__=="__main__":
     with Session(postgres_engine) as session:
-        session.create_all([User])
-        print(f"Table name: {user.get_table_name()}")
-        print(f"Table already exists: {session.query(User).exists()}")
-        session.add(user)
-        session.commit()
-        print(f"Table already exists again after add: {session.query(User).exists()}")
-    # asyncio.run(async_main())
-    # with Session(engine) as session:
-        #     session.create_all([User])
-        #     session.add(user)
-        #     session.commit()
-        # users = (
-        #     session.query(User)
-        #     .limit(10)
-        #     .all()
-        # )
-        # print(f"Users in database: {users}")
+        # session.create_all([User])
+        # session.add(user)
+        # session.commit()
+
+        existing_user = session.query(User).filter(id=user.id).first()
+        exi = session.query(User).select('name', 'email', 'password').first() 
+        if exi:
+            print(f"Also print existing user with selected fields: {exi.dict()}")
+        if existing_user:
+            print(f"Table name: {existing_user.get_table_name()}")
+            print(existing_user.dict())

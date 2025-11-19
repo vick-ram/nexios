@@ -53,3 +53,7 @@ class Psycopg2Connection(SyncDatabaseConnection):
     
     def close(self) -> None:
         self._connection.close()
+
+    @property
+    def raw_connection(self) -> psycopg2.extensions.connection:
+        return self._connection

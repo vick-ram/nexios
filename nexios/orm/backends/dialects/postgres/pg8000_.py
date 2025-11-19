@@ -48,3 +48,7 @@ class Pg8000Connection(SyncDatabaseConnection):
 
     def close(self) -> None:
         self._connection.close()
+    
+    @property
+    def raw_connection(self) -> pg8000.dbapi.Connection:
+        return self._connection

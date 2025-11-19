@@ -16,6 +16,10 @@ class AsyncPgCursor(AsyncCursor):
     @property
     def rowcount(self) -> int:
         return -1  # asyncpg does not provide rowcount directly
+    
+    @property
+    def raw_connection(self) -> asyncpg.connection.Connection:
+        return self._conn
 
     async def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> Any:
         return await self._conn.execute(sql, *parameters)
@@ -51,3 +55,7 @@ class AsyncPgConnection(AsyncDatabaseConnection):
 
     async def close(self) -> None:
         await self._connection.close()
+    
+    @property
+    def raw_connection(self) -> asyncpg.Connection:
+        return self._connection

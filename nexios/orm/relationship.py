@@ -1,23 +1,23 @@
-from typing_extensions import Type, Optional, Any, TYPE_CHECKING
+from typing import Dict
+from typing_extensions import Optional, Any
 
-if TYPE_CHECKING:
-    from nexios.orm.model import Model
 
-class Relationship:
-    """Handle model relationships"""
-    
+class RelationshipInfo:
     def __init__(
         self,
-        related_model: Type["Model"],
-        backref: Optional[str] = None,
-        foreign_key: Optional[str] = None,
-        lazy: bool = True,
-        userlist: bool = True,
-        **kwargs: Any,
+        back_populates: Optional[str] = None,
+        sa_relationship_kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
-        self.related_model = related_model
-        self.backref = backref
-        self.foreign_key = foreign_key
-        self.lazy = lazy
-        self.userlist = userlist
-        self.kwargs = kwargs
+        self.back_populates = back_populates
+        self.sa_relationship_kwargs = sa_relationship_kwargs or {}
+
+
+def Relationship(
+    *,
+    back_populates: Optional[str] = None,
+    **kwargs: Any,
+) -> Any:
+    return RelationshipInfo(
+        back_populates=back_populates,
+        sa_relationship_kwargs=kwargs,
+    )
