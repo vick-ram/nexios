@@ -76,3 +76,7 @@ class MySQLAioMySQLConnection(AsyncDatabaseConnection):
     def raw_connection(self) -> aiomysql.Connection:
         return self._connection
     
+    @property
+    def is_connection_open(self) -> bool:
+        return not self._connection.closed
+    

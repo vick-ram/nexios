@@ -1,13 +1,12 @@
-from typing import Any, Optional, Tuple, List
+import sqlite3
+from typing import Any, List, Optional, Tuple
 
-import pymysql
 from nexios.orm.connection import SyncCursor, SyncDatabaseConnection
 
-
-class PyMySQLCursor(SyncCursor):
-    def __init__(self, cursor: pymysql.cursors.Cursor) -> None:
+class SQLiteCursor(SyncCursor):
+    def __init__(self, cursor: sqlite3.Cursor) -> None:
         self._cursor = cursor
-
+    
     @property
     def description(self) -> Any:
         return self._cursor.description
@@ -36,13 +35,14 @@ class PyMySQLCursor(SyncCursor):
         rows = self._cursor.fetchmany(size)
         return [tuple(row) for row in rows]
 
-class PyMySQLConnection(SyncDatabaseConnection):
-    def __init__(self, connection: pymysql.Connection) -> None:
+
+class SQLiteConnection(SyncDatabaseConnection):
+    def __init__(self, connection: sqlite3.Connection) -> None:
         self._connection = connection
 
     def cursor(self) -> SyncCursor:
         cursor = self._connection.cursor()
-        return PyMySQLCursor(cursor)
+        return SQLiteCursor(cursor)
 
     def commit(self) -> None:
         self._connection.commit()
@@ -54,5 +54,14 @@ class PyMySQLConnection(SyncDatabaseConnection):
         self._connection.close()
     
     @property
-    def raw_connection(self) -> pymysql.Connection:
+    def raw_connection(self) -> sqlite3.Connection:
         return self._connection
+    
+    @property
+    def is_connection_open(self) -> bool:
+        try:
+            stmt = "SELECT 1"
+            self._connection.execute(stmt)
+            return True
+        except sqlite3.ProgrammingError:
+            return False

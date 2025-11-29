@@ -1,9 +1,10 @@
+import logging
 from typing_extensions import Any, Optional, cast
 from nexios.orm.backends.config import DatabaseDetector, DatabaseDialect, MySQLDriver, PostgreSQLDriver
-from nexios.orm.backends.dialects.mysql.base import MySQLConnection_
-from nexios.orm.backends.dialects.postgres.base import PostgresConnection
-from nexios.orm.backends.dialects.sqlite.aiosqlite_ import AioSQLiteConnection
-from nexios.orm.backends.dialects.sqlite.sqlite_ import SQLiteConnection
+from nexios.orm.backends.dbapi.mysql.base import MySQLConnection_
+from nexios.orm.backends.dbapi.postgres.base import PostgresConnection
+from nexios.orm.backends.dbapi.sqlite.aiosqlite_ import AioSQLiteConnection
+from nexios.orm.backends.dbapi.sqlite.sqlite_ import SQLiteConnection
 from nexios.orm.backends.pool.base import BaseAsyncConnectionPool, BaseConnectionPool
 from nexios.orm.backends.pool.factory import ConnectionPoolFactory
 from nexios.orm.connection import (
@@ -14,7 +15,9 @@ from nexios.orm.connection import (
 )
 
 class DatabaseManager:
-    def __init__(self, url: Optional[str] = None, **kwargs: Any):
+    def __init__(self, url: Optional[str] = None, logger: Optional[logging.Logger] = None, **kwargs: Any):
+        self.logger = logger or logging.getLogger(__name__)
+
         if url:
             self.db_type, self.driver, connection_params = DatabaseDetector.detect_from_url(url, False)
             connection_params.update(kwargs)
@@ -33,8 +36,6 @@ class DatabaseManager:
         if self._use_pool:
             if self._connection_pool is None:
                 self._connection_pool = ConnectionPoolFactory.create_sync_pool(
-                    dialect=self.db_type,
-                    driver=self.driver,
                     connection=self._create_direct_connection,
                     min_size=self._pool_min_size,
                     max_size=self._pool_max_size,
@@ -84,17 +85,25 @@ class DatabaseManager:
 
     def cursor(self) -> SyncCursor:
         if not self._connection:
-            self.connect()
+            # self.connect()
+            self._connection = self.connect()
         return self._connection.cursor()  # type: ignore
 
     def close(self) -> None:
         if self._connection:
-            self._connection.close()
+            if not self._use_pool:
+                self._connection.close()
             self._connection = None
+        
+        if self._connection_pool:
+            self._connection_pool.close()
+            self._connection_pool = None
 
 
 class AsyncDatabaseManager:
-    def __init__(self, url: Optional[str] = None, **kwargs: Any):
+    def __init__(self, url: Optional[str] = None, logger: Optional[logging.Logger] = None, **kwargs: Any):
+        self.logger = logger or logging.getLogger(__name__)
+
         if url:
             self.db_type, self.driver, connection_params = DatabaseDetector.detect_from_url(url, True)
             connection_params.update(kwargs)
@@ -113,8 +122,6 @@ class AsyncDatabaseManager:
         if self._use_pool:
             if self._connection_pool is None:
                 self._connection_pool = ConnectionPoolFactory.create_async_pool(
-                    dialect=self.db_type,
-                    driver=self.driver,
                     connection=self._create_async_direct_connection,
                     min_size=self._pool_min_size,
                     max_size=self._pool_max_size,
@@ -125,7 +132,6 @@ class AsyncDatabaseManager:
             return await self._create_async_direct_connection()
 
         
-    
     async def _create_async_direct_connection(self) -> AsyncDatabaseConnection:
         if self.db_type == DatabaseDialect.SQLITE:
             from aiosqlite import connect
@@ -158,17 +164,23 @@ class AsyncDatabaseManager:
     
     async def return_connection(self, conn: AsyncDatabaseConnection):
         if self._use_pool and self._connection_pool:
-            await self._connection_pool.return_connection() # type: ignore
+            await self._connection_pool.return_connection(conn) # type: ignore
         else:
             await conn.close()
 
     async def cursor(self) -> AsyncCursor:
         if not self._connection:
-            await self.connect()
-        cursor = await self._connection.cursor()  # type: ignore
+            # await self.connect()
+            self._connection = await self.connect()
+        cursor = await self._connection.cursor()
         return cast(AsyncCursor, cursor)
 
     async def close(self) -> None:
         if self._connection:
-            await self._connection.close()
+            if not self._use_pool:
+                await self._connection.close()
             self._connection = None
+        
+        if self._connection_pool:
+            await self._connection_pool.close()
+            self._connection_pool = None

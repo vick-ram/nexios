@@ -59,3 +59,7 @@ class AsyncPgConnection(AsyncDatabaseConnection):
     @property
     def raw_connection(self) -> asyncpg.Connection:
         return self._connection
+    
+    @property
+    def is_connection_open(self) -> bool:
+        return not self._connection.is_closed()

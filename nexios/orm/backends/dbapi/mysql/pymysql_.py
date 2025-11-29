@@ -1,12 +1,13 @@
-import sqlite3
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional, Tuple, List
 
+import pymysql
 from nexios.orm.connection import SyncCursor, SyncDatabaseConnection
 
-class SQLiteCursor(SyncCursor):
-    def __init__(self, cursor: sqlite3.Cursor) -> None:
+
+class PyMySQLCursor(SyncCursor):
+    def __init__(self, cursor: pymysql.cursors.Cursor) -> None:
         self._cursor = cursor
-    
+
     @property
     def description(self) -> Any:
         return self._cursor.description
@@ -35,14 +36,13 @@ class SQLiteCursor(SyncCursor):
         rows = self._cursor.fetchmany(size)
         return [tuple(row) for row in rows]
 
-
-class SQLiteConnection(SyncDatabaseConnection):
-    def __init__(self, connection: sqlite3.Connection) -> None:
+class PyMySQLConnection(SyncDatabaseConnection):
+    def __init__(self, connection: pymysql.Connection) -> None:
         self._connection = connection
 
     def cursor(self) -> SyncCursor:
         cursor = self._connection.cursor()
-        return SQLiteCursor(cursor)
+        return PyMySQLCursor(cursor)
 
     def commit(self) -> None:
         self._connection.commit()
@@ -54,5 +54,9 @@ class SQLiteConnection(SyncDatabaseConnection):
         self._connection.close()
     
     @property
-    def raw_connection(self) -> sqlite3.Connection:
+    def raw_connection(self) -> pymysql.Connection:
         return self._connection
+    
+    @property
+    def is_connection_open(self) -> bool:
+        return self._connection.open

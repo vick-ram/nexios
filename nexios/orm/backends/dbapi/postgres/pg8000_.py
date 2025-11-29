@@ -52,3 +52,14 @@ class Pg8000Connection(SyncDatabaseConnection):
     @property
     def raw_connection(self) -> pg8000.dbapi.Connection:
         return self._connection
+    
+    @property
+    def is_connection_open(self) -> bool:
+        # return not self._connection.closed
+        try:
+            stmt = "SELECT 1"
+            cur = self._connection.cursor()
+            cur.execute(stmt)
+            return True
+        except pg8000.dbapi.InterfaceError:
+            return False

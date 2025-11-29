@@ -6,10 +6,10 @@ import asyncpg
 import psycopg
 import psycopg2
 
-from nexios.orm.backends.dialects.postgres.async_psycopg_ import AsyncPsycopgConnection
-from nexios.orm.backends.dialects.postgres.asyncpg_ import AsyncPgConnection
-from nexios.orm.backends.dialects.postgres.psycopg2_ import Psycopg2Connection
-from nexios.orm.backends.dialects.postgres.psycopg_ import PsycopgConnection
+from nexios.orm.backends.dbapi.postgres.async_psycopg_ import AsyncPsycopgConnection
+from nexios.orm.backends.dbapi.postgres.asyncpg_ import AsyncPgConnection
+from nexios.orm.backends.dbapi.postgres.psycopg2_ import Psycopg2Connection
+from nexios.orm.backends.dbapi.postgres.psycopg_ import PsycopgConnection
 from nexios.orm.connection import AsyncDatabaseConnection, SyncDatabaseConnection
 
 class PostgresConnection:

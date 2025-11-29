@@ -34,6 +34,10 @@ class PsycopgCursor(SyncCursor):
     def fetchmany(self, size: int = -1) -> List[Tuple[Any, ...]]:
         rows = self._cursor.fetchmany(size)
         return [tuple(row) for row in rows] if rows else []
+    
+    
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self._cursor.close()
 
 class PsycopgConnection(SyncDatabaseConnection):
     def __init__(self, connection: psycopg.Connection) -> None:
@@ -55,4 +59,8 @@ class PsycopgConnection(SyncDatabaseConnection):
     @property
     def raw_connection(self) -> psycopg.Connection:
         return self._connection
+    
+    @property
+    def is_connection_open(self) -> bool:
+        return not self._connection.closed
     

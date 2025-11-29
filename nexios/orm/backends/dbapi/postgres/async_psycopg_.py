@@ -55,3 +55,7 @@ class AsyncPsycopgConnection(AsyncDatabaseConnection):
     @property
     def raw_connection(self) -> psycopg.AsyncConnection:
         return self._connection
+    
+    @property
+    def is_connection_open(self) -> bool:
+        return not self._connection.closed

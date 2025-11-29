@@ -57,3 +57,12 @@ class AioSQLiteConnection(AsyncDatabaseConnection):
     @property
     def raw_connection(self) -> aiosqlite.Connection:
         return self._connection
+    
+    @property
+    def is_connection_open(self) -> bool:
+        try:
+            stmt = "SELECT 1"
+            self._connection.execute(stmt)
+            return True
+        except aiosqlite.ProgrammingError:
+            return False

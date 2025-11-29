@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Tuple, TypeVar
 from typing_extensions import Optional, Type, List
 from nexios.orm.connection import (
@@ -12,30 +13,31 @@ from nexios.orm.query import Select, select
 
 _T = TypeVar("_T", bound="Model")
 
+
 class Session:
     """Synchronous session managing a database transaction.""" 
 
-    def __init__(self, engine: Engine):
+    def __init__(self, engine: Engine, logger: Optional[logging.Logger] = None):
         self.engine = engine
         self.connection: Optional[SyncDatabaseConnection] = None
         self._cursor: Optional[SyncCursor] = None
-        self._in_transaction = False
+        self.logger = logger or logging.getLogger(__name__)
 
     def __enter__(self):
         self.connection = self.engine.connect()
         self._cursor = self.connection.cursor() # type: ignore
-        self._in_transaction = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
-            if exc_type:
+            if exc_type is not None:
                 self.rollback()
             else:
                 self.commit()
+        except Exception as e:
+            self.logger.error(f"Failed to commit or rollback: {e}")
         finally:
             if self.connection:
-                print(f"DEBUG: Returning connection, transaction state: {self._in_transaction}")  # DEBUG
                 self.engine.return_connection(self.connection)
                 self.connection = None
                 self._cursor = None
@@ -67,14 +69,12 @@ class Session:
         return self._cursor.fetchmany(size) # type: ignore
 
     def commit(self):
-        if self._in_transaction and self.connection:
-            self.connection.commit()  # type: ignore
-            self._in_transaction = False
+        if self.connection:
+            self.connection.commit()
 
     def rollback(self):
-        if self._in_transaction and self.connection:
-            self.connection.rollback()  # type: ignore
-            self._in_transaction = False
+        if self.connection:
+            self.connection.rollback()
 
     def add(self, instance: "Model"):
         sql, params = instance.save(self.engine.dialect)
@@ -142,14 +142,12 @@ class AsyncSession:
         return await self._cursor.fetchmany(size) # type: ignore
 
     async def commit(self):
-        if self._in_transaction and self.connection:
-            await self.connection.commit()  # type: ignore
-            self._in_transaction = False
+        if self.connection:
+            await self.connection.commit()
 
     async def rollback(self):
-        if self._in_transaction and self.connection:
-            await self.connection.rollback()  # type: ignore
-            self._in_transaction = False
+        if self.connection:
+            await self.connection.rollback()
 
     async def add(self, instance: "Model"):
         sql, params = instance.save(self.engine.dialect) # type: ignore

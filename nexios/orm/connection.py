@@ -28,6 +28,12 @@ class SyncCursor(BaseCursor):
     @abstractmethod
     def fetchmany(self, size: int = ...) -> List[Tuple[Any, ...]]: ...
 
+    def __enter__(self) -> "SyncCursor":
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
 class AsyncCursor(BaseCursor):
     @abstractmethod
     async def execute(self, sql: str, parameters: Tuple[Any, ...] = ...) -> Any: ...
@@ -61,6 +67,10 @@ class SyncDatabaseConnection(ABC):
     @abstractmethod
     def raw_connection(self) -> Any: ...
 
+    @property
+    @abstractmethod
+    def is_connection_open(self) -> bool: ...
+
 class AsyncDatabaseConnection(ABC):
     @abstractmethod
     async def cursor(self) -> AsyncCursor: ...
@@ -77,4 +87,8 @@ class AsyncDatabaseConnection(ABC):
     @property
     @abstractmethod
     def raw_connection(self) -> Any: ...
+
+    @property
+    @abstractmethod
+    def is_connection_open(self) -> bool: ...
 
