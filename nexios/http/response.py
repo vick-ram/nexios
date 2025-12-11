@@ -252,8 +252,7 @@ class BaseResponse:
         """Set multiple headers at once."""
         for key, value in headers.items():
             self.set_header(key, value)
-        return self
-
+   
 
 class PlainTextResponse(BaseResponse):
     def __init__(
@@ -743,20 +742,37 @@ class NexiosResponse:
             )
         ```
     """
-    
-    _instance = None
 
-    def __new__(cls, *args, **kwargs):  # type:ignore
-        if cls._instance is None:
-            cls._instance = super(NexiosResponse, cls).__new__(cls)
-            cls._instance._initialized = False  # type:ignore
-        return cls._instance
+    def __new__(cls, request: Request):  # type:ignore
+        """
+        Create or retrieve request-scoped response instance.
+        Each request gets its own instance stored in request.state.
+        """
+        # Check if response already exists for this request
+        # Use _state dict directly to avoid State.__getattr__ returning None
+        existing = request.state._state.get('_response_instance')
+        if existing is not None:
+            return existing
+        
+        # Create new instance and store in request state
+        instance = super(NexiosResponse, cls).__new__(cls)
+        request.state._response_instance = instance
+        instance._initialized = False  # type:ignore
+        return instance
 
     def __init__(self, request: Request):
+        """
+        Initialize response instance. Only runs once per request.
+        """
+        # Only initialize once per request
+        if hasattr(self, '_initialized') and self._initialized:  # type:ignore
+            return
+            
         self._response: BaseResponse = BaseResponse()
         self._cookies: List[Dict[str, Any]] = []
         self._status_code = self._response.status_code
         self._request = request
+        self._initialized = True  # type:ignore
 
     @property
     def headers(self):
@@ -967,13 +983,14 @@ class NexiosResponse:
         path: str,
         filename: Optional[str] = None,
         content_disposition_type: str = "inline",
+        headers: Dict[str, Any] = {},
     ):
         """Send file response."""
         new_response = FileResponse(
             path=path,
             filename=filename,
             status_code=self._status_code,
-            headers=self._response.headers,
+            headers=headers,
             content_disposition_type=content_disposition_type,
         )
         self._response = self._preserve_headers_and_cookies(new_response)
@@ -985,6 +1002,7 @@ class NexiosResponse:
         iterator: Generator[Union[str, bytes], Any, Any],
         content_type: str = "text/plain",
         status_code: Optional[int] = None,
+        headers: Dict[str, Any] = {},
     ):
         """Send streaming response."""
         if status_code is None:
@@ -992,16 +1010,16 @@ class NexiosResponse:
         new_response = StreamingResponse(
             content=iterator,  # type: ignore
             status_code=status_code or self._status_code,
-            headers=self._response.headers,
+            headers=headers,
             content_type=content_type,
         )
         self._response = self._preserve_headers_and_cookies(new_response)
         return self
 
-    def redirect(self, url: str, status_code: int = 302):
+    def redirect(self, url: str, status_code: int = 302, headers: Dict[str, Any] = {}):
         """Send redirect response."""
         new_response = RedirectResponse(
-            url=url, status_code=status_code, headers=self._response.headers
+            url=url, status_code=status_code, headers=headers
         )
         self._response = self._preserve_headers_and_cookies(new_response)
         return self
@@ -1360,6 +1378,9 @@ class NexiosResponse:
 
         result = await paginator.paginate()
         return self.json(result)
+
+    async def __call__(self, *args: Any, **kwargs: Any) -> "NexiosResponse":
+        return await self._response(*args, **kwargs)
 
     def __str__(self):
         return f"Response [{self._status_code} {self.body}]"

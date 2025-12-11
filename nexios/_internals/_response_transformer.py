@@ -42,12 +42,11 @@ async def request_response(
     assert asyncio.iscoroutinefunction(func), "Endpoints must be async"
 
     async def app(scope: Scope, receive: Receive, send: Send) -> None:
-        response_manager = Response._instance  # type: ignore[reportPrivateUsage]
-        if not response_manager:
-            request = Request(scope, receive, send)
-            response_manager = Response(request)
-        else:
-            request = response_manager._request  # type: ignore[reportPrivateUsage]
+        request = Request(scope, receive, send)
+        
+        # Get or create response manager for this request
+        # __new__ automatically returns existing instance if available
+        response_manager = Response(request)
 
         ctx = Context(
             request=request,
