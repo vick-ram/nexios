@@ -5,38 +5,15 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Literal,
     Optional,
-    TypedDict,
     TypeVar,
-    cast,
 )
 
-# Type definitions for server configuration
-InterfaceType = Literal["asgi", "wsgi", "asgi-http"]
-HttpProtocolType = Literal["h11", "h2", "auto"]
-LogLevelType = Literal["critical", "error", "warning", "info", "debug", "trace"]
-ServerType = Literal["auto", "uvicorn", "granian"]
 
-
-class ServerConfigDict(TypedDict, total=False):
-    """TypedDict for server configuration options."""
-
-    host: str
-    port: int
-    workers: int
-    interface: InterfaceType
-    http_protocol: HttpProtocolType
-    log_level: LogLevelType
-    reload: bool
-    threading: bool
-    access_log: bool
-    server: ServerType
 
 
 # Type for configuration validation functions
 T = TypeVar("T")
-ValidationFunc = Callable[[T], bool]
 
 
 class MakeConfig:
