@@ -2,8 +2,8 @@ from nexios.orm.benchmark.postgres import ConnectionPoolBenchmark
 
 def run_benchmarks():
     """Run comprehensive benchmarks"""
-    # Replace with your actual database DSN
     dsn = "postgresql://vickram:Vickram9038@localhost:5432/p_orm"
+
     
     benchmark = ConnectionPoolBenchmark(dsn)
     

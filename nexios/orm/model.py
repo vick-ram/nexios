@@ -1,595 +1,718 @@
-from decimal import Decimal
+from __future__ import annotations
+
 import sys
-from pydantic import (
-    BaseModel,
-    PrivateAttr,
-    create_model,
-    Field as PydanticField,
-    field_validator,
-)
-from typing_extensions import (
-    Any,
+import builtins
+import inspect
+import re
+from enum import Enum
+from dataclasses import dataclass
+from typing import (
+    Annotated,
+    ClassVar,
     Dict,
+    List,
+    Literal,
     Optional,
     Type,
-    Tuple,
+    TypeVar,
+    Any,
     Union,
-    Annotated,
-    List,
-    get_origin,
+    dataclass_transform,
     get_args,
+    get_origin,
+    ForwardRef,
     get_type_hints,
-    ForwardRef
+    Callable,
+    overload,
 )
-from datetime import datetime, date
-from uuid import UUID
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict
+from pydantic.fields import FieldInfo
+from pydantic_core import (
+    PydanticUndefined as Undefined,
+    PydanticUndefinedType as UndefinedType,
+)
+from nexios.orm.query import ColumnExpression
+from pydantic._internal._model_construction import ModelMetaclass as ModelMetaclass
 
-from nexios.orm.backends.config import DatabaseDialect
-from nexios.orm.backends.fieldinfo import FieldInfo
-from nexios.orm.backends.sessions import Session, AsyncSession
-from nexios.orm.field import FieldType, ForeignConstraint
-from nexios.orm.query import ColumnExpression, select
-from nexios.orm.relationship import RelationshipInfo
+T = TypeVar("T", bound="BaseModel")
+ModelType = TypeVar("ModelType", bound="BaseModel")
 
 
-class ModelMeta(type):
-    _registry: Dict[str, Type["Model"]] = {}
+class RelationshipType(Enum):
+    ONE_TO_ONE = "one_to_one"
+    ONE_TO_MANY = "one_to_many"
+    MANY_TO_ONE = "many_to_one"
+    MANY_TO_MANY = "many_to_many"
 
-    def __new__(
-        cls, name: str, bases: Tuple[Type, ...], namespace: Dict[str, Any], **kwargs
+@dataclass
+class ColumnInfo:
+    primary_key: bool = False
+    foreign_key: Optional[str] = None
+    unique: bool = False
+    index: bool = False
+    auto_increment: bool = False
+    nullable: bool = True
+    default: Optional[Any] = None
+    db_type: Optional[str] = None
+    relationship: Optional[Dict[str, Any]] = None
+
+
+def get_column_info(annotation: Any, info: Any) -> ColumnInfo:
+    """Type-safe version with proper validation"""
+    column_info = ColumnInfo()
+
+    # Normalize to default and optionally keep FieldInfo for extracting json_schema_extra
+    field_info_obj: Optional[FieldInfo] = None
+    default = None
+    if isinstance(info, FieldInfo):
+        field_info_obj = info
+        # FieldInfo may store PydanticUndefined as default sentinel
+        default = getattr(field_info_obj, "default", None)
+    else:
+        default = info
+
+    # Set nullable based on default value and type
+    column_info.nullable = _determine_nullable(annotation, default)
+
+    if default is Undefined:
+        default = None
+
+    # Set nullable based on default value and type
+    column_info.nullable = _determine_nullable(annotation, default)
+
+    if field_info_obj is not None:
+        column_info = _extract_from_field_info(field_info_obj, column_info, default)
+
+    if get_origin(annotation) is Annotated:
+        base_type, *metadata = get_args(annotation)
+        for meta in metadata:
+            if isinstance(meta, FieldInfo):
+                column_info = _extract_from_field_info(meta, column_info, default)
+            elif isinstance(meta, ColumnInfo):
+                column_info = meta
+            elif isinstance(meta, str):
+                column_info = _apply_string_metadata(meta, column_info)
+            elif isinstance(meta, dict):
+                column_info = _apply_dict_metadata(meta, column_info)
+    else:
+        # Handle non-annotated types
+        column_info = _infer_from_type_and_default(annotation, default, column_info)
+
+    return column_info
+
+
+def _determine_nullable(annotation: Any, default: Any) -> bool:
+    """Determine if a field is nullable based on type and default"""
+    if default is None:
+        return True
+
+    origin = get_origin(annotation)
+    return origin is Union and type(None) in get_args(annotation)
+
+
+def _infer_from_type_and_default(
+    annotation: Any, default: Any, column_info: ColumnInfo
+) -> ColumnInfo:
+    """Infer ORM properties from type and default value"""
+    # Auto-increment inference for primary keys with None default
+    if (
+        column_info.primary_key
+        and default is None
+        and annotation in (int, Optional[int])
     ):
-        if name == "Model":
-            return super().__new__(cls, name, bases, namespace, **kwargs)
+        column_info.auto_increment = True
 
-        # Collect fields, relationships, and foreign keys
-        fields: Dict[str, FieldInfo] = {}
-        relationships: Dict[str, RelationshipInfo] = {}
-        foreign_keys: Dict[str, str] = {}
+    # Handle default values that imply database defaults
+    if default is not None:
+        column_info.default = default
+        if callable(default):
+            column_info.default = default()
 
-        # type_hints = namespace.get("__annotations__", {})
-        type_hints = get_type_hints(
-            namespace, globalns=namespace.get("__globals__", {})
-        )
+    return column_info
 
-        # Process each field
-        for field_name, field_type in type_hints.items():
-            if field_name.startswith("_"):
-                continue
 
-            field_value = namespace.get(field_name)
+def _apply_string_metadata(meta: str, column_info: ColumnInfo) -> ColumnInfo:
+    """Apply string-based metadata to column info"""
+    if meta == "primary_key":
+        column_info.primary_key = True
+    elif meta == "unique":
+        column_info.unique = True
+    elif meta == "index":
+        column_info.index = True
+    elif meta == "auto_increment":
+        column_info.auto_increment = True
+    elif meta == "nullable":
+        column_info.nullable = True
+    elif meta == "not_null":
+        column_info.nullable = False
+    elif meta.startswith("fk:"):
+        # Handle foreign key syntax: 'fk:User' or 'fk:User.id'
+        fk_parts = meta.split(":")
+        if len(fk_parts) > 1:
+            column_info.foreign_key = fk_parts[1]
 
-            # Handle FieldInfo instances
-            if isinstance(field_value, FieldInfo):
-                field_info = field_value
-                # Set python_type from type hint if not already set
-                if field_info.python_type is None:
-                    field_info.python_type = cls._extract_actual_type(field_type)
+    return column_info
 
-                # Check if this is a foreign key field
-                if field_info.foreign_key:
-                    related_model = cls._extract_related_model_from_fk(
-                        field_info.foreign_key
-                    )
-                    if related_model:
-                        foreign_keys[field_name] = related_model
 
-                fields[field_name] = field_info
+def _apply_dict_metadata(meta: dict, column_info: ColumnInfo) -> ColumnInfo:
+    """Apply dictionary metadata to column info"""
+    # Handle direct ORM configuration in dict
+    if "primary_key" in meta and isinstance(meta["primary_key"], bool):
+        column_info.primary_key = meta["primary_key"]
 
-            # Handle Relationship
-            elif isinstance(field_value, RelationshipInfo):
-                relationships[field_name] = field_value
-                continue
+    if "unique" in meta and isinstance(meta["unique"], bool):
+        column_info.unique = meta["unique"]
 
-            # Create FieldInfo from type hints
-            else:
-                field_info = cls._create_field_from_type_hints(field_type, field_value)
-                if field_info:
-                    fields[field_name] = field_info
+    if "index" in meta and isinstance(meta["index"], bool):
+        column_info.index = meta["index"]
 
-        # Remove field values from namespace to avoid conflicts
-        for field_name in list(fields.keys()) + list(relationships.keys()):
-            if field_name in namespace:
-                del namespace[field_name]
+    if "auto_increment" in meta and isinstance(meta["auto_increment"], bool):
+        column_info.auto_increment = meta["auto_increment"]
 
-        # Create the actual class
-        new_class = super().__new__(cls, name, bases, namespace)
+    if "foreign_key" in meta and isinstance(meta["foreign_key"], str):
+        column_info.foreign_key = meta["foreign_key"]
 
-        # Set metadata
-        setattr(new_class, "_fields", fields)
-        setattr(new_class, "_relationships", relationships)
-        setattr(new_class, "_foreign_keys", foreign_keys)
-        setattr(new_class, "_tablename", namespace.get("__tablename__", name.lower()))
+    if "nullable" in meta and isinstance(meta["nullable"], bool):
+        column_info.nullable = meta["nullable"]
 
-        # Create Pydantic model with proper validation
-        pydantic_fields = {}
-        for field_name, field_info in fields.items():
-            field_type = field_info.python_type or str
+    if "db_type" in meta and isinstance(meta["db_type"], str):
+        column_info.db_type = meta["db_type"]
 
-            # Apply constraints based on field_info metadata
-            final_field = PydanticField(
-                default=field_info.default,
-                # default_factory=field_info.default_factory,
-                alias=field_info.alias,
-                title=field_info.title,
-                description=field_info.description,
-                # Pass validation constraints that Pydantic understands
-                **{
-                    k: v
-                    for k, v in {
-                        "min_length": getattr(field_info, "min_length", None),
-                        "max_length": getattr(field_info, "max_length", None),
-                        "regex": getattr(field_info, "regex", None),
-                        "gt": getattr(field_info, "gt", None),
-                        "ge": getattr(field_info, "ge", None),
-                        "lt": getattr(field_info, "lt", None),
-                        "le": getattr(field_info, "le", None),
-                        "multiple_of": getattr(field_info, "multiple_of", None),
-                        "min_items": getattr(field_info, "min_items", None),
-                        "max_items": getattr(field_info, "max_items", None),
-                    }.items()
-                    if v is not None
-                },
-            )
+    # Handle relationship configuration
+    if "relationship" in meta and isinstance(meta["relationship"], dict):
+        column_info.relationship = meta["relationship"]
 
-            pydantic_fields[field_name] = (field_type, final_field)
+    return column_info
 
-        # Create Pydantic model as __pydantic_model__
-        pydantic_model = create_model(
-            f"{name}Model", __base__=BaseModel, **pydantic_fields
-        )
-        setattr(new_class, "__pydantic_model__", pydantic_model)
-        tbname = getattr(cls, "_tablename", None)
 
-        # Register the class
-        cls._registry[tbname] = new_class  # type: ignore
+def _extract_from_field_info(
+    field_info: FieldInfo, column_info: ColumnInfo, default: Any
+) -> ColumnInfo:
+    """Safely extract ORM config from FieldInfo"""
+    if not field_info.json_schema_extra:
+        return column_info
 
-        # Set up back-populates relationship
-        cls._setup_back_populates(new_class, relationships, foreign_keys) # type: ignore
+    json_extra = field_info.json_schema_extra
 
-        return new_class
+    # Type guard checks
+    if not isinstance(json_extra, dict):
+        return column_info
 
-    @classmethod
-    def _extract_related_model_from_fk(cls, foreign_key: ForeignConstraint):
-        """Extract related model name from foreign key consraint"""
-        table_name = foreign_key.table
-        for model_name, model_class in cls._registry.items():
-            if model_class.get_table_name() == table_name:
-                return model_name
-        return None
+    orm_config = json_extra.get("orm")
+    if not isinstance(orm_config, dict):
+        return column_info
 
-    @classmethod
-    def _setup_back_populates(
-        cls,
-        model_class: Type["Model"],
-        relationships: Dict[str, RelationshipInfo],
-        foreign_keys: Dict[str, str],
+    # Safe extraction with type checking
+    if "primary_key" in orm_config and isinstance(orm_config["primary_key"], bool):
+        column_info.primary_key = orm_config["primary_key"]
+        # If it's a primary key with None default and int type, assume auto-increment
+        if column_info.primary_key and default is None:
+            column_info.auto_increment = True
+
+    if "unique" in orm_config and isinstance(orm_config["unique"], bool):
+        column_info.unique = orm_config["unique"]
+
+    if "index" in orm_config and isinstance(orm_config["index"], bool):
+        column_info.index = orm_config["index"]
+
+    if "auto_increment" in orm_config and isinstance(
+        orm_config["auto_increment"], bool
     ):
-        """Set up back-populates relationship between models"""
-        for rel_name, rel_info in relationships.items():
-            if rel_info.back_populates:
-                type_hints = get_type_hints(
-                    model_class, globalns=model_class.__dict__.get("__globals__", {})
-                )
-                rel_type = type_hints.get(rel_name)
-                if rel_type:
-                    related_model = cls._resolve_type(rel_type)
-                    if related_model and hasattr(related_model, "_relationships"):
-                        if rel_info.back_populates in related_model._relationships:
-                            # Link the relationships
-                            pass
+        column_info.auto_increment = orm_config["auto_increment"]
 
-    @classmethod
-    def _resolve_type(cls, type_hint: Any) -> Optional[Type["Model"]]:
-        """Resole forward references and get the actual model class"""
-        try:
-            if isinstance(type_hint, ForwardRef):
-                globals = sys.modules[__name__].__dict__
-                try:
-                    actual_type = type_hint._evaluate(globals, globals, recursive_guard=frozenset())
-                except (NameError, AttributeError):
-                    # If evaluation fails, try to find the class in the registry
-                    class_name = type_hint.__forward_arg__
-                    for model_cls in cls._registry.values():
-                        if model_cls.__name__ == class_name:
-                            return model_cls
-                    return None
-            else:
-                actual_type = type_hint
+    if "foreign_key" in orm_config and isinstance(orm_config["foreign_key"], str):
+        column_info.foreign_key = orm_config["foreign_key"]
 
-            # Handle List[Model] and Optional[Model]
-            origin = get_origin(actual_type)
-            if origin in (list, List):
-                args = get_args(actual_type)
-                if args:
-                    actual_type = args[0]
-            elif origin in Union: # type: ignore
-                args = [arg for arg in get_args(actual_type) if arg is not type(None)]
-                if args:
-                    actual_type = args[0]
-            if isinstance(actual_type, type) and issubclass(actual_type, Model):
-                return actual_type
-        except Exception:
-            pass
-        return None
+    if "nullable" in orm_config and isinstance(orm_config["nullable"], bool):
+        column_info.nullable = orm_config["nullable"]
 
-    @classmethod
-    def _create_field_from_type_hints(
-        cls, field_type: Type, default: Any
-    ) -> Optional[FieldInfo]:
-        """Create FieldInfo from type hints"""
-        origin = get_origin(field_type)
-        metadata = {}
-        python_type = field_type
+    if "db_type" in orm_config and isinstance(orm_config["db_type"], str):
+        column_info.db_type = orm_config["db_type"]
+
+    if "relationship" in orm_config and isinstance(orm_config["relationship"], dict):
+        column_info.relationship = orm_config["relationship"]
+
+    if default is not None and default is not Undefined:
+        column_info.default = default
+
+    return column_info
+
+# @dataclass_transform(kw_only_default=True, field_specifiers=(Field, ColumnInfo))
+class BaseModelMeta(ModelMetaclass):
+    def __getattribute__(cls, key):
+        if key in ["model_fields", "__dict__", "__pydantic_fields__", "__pydantic_complete__", "model_fields_set"]:
+            return super().__getattribute__(key)
+        if key not in cls.model_fields:
+            return super().__getattribute__(key)
+        return ColumnExpression(cls, key) # type: ignore
+
+class ORMConfig:
+    def __init__(self):
+        self.table_name: Optional[str] = None
+        self.database: Optional[str] = "default"
+        self.relationships: Dict[str, Dict[str, Any]] = {}
+        # self.relationships: Dict[str, RelationshipInfo]
+        self.indexes: List[Dict[str, Any]] = []
+        self.unique_constraints: List[List[str]] = []
+        self.fields: Dict[str, ColumnInfo] = {}
+        self.primary_key: Optional[str] = None
+
+    def analyze_fields(self, model_class: Type[BaseModel]):
+        """Analyze model fields to extract ORM metadata"""
+        self.fields = {}
+
+        for field_name, field_info in model_class.model_fields.items():
+            annotation = model_class.__annotations__.get(field_name, Any)
+            column_info = get_column_info(annotation, field_info.default)
+
+        for field_name, field_info in model_class.model_fields.items():
+            annotation = model_class.__annotations__.get(field_name, Any)
+            column_info = get_column_info(annotation, field_info)
+
+            # Store field metadata
+            self.fields[field_name] = column_info
+
+            # Track primary key
+            if column_info.primary_key:
+                self.primary_key = field_name
+
+            # Auto-detect relationships from type hints
+            self._detect_relationships(model_class, field_name, annotation, column_info)
+
+    def _detect_relationships(
+        self,
+        model_class: Type[BaseModel],
+        field_name: str,
+        annotation: Any,
+        column_info: ColumnInfo,
+    ):
+        """Auto-detect relationships from type annotations"""
+        actual_type = annotation
 
         # Handle Annotated types
-        if origin is Annotated:
-            args = get_args(field_type)
-            python_type = args[0]
-            for meta in args[1:]:
-                if isinstance(meta, FieldInfo):
-                    return meta
-                elif isinstance(meta, dict):
-                    metadata.update(meta)
+        if get_origin(annotation) is Annotated:
+            base_type, *metadata = get_args(annotation)
+            actual_type = base_type
 
-        # Handle Optional types
-        is_optional = cls._is_optional_type(python_type)
-        if is_optional:
-            python_type = cls._extract_actual_type(python_type)
+            # Check for relationship metadata
+            for meta in metadata:
+                if isinstance(meta, dict) and "relationship" in meta:
+                    self.relationships[field_name] = meta["relationship"]
+                    return
 
-        # Map Python types to FieldType
-        field_type_enum = cls._python_type_to_field_type(python_type)
+        # Handle ForwardRefs (string type hints)
+        if isinstance(actual_type, str):
+            # We'll resolve these in __init_subclass__
+            return
 
-        # Create FieldInfo
-        field_info = FieldInfo(
-            default=default if default is not None else ...,
-            field_type=field_type_enum,
-            python_type=python_type,
-            nullable=is_optional or default is None,
-            **metadata,
-        )
+        def unwrap_optional(t):
+            if get_origin(t) is Union:
+                args = [a for a in get_args(t) if a is not type(None)]
+                return args[0] if args else t
+            return t
 
-        return field_info
+        actual_type = unwrap_optional(actual_type)
 
-    @staticmethod
-    def _is_optional_type(field_type: Type) -> bool:
-        origin = get_origin(field_type)
-        if origin is Union:
-            return type(None) in get_args(field_type)
-        return False
+        # Auto-detect based on type
+        if (
+            inspect.isclass(actual_type)
+            and issubclass(actual_type, BaseModel)
+            and field_name not in self.relationships
+        ):
+            # Many-to-one relationship (ForeignKey)
+            if not column_info.foreign_key:
+                column_info.foreign_key = f"{actual_type.__name__.lower()}_id"
 
-    @staticmethod
-    def _extract_actual_type(field_type: Type) -> Type:
-        origin = get_origin(field_type)
-        if origin is Union:
-            args = [arg for arg in get_args(field_type) if arg is not type(None)]
-            return args[0] if args else field_type
-        elif origin is Annotated:
-            return get_args(field_type)[0]
-        return field_type
+            self.relationships[field_name] = {
+                "type": RelationshipType.MANY_TO_ONE,
+                "related_class": actual_type,
+                "foreign_key": column_info.foreign_key,
+            }
 
-    @staticmethod
-    def _python_type_to_field_type(python_type: Type) -> FieldType:
-        type_mapping = {
-            int: FieldType.INTEGER,
-            str: FieldType.VARCHAR,
-            bool: FieldType.BOOLEAN,
-            float: FieldType.FLOAT,
-            datetime: FieldType.DATETIME,
-            date: FieldType.DATE,
-            Decimal: FieldType.DECIMAL,
-            bytes: FieldType.BINARY,
-            UUID: FieldType.UUID,
-            dict: FieldType.JSON,
-            list: FieldType.JSON,
-        }
-        return type_mapping.get(python_type, FieldType.VARCHAR)
+        # Handle List[Model] for one-to-many
+        elif get_origin(actual_type) is list or get_origin(actual_type) is List:
+            args = get_args(actual_type)
+            if args and inspect.isclass(args[0]) and issubclass(args[0], BaseModel):
+                related_class = args[0]
+                relationship_name = f"{model_class.__name__.lower()}_id"
+
+                self.relationships[field_name] = {
+                    "type": RelationshipType.ONE_TO_MANY,
+                    "related_class": related_class,
+                    "foreign_key": relationship_name,
+                }
 
 
-class Model(metaclass=ModelMeta):
-    _fields: Dict[str, FieldInfo]
-    _relationships: Dict[str, RelationshipInfo]
-    _foreign_keys: Dict[str, str]
-    _tablename: str
-    __pydantic_model__: Type[BaseModel]
-    _session: Optional[Union["Session", "AsyncSession"]] = None
+class BaseModel(PydanticBaseModel, metaclass=BaseModelMeta):
+    __orm_config__: ClassVar[ORMConfig] = ORMConfig()
+    __session__: ClassVar[Optional[Any]] = None
+    __registry__: ClassVar[Dict[str, Type["BaseModel"]]] = {}
+    __initialized__: ClassVar[bool] = False
+    __fields_cache__: ClassVar[Dict[str, ColumnInfo]] = {}
+    is_table: ClassVar[bool] = False
 
-    _relationship_cache: Dict[str, Any] = PrivateAttr(default_factory=dict)
-    _relationship_loaded: Dict[str, bool] = PrivateAttr(default_factory=dict)
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+        from_attributes=True,
+        use_enum_values=True,
+        protected_namespaces=(),  # Allow __orm_config__ without conflicts
+        populate_by_name=True,
+    )
 
-    def __init__(self, **kwargs) -> None:
-        field_kwargs = {}
-        rel_kwargs = {}
+    def __init_subclass__(cls, table=False, **kwargs):
+        super().__init_subclass__(**kwargs)
 
-        for key, value in kwargs.items():
-            if key in self._relationships:
-                rel_kwargs[key] = value
+        # Initialize ORM config
+        cls.__orm_config__ = ORMConfig()
+
+        # Register the class
+        cls.__registry__[cls.__name__] = cls
+
+        if not cls.is_table:
+            cls.is_table = hasattr(cls, "__tablename__")
+        else:
+            cls.is_table = table
+
+        if cls.is_table:
+            if hasattr(cls, "__tablename__"):
+                cls.__orm_config__.table_name = cls.__tablename__  # type: ignore
             else:
-                field_kwargs[key] = value
-
-        # Validate and set fields using Pydantic
-        pydantic_instance = self.__pydantic_model__(**field_kwargs)
-
-        for field_name in self._fields:
-            value = getattr(pydantic_instance, field_name)
-            field_info = self._fields[field_name]
-
-            # Handle auto-generated values
-            if value is None:
-                if field_info.auto_now_add:
-                    value = datetime.now()
-                elif field_info.default is not ...:
-                    value = field_info.get_default_value()
-
-            # Additional validation
-            if value is not None:
-                value = field_info.validate_value(value)
-
-            setattr(self, field_name, value)
-
-        # Set relationship attributes
-        for rel_name, value in rel_kwargs.items():
-            setattr(self, rel_name, value)
-
-        # Set auto_now fields
-        for field_name, field_info in self._fields.items():
-            if field_info.auto_now:
-                setattr(self, field_name, datetime.now())
-
-        # Set provided relationship data
-        for rel_name, value in rel_kwargs.items():
-            self._relationship_cache[rel_name] = value
-            self._relationship_loaded[rel_name] = True
-
-    def __getattribute__(self, name: str) -> Any:
-        """Lazy load relationships when accessed"""
-        # Get the class relationship
-        relationships = object.__getattribute__(self, "_relationships")
-
-        loaded = object.__getattribute__(self, "relationship_loaded")
-        if name in relationships and not getattr(loaded, "get", lambda *_: False)(name, False):
-            return self._get_relationship(name)
-
-        return object.__getattribute__(self, name)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if hasattr(self, "_relationships") and name in self._relationships:
-            self._set_relationship(name, value)
+                cls.__orm_config__.table_name = cls.__name__.lower() + "s"
         else:
-            super().__setattr__(name, value)
+            cls.__orm_config__.table_name = None
 
-    def _get_relationship(self, rel_name: str) -> Any:
-        """Load related objects from database"""
-        if self._relationship_loaded.get(rel_name, False):
-            return self._relationship_cache.get(rel_name)
+        cls.__initialized__ = False
 
-        if not self._session:
-            raise ValueError("Cannot load relationship: model not bound to a session")
+    @classmethod
+    def _initialize_orm(cls):
+        if getattr(cls, "__initialized__", False):
+            return
 
-        rel_info = self._relationships[rel_name]
-        related_objects = self._load_relationship(rel_name, rel_info)
+        if not hasattr(cls, "model_fields") or not cls.model_fields:
+            cls.model_fields = cls.model_fields  # type: ignore
 
-        # Cache the result
-        self._relationship_cache[rel_name] = related_objects
-        self._relationship_loaded[rel_name] = True
+        # Analyze fields after class creation
+        cls.__orm_config__.analyze_fields(cls)
 
-        return related_objects
+        # Cache the fields
+        cls.__fields_cache__ = cls.__orm_config__.fields.copy()
 
-    def _set_relationship(self, rel_name: str, value: Any) -> None:
-        """Set a relationship and handle back-populates"""
-        rel_info = self._relationships[rel_name]
+        # Resolve forward references and relationships
+        cls._resolve_forward_references()
+        cls._auto_setup_relationships()
 
-        # Set the relationship value
-        self._relationship_cache[rel_name] = value
-        self._relationship_loaded[rel_name] = True
+        cls.__initialized__ = True
 
-        # Handle a back populates
-        if rel_info.back_populates and value is not None:
-            if isinstance(value, list):
-                for item in value:
-                    if hasattr(item, rel_info.back_populates):
-                        setattr(value, rel_info.back_populates, self)
-            else:
-                if hasattr(value, rel_info.back_populates):
-                    setattr(value, rel_info.back_populates, self)
+    @classmethod
+    def c(cls, field_name: str) -> ColumnExpression:
+        return ColumnExpression(cls, field_name)
 
-    def _load_relationship(self, rel_name: str, rel_info: RelationshipInfo) -> Any:
-        """Load a relationship from the database"""
-        type_hints = get_type_hints(self.__class__)
-        rel_type = type_hints.get(rel_name)
+    @classmethod
+    def _resolve_forward_references(cls):
+        """Resolve string type annotations to actual classes"""
+        globalns = cls._get_global_namespace()
+        localns = cls._get_local_namespace()
 
-        if not rel_type:
-            raise ValueError(f"Cannot determine type for relationship {rel_name}")
+        try:
+            resolved_hints = get_type_hints(cls, globalns=globalns, localns=localns)
+            cls.__annotations__.update(resolved_hints)
+        except Exception:
+            cls._custom_resolve_forward_references(globalns, localns)
 
-        origin = get_origin(rel_type)
-        is_list = origin in (list, List)
+    @classmethod
+    def _get_global_namespace(cls) -> Dict[str, Any]:
+        globalns = {**builtins.__dict__}
+        import typing
 
-        if is_list:
-            return self._load_to_many_relationship(rel_name, rel_type)
-        else:
-            return self._load_to_one_relationship(rel_name, rel_type)
+        globalns.update(typing.__dict__)
+        try:
+            import typing_extensions
 
-    def _load_to_many_relationship(
-        self, rel_name: str, rel_type: Any
-    ) -> List["Model"]:
-        """Loaad one-to-many or many-to-many relationships"""
-        related_model = ModelMeta._resolve_type(rel_type)
-        if not related_model:
-            raise ValueError(
-                f"Cannot determine related model for relationship {rel_name}"
-            )
-
-        fk_field = None
-        for field_name, field_info in related_model._fields.items():
-            if (
-                field_info.foreign_key
-                and field_info.foreign_key.table.lower() == self._tablename.lower()
-            ):
-                fk_field = field_name
-                break
-
-        if not fk_field:
-            # Try common naming convention
-            fk_field = f"{self.__class__.__name__.lower()}_id"
-
-        # Get this instance's primary key
-        pk_field, pk_value = self._get_primary_key()
-        if not pk_value:
-            return []
-
-        query = select(related_model).where(
-            getattr(related_model, fk_field) == pk_value
-        )
-
-        if isinstance(self._session, Session):
-            return self._session.exec(query)
-        else:
-            # Handle async
+            globalns.update(typing_extensions.__dict__)
+        except ImportError:
             pass
 
-    def _load_to_one_relationship(
-        self,
-        rel_name: str,
-        rel_type: Any,
-    ) -> Optional["Model"]:
-        """Load many-to-one or one-to-one relationships"""
-        related_model = ModelMeta._resolve_type(rel_type)
-        if not related_model:
-            raise ValueError(f"Cannot resolve related model for {rel_name}")
+        globalns.update(cls.__registry__)
+        module = sys.modules.get(cls.__module__)
+        if module:
+            globalns.update(getattr(module, "__dict__", {}))
+        return globalns
 
-        # Look for foreign key in this model that points to the related model
-        fk_field = None
-        for field_name, field_info in self._fields.items():
-            if (
-                field_info.foreign_key
-                and field_info.foreign_key.table.lower()
-                == related_model.get_table_name().lower()
-            ):
-                fk_field = field_name
-                break
+    @classmethod
+    def _get_local_namespace(cls) -> Dict[str, Any]:
+        """Get local namespace for type resolution"""
+        localns = {}
 
-        if not fk_field:
-            # Try common naming convention
-            fk_field = f"{related_model.__name__.lower()}_id"
+        # Add the class itself and its attributes
+        localns[cls.__name__] = cls
 
-        # Get the foreign key value
-        fk_value = getattr(self, fk_field, None)
-        if not fk_value:
+        # Add all classes in the same module
+        module = sys.modules.get(cls.__module__)
+        if module:
+            for name, obj in module.__dict__.items():
+                if (
+                    isinstance(obj, type)
+                    and hasattr(obj, "__module__")
+                    and obj.__module__ == cls.__module__
+                ):
+                    localns[name] = obj
+
+        return localns
+
+    @classmethod
+    def _custom_resolve_forward_references(
+        cls, globalns: Dict[str, Any], localns: Dict[str, Any]
+    ):
+        """Custom forward reference resolution when built-in fails"""
+        for field_name, annotation in list(cls.__annotations__.items()):
+            try:
+                if isinstance(annotation, str):
+                    resolved = cls._resolve_single_forward_ref(
+                        annotation, globalns, localns
+                    )
+                    if resolved is not None:
+                        cls.__annotations__[field_name] = resolved
+
+                elif isinstance(annotation, ForwardRef):
+                    resolved = cls._resolve_forward_ref_instance(
+                        annotation, globalns, localns
+                    )
+                    if resolved is not None:
+                        cls.__annotations__[field_name] = resolved
+
+            except Exception as e:
+                # Log the error but don't break the whole process
+                print(
+                    f"Warning: Could not resolve forward reference for {cls.__name__}.{field_name}: {e}"
+                )
+                continue
+
+    @classmethod
+    def _resolve_single_forward_ref(
+        cls, annotation: str, globalns: Dict, localns: Dict
+    ) -> Any:
+        """Resolve a single string forward reference"""
+        # Handle generic types like List['User'], Optional['User'], etc.
+        if re.match(r"^[A-Z][a-zA-Z_]*\[", annotation):
+            return cls._resolve_generic_forward_ref(annotation, globalns, localns)
+
+        # Handle simple type names
+        if annotation in localns:
+            return localns[annotation]
+
+        if annotation in globalns:
+            return globalns[annotation]
+
+        # Try to find in registry by class name
+        for key, model_class in cls.__registry__.items():
+            if key.endswith(f".{annotation}") or model_class.__name__ == annotation:
+                return model_class
+
+        # Try to evaluate the type
+        try:
+            return get_type_hints(annotation, globalns, localns)
+        except Exception:
+            pass
+
+        return None
+
+    @classmethod
+    def _resolve_generic_forward_ref(
+        cls, annotation: str, globalns: Dict, localns: Dict
+    ) -> Any:
+        """Resolve generic types with forward references"""
+        try:
+            # Extract the outer type and inner types
+            match = re.match(r"^([A-Z][a-zA-Z_]*)\[(.*)\]$", annotation)
+            if not match:
+                return None
+
+            outer_type_name, inner_types_str = match.groups()
+
+            # Get the outer type
+            outer_type = None
+            if outer_type_name in localns:
+                outer_type = localns[outer_type_name]
+            elif outer_type_name in globalns:
+                outer_type = globalns[outer_type_name]
+
+            if outer_type is None:
+                return None
+
+            # Parse and resolve inner types
+            inner_types = cls._parse_inner_types(inner_types_str)
+            resolved_inner_types = []
+
+            for inner_type in inner_types:
+                if isinstance(inner_type, str) and inner_type.strip():
+                    resolved_inner = cls._resolve_single_forward_ref(
+                        inner_type.strip(), globalns, localns
+                    )
+                    resolved_inner_types.append(resolved_inner or inner_type)
+                else:
+                    resolved_inner_types.append(inner_type)
+
+            # Reconstruct the generic type
+            if hasattr(outer_type, "__getitem__"):
+                if len(resolved_inner_types) == 1:
+                    return outer_type[resolved_inner_types[0]]
+                else:
+                    return outer_type[tuple(resolved_inner_types)]
+            else:
+                return outer_type
+
+        except Exception as e:
             return None
 
-        # Get the related model's primary key
-        related_pk = related_model._get_primary_key_field()
+    @classmethod
+    def _parse_inner_types(cls, inner_types_str: str) -> List[str]:
+        """Parse inner types from a generic type string"""
+        # Simple parser for generic type arguments
+        inner_types = []
+        depth = 0
+        current = []
 
-        # Build and execute query
-        query = (
-            select(related_model)
-            .where(getattr(related_model, related_pk) == fk_value)
-            .limit(1)
-        )
-        if isinstance(self._session, Session):
-            results = self._session.exec(query)
-            return results[0] if results else None
-        else:
-            # Handle async
-            pass
+        for char in inner_types_str:
+            if char == "[":
+                depth += 1
+            elif char == "]":
+                depth -= 1
+            elif char == "," and depth == 0:
+                inner_types.append("".join(current).strip())
+                current = []
+                continue
 
-    def _get_primary_key(self) -> Tuple[Optional[str], Any]:
-        """Get the primary key value field name and value"""
-        for field_name, field_info in self._fields.items():
-            if field_info.primary_key:
-                return field_name, getattr(self, field_name)
-        return None, None
+            current.append(char)
+
+        if current:
+            inner_types.append("".join(current).strip())
+
+        return inner_types
 
     @classmethod
-    def _get_primary_key_field(cls) -> str:
-        """Get the primary key field name for this model"""
-        for field_name, field_info in cls._fields.items():
-            if field_info.primary_key:
-                return field_name
-
-        # Fallback
-        common_pks = ["id", f"{cls.__name__.lower()}_id"]
-        for pk in common_pks:
-            if pk in cls._fields:
-                return pk
-
-        raise ValueError(f"No primary key found for model {cls.__name__}")
-
-    @classmethod
-    def __getattr__(cls, name: str) -> ColumnExpression:
-        """Allow User.name syntax"""
-        if name in cls._fields:
-            return ColumnExpression(cls, name)
-        raise AttributeError(f"{cls.__name__} has no attribute {name}")
-
-    @classmethod
-    def __getitem__(cls, name: str) -> ColumnExpression:
-        """Allow User['name'] syntax"""
-        return getattr(cls, name)
-
-    @classmethod
-    def get_table_name(cls) -> str:
-        return cls._tablename
-
-    @classmethod
-    def get_fields(cls) -> Dict[str, FieldInfo]:
-        return cls._fields
-
-    def dict(self) -> Dict[str, Any]:
-        """Convert model to dictionary"""
-        result = {}
-        for field_name in self._fields:
-            value = getattr(self, field_name, None)
-            result[field_name] = value
-        return result
-
-    def validate(self) -> bool:
-        """Validate all fields"""
+    def _resolve_forward_ref_instance(
+        cls, forward_ref: ForwardRef, globalns: Dict, localns: Dict
+    ) -> Any:
+        """Resolve a ForwardRef instance"""
         try:
-            self.__pydantic_model__(**self.dict())
-            return True
-        except Exception:
-            return False
+            # Try Pydantic's method first
+            if hasattr(forward_ref, "_evaluate"):
+                return get_type_hints(globalns, localns)
+                # return forward_ref._evaluate(globalns, localns, recursive_guard=frozenset())
+
+            # Fallback to manual evaluation
+            return get_type_hints(forward_ref.__forward_arg__, globalns, localns)
+        except Exception as e:
+            return None
 
     @classmethod
-    def create_table(cls) -> str:
-        def _table_name() -> str:
-            if cls._tablename.strip() == "":
-                return (
-                    cls.__class__.__name__.lower()
-                    if cls.__class__.__name__.endswith("s")
-                    else f"{cls.__class__.__name__}s"
-                )
-            else:
-                return cls._tablename
+    def _auto_setup_relationships(cls):
+        """Automatically setup bidirectional relationships"""
+        for field_name, relationship in cls.__orm_config__.relationships.items():
+            related_class = relationship["related_class"]
 
-        columns: List[str] = []
-        for field_name, field in cls._fields.items():
-            column_def = f"{field_name} {field.get_sql_definition()}"
-            columns.append(column_def)
+            # Setup reverse relationship
+            if relationship["type"] == RelationshipType.MANY_TO_ONE:
+                # This is a foreign key, setup reverse one-to-many
+                reverse_name = cls.__name__.lower() + "s"
+                if reverse_name not in related_class.__orm_config__.relationships:
+                    related_class.__orm_config__.relationships[reverse_name] = {
+                        "type": RelationshipType.ONE_TO_MANY,
+                        "related_class": cls,
+                        "foreign_key": relationship["foreign_key"],
+                    }
 
-        tbname = _table_name()
+            elif relationship["type"] == RelationshipType.ONE_TO_MANY:
+                # This is a one-to-many, setup reverse many-to-one
+                reverse_name = cls.__name__.lower()
+                if reverse_name not in related_class.__orm_config__.relationships:
+                    related_class.__orm_config__.relationships[reverse_name] = {
+                        "type": RelationshipType.MANY_TO_ONE,
+                        "related_class": cls,
+                        "foreign_key": relationship["foreign_key"],
+                    }
 
-        sql = f"CREATE TABLE IF NOT EXISTS {tbname} ({', '.join(columns)})"
+    @classmethod
+    def set_session(cls, session: Any):
+        cls.__session__ = session
 
-        return sql
+    # Enhanced field access methods
+    @classmethod
+    def get_primary_key(cls) -> Optional[str]:
+        return cls.__orm_config__.primary_key
 
-    def save(self, dialect: DatabaseDialect) -> Tuple[str, tuple]:
-        fields_to_save: Dict[str, Any] = {}
+    @classmethod
+    def get_fields(cls) -> Dict[str, ColumnInfo]:
+        if not cls.__initialized__:
+            cls._initialize_orm()
+        return cls.__orm_config__.fields
 
-        for field_name, field in self._fields.items():
-            value = getattr(self, field_name, None)
-            if value is not None:
-                fields_to_save[field_name] = value
+    @classmethod
+    def get_relationships(cls) -> Dict[str, Dict[str, Any]]:
+        if not cls.__initialized__:
+            cls._initialize_orm()
 
-        field_names = list(fields_to_save.keys())
-        placeholder = "%s" if dialect == DatabaseDialect.POSTGRES else "?"
-        placeholders = ", ".join([placeholder] * len(field_names))
-        field_names_str = ", ".join(field_names)
+        return cls.__orm_config__.relationships
 
-        sql = (
-            f"INSERT INTO {self._tablename} ({field_names_str}) VALUES ({placeholders})"
-        )
-        params = tuple(getattr(self, fname) for fname in field_names)
 
-        return sql, params
+def Field(
+    default: Optional[Any] = ...,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+    alias: Optional[str] = None,
+    *,
+    primary_key: bool = False,
+    unique: bool = False,
+    index: bool = False,
+    auto_increment: Optional[bool] = None,
+    foreign_key: Optional[str] = None,
+    nullable: Optional[bool] = None,
+    db_type: Optional[str] = None,
+    relationship: Optional[Dict[str, Any]] = None,
+    json_schema_extra: Optional[Dict[str, Any]] = None,
+    **kwargs,
+) -> Any:
+    orm_meta: Dict[str, Any] = {}
+
+    if primary_key:
+        orm_meta["primary_key"] = True
+
+    if auto_increment is not None:
+        orm_meta["auto_increment"] = auto_increment
+
+    if unique:
+        orm_meta["unique"] = True
+
+    if index:
+        orm_meta["index"] = True
+
+    if foreign_key:
+        orm_meta["foreign_key"] = foreign_key
+
+    if nullable is not None:
+        orm_meta["nullable"] = nullable
+
+    if db_type:
+        orm_meta["db_type"] = db_type
+
+    if relationship:
+        orm_meta["relationship"] = relationship
+
+    extra = dict(json_schema_extra) if json_schema_extra else {}
+    existing_orm = (
+        extra.get("orm", {}) if isinstance(extra.get("orm", {}), dict) else {}
+    )
+    merged_orm = {**existing_orm, **orm_meta}
+    if merged_orm:
+        extra["orm"] = merged_orm
+
+    return FieldInfo(
+        default=default,
+        alias=alias,
+        title=title,
+        description=description,
+        json_schema_extra=extra,
+        **kwargs,
+    )
 

@@ -3,7 +3,7 @@ import threading
 import time
 from typing import Callable, Dict, Optional, Tuple, Deque, List
 from contextlib import contextmanager
-from nexios.orm.backends.pool.base import BaseConnectionPool, PoolConfig, PoolEvent
+from nexios.orm.pool.base import BaseConnectionPool, PoolConfig, PoolEvent
 from nexios.orm.connection import SyncDatabaseConnection
 import statistics
 import weakref

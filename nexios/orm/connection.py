@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing_extensions import Any, Optional, Tuple, List, Union
+from typing_extensions import Any, Optional, Tuple, List
 
 class BaseCursor(ABC):
     @property

@@ -1,7 +1,7 @@
 from logging import getLogger
 from typing import Optional
 from typing_extensions import Tuple, Any
-from nexios.orm.backends.manager import AsyncDatabaseManager, DatabaseManager
+from nexios.orm.manager import AsyncDatabaseManager, DatabaseManager
 from nexios.orm.connection import AsyncDatabaseConnection, SyncDatabaseConnection
 
 
@@ -37,6 +37,7 @@ class Engine:
 
         # Get detected dialect and driver from managers
         self.dialect = self.db_manager.db_type
+        print(f"Dialect called in engine: {self.dialect}")
         self.driver = self.db_manager.driver
 
         self.logger = getLogger(__name__)

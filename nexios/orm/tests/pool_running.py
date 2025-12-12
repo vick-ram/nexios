@@ -16,9 +16,9 @@ def quick_test():
     
     # Test custom pool
     print("Testing custom pool...")
-    from nexios.orm.backends.pool.base import PoolConfig
-    from nexios.orm.backends.pool.connection_pool import ConnectionPool
-    from nexios.orm.backends.dbapi.postgres.psycopg_ import PsycopgConnection
+    from nexios.orm.pool.base import PoolConfig
+    from nexios.orm.pool.connection_pool import ConnectionPool
+    from nexios.orm.dbapi.postgres.psycopg_ import PsycopgConnection
     
     config = PoolConfig(min_size=2, max_size=5)
 

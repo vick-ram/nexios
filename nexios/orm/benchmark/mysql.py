@@ -1,7 +1,6 @@
 import time
 import statistics
 import threading
-import psycopg
 import matplotlib.pyplot as plt
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,19 +20,13 @@ class MySQLConnectionPoolBenchmark:
         self.kwargs = kwargs
         self.results = {}
     
-    def benchmark_mysql_pool(self, min_size: int, max_size: int, operations: int, concurrency: int):
+    def benchmark_mysql_pool(self, pool_size: int, operations: int, concurrency: int):
         """Benchmark mysql's built-in connection pool"""
-        print(f"Testing mysql pool: {min_size}-{max_size} connections, {operations} ops, {concurrency} threads")
-        
-        # pool = PsycopgPool(
-        #     self.dsn,
-        #     min_size=min_size,
-        #     max_size=max_size,
-        #     timeout=10.0
-        # )
+        print(f"Testing mysql pool: {pool_size} connections, {operations} ops, {concurrency} threads")
+
         pool = mysql_pooling.MySQLConnectionPool(
-            pool_name="mypool",
-            pool_size=max_size,
+            pool_name="mysql_pool",
+            pool_size=pool_size,
             **self.kwargs
         )
         
@@ -76,7 +69,8 @@ class MySQLConnectionPoolBenchmark:
 
         end_total = time.perf_counter()
         
-        pool.close() # type: ignore
+        conn = pool.get_connection()
+        conn.close()
         
         total_time = end_total - start_total
         ops_per_sec = operations / total_time
@@ -87,8 +81,8 @@ class MySQLConnectionPoolBenchmark:
             'avg_latency_ms': statistics.mean(times) * 1000,
             'p95_latency_ms': np.percentile(times, 95) * 1000 if times else 0,
             'errors': errors,
-            'min_size': min_size,
-            'max_size': max_size
+            'min_size': pool_size,
+            'max_size': pool_size
         }
         
         print(f"  Results: {ops_per_sec:.1f} ops/sec, {statistics.mean(times)*1000:.1f}ms avg latency")
@@ -99,8 +93,8 @@ class MySQLConnectionPoolBenchmark:
         """Benchmark your custom connection pool"""
         print(f"Testing custom pool: {min_size}-{max_size} connections, {operations} ops, {concurrency} threads")
         
-        from nexios.orm.backends.pool.base import PoolConfig
-        from nexios.orm.backends.pool.connection_pool import  ConnectionPool
+        from nexios.orm.pool.base import PoolConfig
+        from nexios.orm.pool.connection_pool import  ConnectionPool
         
         config = PoolConfig(
             min_size=min_size,
@@ -112,9 +106,9 @@ class MySQLConnectionPoolBenchmark:
         )
         
         def create_conn():
-            from nexios.orm.backends.dbapi.postgres.psycopg_ import PsycopgConnection
-            conn = psycopg.connect(**self.kwargs)
-            return PsycopgConnection(conn)
+            from nexios.orm.dbapi.mysql.mysql_connector_ import MySQLConnectorConnection
+            conn = cast(mysql.connector.connection.MySQLConnection, mysql.connector.connect(**self.kwargs))
+            return MySQLConnectorConnection(conn)
         
         pool = ConnectionPool(create_conn, config)
 
@@ -183,16 +177,16 @@ class MySQLConnectionPoolBenchmark:
         print(f"Testing {pool_type} pool under sustained load for {duration}s")
         
         if pool_type == 'mysql':
-            pool = mysql_pooling.MySQLConnectionPool(min_size=5, max_size=20, timeout=30.0, **self.kwargs)
+            pool = mysql_pooling.MySQLConnectionPool(pool_name="mysql_pool", pool_size=20, **self.kwargs)
         else:
-            from nexios.orm.backends.pool.base import PoolConfig
-            from nexios.orm.backends.pool.connection_pool import  ConnectionPool
-            from nexios.orm.backends.dbapi.mysql.mysql_connector_ import MySQLConnectorConnection
+            from nexios.orm.pool.base import PoolConfig
+            from nexios.orm.pool.connection_pool import  ConnectionPool
+            from nexios.orm.dbapi.mysql.mysql_connector_ import MySQLConnectorConnection
 
             config = PoolConfig(min_size=5, max_size=20)
             conn = cast(mysql.connector.connection.MySQLConnection, mysql.connector.connect(**self.kwargs))
 
-            pool = ConnectionPool(lambda: MySQLConnectorConnection(conn), config)
+            pool = ConnectionPool(lambda: MySQLConnectorConnection(conn), config) # type: ignore
         
         metrics = {
             'throughput': [],
@@ -218,15 +212,15 @@ class MySQLConnectionPoolBenchmark:
                 start_time = time.perf_counter()
                 try:
                     if pool_type == 'mysql':
-                        with pool.get_connection() as conn:
-                            cur = conn.cursor()
-                            cur.execute("SELECT 1")
-                            cur.fetchone()
+                        conn = pool.get_connection()
+                        cur = conn.cursor()
+                        cur.execute("SELECT 1")
+                        cur.fetchone()
                     else:
-                        with pool.connection() as conn:
-                            cur = conn.cursor()
-                            cur.execute("SELECT 1")
-                            cur.fetchone()
+                        conn = pool.get_connection()
+                        cur = conn.cursor()
+                        cur.execute("SELECT 1")
+                        cur.fetchone()
                     
                     worker_times.append(time.perf_counter() - start_time)
                     worker_ops += 1
@@ -275,10 +269,11 @@ class MySQLConnectionPoolBenchmark:
         
         stop_event.set()
         
-        if pool_type == 'psycopg3':
-            pool.close()
+        if pool_type == 'mysql':
+            conn = pool.get_connection()
+            conn.close()
         else:
-            pool.close()
+            pool.close() # type: ignore
         
         return metrics
 
@@ -289,31 +284,41 @@ class MySQLConnectionPoolBenchmark:
         for scenario_name, params in scenarios.items():
             print(f"\n=== Scenario: {scenario_name} ===")
             print(f"Parameters: {params}")
+
+            def mysql_params():
+                kw = params.copy()
+                kw.pop('min_size')
+                kw.update({'pool_size': kw.pop('max_size')})
+                return kw
+
+            mysql_kwargs = mysql_params()
+
+            print(f"Mysql kwargs: {mysql_kwargs}")
             
-            psycopg_result = self.benchmark_psycopg3_pool(**params)
+            mysql_result = self.benchmark_mysql_pool(**mysql_kwargs)
             custom_result = self.benchmark_custom_pool(**params)
             
             comparison = {
-                'psycopg3': psycopg_result,
+                'mysql': mysql_result,
                 'custom': custom_result,
-                'custom_vs_psycopg3': {
-                    'throughput_ratio': custom_result['operations_per_second'] / psycopg_result['operations_per_second'],
-                    'latency_ratio': custom_result['avg_latency_ms'] / psycopg_result['avg_latency_ms'],
-                    'advantage': 'custom' if custom_result['operations_per_second'] > psycopg_result['operations_per_second'] else 'psycopg3'
+                'custom_vs_mysql': {
+                    'throughput_ratio': custom_result['operations_per_second'] / mysql_result['operations_per_second'],
+                    'latency_ratio': custom_result['avg_latency_ms'] / mysql_result['avg_latency_ms'],
+                    'advantage': 'custom' if custom_result['operations_per_second'] > mysql_result['operations_per_second'] else 'mysql'
                 }
             }
             
             comparison_results[scenario_name] = comparison
             
-            print(f"Winner: {comparison['custom_vs_psycopg3']['advantage']}")
-            print(f"Throughput ratio: {comparison['custom_vs_psycopg3']['throughput_ratio']:.2f}x")
+            print(f"Winner: {comparison['custom_vs_mysql']['advantage']}")
+            print(f"Throughput ratio: {comparison['custom_vs_mysql']['throughput_ratio']:.2f}x")
         
         return comparison_results
 
     def plot_results(self, comparison_results):
         """Plot comparison results"""
         scenarios = list(comparison_results.keys())
-        psycopg_throughput = [comparison_results[s]['psycopg3']['operations_per_second'] for s in scenarios]
+        mysql_throughput = [comparison_results[s]['mysql']['operations_per_second'] for s in scenarios]
         custom_throughput = [comparison_results[s]['custom']['operations_per_second'] for s in scenarios]
         
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
@@ -321,7 +326,7 @@ class MySQLConnectionPoolBenchmark:
         # Throughput comparison
         x = range(len(scenarios))
         width = 0.35
-        ax1.bar([i - width/2 for i in x], psycopg_throughput, width, label='psycopg3', alpha=0.7)
+        ax1.bar([i - width/2 for i in x], mysql_throughput, width, label='mysql', alpha=0.7)
         ax1.bar([i + width/2 for i in x], custom_throughput, width, label='Custom', alpha=0.7)
         ax1.set_xlabel('Scenario')
         ax1.set_ylabel('Operations/sec')
@@ -332,10 +337,10 @@ class MySQLConnectionPoolBenchmark:
         ax1.grid(True, alpha=0.3)
         
         # Latency comparison
-        psycopg_latency = [comparison_results[s]['psycopg3']['avg_latency_ms'] for s in scenarios]
+        mysql_latency = [comparison_results[s]['mysql']['avg_latency_ms'] for s in scenarios]
         custom_latency = [comparison_results[s]['custom']['avg_latency_ms'] for s in scenarios]
         
-        ax2.bar([i - width/2 for i in x], psycopg_latency, width, label='psycopg3', alpha=0.7)
+        ax2.bar([i - width/2 for i in x], mysql_latency, width, label='mysql', alpha=0.7)
         ax2.bar([i + width/2 for i in x], custom_latency, width, label='Custom', alpha=0.7)
         ax2.set_xlabel('Scenario')
         ax2.set_ylabel('Average Latency (ms)')
@@ -346,21 +351,21 @@ class MySQLConnectionPoolBenchmark:
         ax2.grid(True, alpha=0.3)
         
         # Performance ratio
-        ratios = [comparison_results[s]['custom_vs_psycopg3']['throughput_ratio'] for s in scenarios]
+        ratios = [comparison_results[s]['custom_vs_mysql']['throughput_ratio'] for s in scenarios]
         ax3.bar(x, ratios, color=['green' if r > 1 else 'red' for r in ratios], alpha=0.7)
         ax3.axhline(y=1, color='black', linestyle='--', alpha=0.5)
         ax3.set_xlabel('Scenario')
-        ax3.set_ylabel('Custom/psycopg3 Throughput Ratio')
+        ax3.set_ylabel('Custom/mysql Throughput Ratio')
         ax3.set_title('Performance Ratio (>1 = Custom is better)')
         ax3.set_xticks(x)
         ax3.set_xticklabels(scenarios, rotation=45)
         ax3.grid(True, alpha=0.3)
         
         # Error comparison
-        psycopg_errors = [comparison_results[s]['psycopg3']['errors'] for s in scenarios]
+        mysql_errors = [comparison_results[s]['mysql']['errors'] for s in scenarios]
         custom_errors = [comparison_results[s]['custom']['errors'] for s in scenarios]
         
-        ax4.bar([i - width/2 for i in x], psycopg_errors, width, label='psycopg3', alpha=0.7)
+        ax4.bar([i - width/2 for i in x], mysql_errors, width, label='mysql', alpha=0.7)
         ax4.bar([i + width/2 for i in x], custom_errors, width, label='Custom', alpha=0.7)
         ax4.set_xlabel('Scenario')
         ax4.set_ylabel('Errors')
@@ -385,20 +390,20 @@ class MySQLConnectionPoolBenchmark:
             report.append("-" * 30)
             
             custom = results['custom']
-            psycopg = results['psycopg3']
-            comparison = results['custom_vs_psycopg3']
+            mysql_ = results['mysql']
+            comparison = results['custom_vs_mysql']
             
-            report.append(f"psycopg3: {psycopg['operations_per_second']:.1f} ops/sec, {psycopg['avg_latency_ms']:.1f}ms latency")
+            report.append(f"mysql: {mysql_['operations_per_second']:.1f} ops/sec, {mysql_['avg_latency_ms']:.1f}ms latency")
             report.append(f"Custom:   {custom['operations_per_second']:.1f} ops/sec, {custom['avg_latency_ms']:.1f}ms latency")
             report.append(f"Ratio:    {comparison['throughput_ratio']:.2f}x throughput, {comparison['latency_ratio']:.2f}x latency")
             report.append(f"Winner:   {comparison['advantage'].upper()}")
         
         # Overall summary
         custom_wins = sum(1 for r in comparison_results.values() 
-                         if r['custom_vs_psycopg3']['advantage'] == 'custom')
+                         if r['custom_vs_mysql']['advantage'] == 'custom')
         total_scenarios = len(comparison_results)
         
-        report.append(f"\nOverall Summary:")
+        report.append("\nOverall Summary:")
         report.append(f"Custom pool won {custom_wins}/{total_scenarios} scenarios")
         
         return "\n".join(report)

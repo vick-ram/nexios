@@ -4,21 +4,17 @@ from typing import Any, Optional
 
 import asyncpg
 import psycopg
-import psycopg2
 
-from nexios.orm.backends.dbapi.postgres.async_psycopg_ import AsyncPsycopgConnection
-from nexios.orm.backends.dbapi.postgres.asyncpg_ import AsyncPgConnection
-from nexios.orm.backends.dbapi.postgres.psycopg2_ import Psycopg2Connection
-from nexios.orm.backends.dbapi.postgres.psycopg_ import PsycopgConnection
+from nexios.orm.dbapi.postgres.async_psycopg_ import AsyncPsycopgConnection
+from nexios.orm.dbapi.postgres.asyncpg_ import AsyncPgConnection
+from nexios.orm.dbapi.postgres.psycopg_ import PsycopgConnection
 from nexios.orm.connection import AsyncDatabaseConnection, SyncDatabaseConnection
 
 class PostgresConnection:
     
     @staticmethod
     def connect(connection: Any) -> Optional["SyncDatabaseConnection"]:
-        if isinstance(connection, psycopg2.extensions.connection):
-            return Psycopg2Connection(connection)
-        elif isinstance(connection, psycopg.Connection):
+        if isinstance(connection, psycopg.Connection):
             return PsycopgConnection(connection)
         else:
             return None

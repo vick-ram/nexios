@@ -94,8 +94,8 @@ class ConnectionPoolBenchmark:
         """Benchmark your custom connection pool"""
         print(f"Testing custom pool: {min_size}-{max_size} connections, {operations} ops, {concurrency} threads")
         
-        from nexios.orm.backends.pool.base import PoolConfig
-        from nexios.orm.backends.pool.connection_pool import  ConnectionPool
+        from nexios.orm.pool.base import PoolConfig
+        from nexios.orm.pool.connection_pool import  ConnectionPool
         
         config = PoolConfig(
             min_size=min_size,
@@ -107,7 +107,7 @@ class ConnectionPoolBenchmark:
         )
         
         def create_conn():
-            from nexios.orm.backends.dbapi.postgres.psycopg_ import PsycopgConnection
+            from nexios.orm.dbapi.postgres.psycopg_ import PsycopgConnection
             conn = psycopg.connect(self.dsn)
             return PsycopgConnection(conn)
         
@@ -180,9 +180,9 @@ class ConnectionPoolBenchmark:
         if pool_type == 'psycopg3':
             pool = PsycopgPool(self.dsn, min_size=5, max_size=20, timeout=30.0)
         else:
-            from nexios.orm.backends.pool.base import PoolConfig
-            from nexios.orm.backends.pool.connection_pool import  ConnectionPool
-            from nexios.orm.backends.dbapi.postgres.psycopg_ import PsycopgConnection
+            from nexios.orm.pool.base import PoolConfig
+            from nexios.orm.pool.connection_pool import  ConnectionPool
+            from nexios.orm.dbapi.postgres.psycopg_ import PsycopgConnection
             config = PoolConfig(min_size=5, max_size=20)
             conn = psycopg.connect(self.dsn)
 

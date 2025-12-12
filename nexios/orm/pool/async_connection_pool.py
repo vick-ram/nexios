@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Awaitable, Callable, Deque, Dict, List, Optional, Tuple
 import weakref
-from nexios.orm.backends.pool.base import BaseAsyncConnectionPool, PoolConfig, PoolEvent
+from nexios.orm.pool.base import BaseAsyncConnectionPool, PoolConfig, PoolEvent
 from nexios.orm.connection import AsyncDatabaseConnection
 
 

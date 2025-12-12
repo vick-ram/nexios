@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import logging
+from typing import Dict
 from typing_extensions import Any, Optional, cast
-from nexios.orm.backends.config import DatabaseDetector, DatabaseDialect, MySQLDriver, PostgreSQLDriver
-from nexios.orm.backends.dbapi.mysql.base import MySQLConnection_
-from nexios.orm.backends.dbapi.postgres.base import PostgresConnection
-from nexios.orm.backends.dbapi.sqlite.aiosqlite_ import AioSQLiteConnection
-from nexios.orm.backends.dbapi.sqlite.sqlite_ import SQLiteConnection
-from nexios.orm.backends.pool.base import BaseAsyncConnectionPool, BaseConnectionPool
-from nexios.orm.backends.pool.factory import ConnectionPoolFactory
+from nexios.orm.config import DatabaseDetector, MySQLDriver, PostgreSQLDriver, SQLiteDialect, PostgreSQLDialect, MySQLDialect
+from nexios.orm.dbapi.mysql.base import MySQLConnection_
+from nexios.orm.dbapi.postgres.base import PostgresConnection
+from nexios.orm.dbapi.sqlite.aiosqlite_ import AioSQLiteConnection
+from nexios.orm.dbapi.sqlite.sqlite_ import SQLiteConnection
+from nexios.orm.pool.base import BaseAsyncConnectionPool, BaseConnectionPool
+from nexios.orm.pool.factory import ConnectionPoolFactory
 from nexios.orm.connection import (
     AsyncCursor,
     AsyncDatabaseConnection,
@@ -46,23 +49,25 @@ class DatabaseManager:
             return self._create_direct_connection()
     
     def _create_direct_connection(self) -> SyncDatabaseConnection:
-        if self.db_type == DatabaseDialect.SQLITE:
+        
+        if isinstance(self.db_type, SQLiteDialect):
             import sqlite3
             raw_conn = sqlite3.connect(**self.connection_params)
             self._connection = SQLiteConnection(raw_conn)
-        elif self.db_type == DatabaseDialect.POSTGRES:
+        elif isinstance(self.db_type, PostgreSQLDialect):
+            conn_params = self._postgres_connection_params(**self.connection_params)
             if self.driver == PostgreSQLDriver.PSYCOPG3:
                 import psycopg
-                raw_conn = psycopg.connect(**self.connection_params)
+                raw_conn = psycopg.connect(**conn_params)
             elif self.driver == PostgreSQLDriver.PG8000:
                 import pg8000
-                raw_conn = pg8000.connect(**self.connection_params)
+                raw_conn = pg8000.connect(**conn_params)
             else:
                 raise ValueError(f"Unsupported Postgres driver: {self.driver}")
             
             self._connection = PostgresConnection.connect(raw_conn)
 
-        elif self.db_type == DatabaseDialect.MYSQL:
+        elif isinstance(self.db_type, MySQLDialect):
             if self.driver == MySQLDriver.MYSQL_CONNECTOR:
                 import mysql.connector
                 raw_conn = mysql.connector.connect(**self.connection_params)
@@ -75,6 +80,14 @@ class DatabaseManager:
             self._connection = MySQLConnection_.connection(raw_conn)
         
         return cast(SyncDatabaseConnection, self._connection)
+    
+    def _postgres_connection_params(self, **kwargs) -> Dict[str, Any]:
+        conn_params = kwargs.copy()
+        conn_params.pop('use_pool')
+        conn_params.pop('pool_min_size')
+        conn_params.pop('pool_max_size')
+
+        return conn_params
     
     def return_connection(self, conn: SyncDatabaseConnection) -> None:
         if self._use_pool and self._connection_pool:
@@ -133,12 +146,12 @@ class AsyncDatabaseManager:
 
         
     async def _create_async_direct_connection(self) -> AsyncDatabaseConnection:
-        if self.db_type == DatabaseDialect.SQLITE:
+        if isinstance(self.db_type, SQLiteDialect):
             from aiosqlite import connect
 
             raw_conn = await connect(**self.connection_params)
             self._connection = AioSQLiteConnection(raw_conn)
-        elif self.db_type == DatabaseDialect.POSTGRES:
+        elif isinstance(self.db_type, PostgreSQLDialect):
             if self.driver == PostgreSQLDriver.PSYCOPG3:
                 import psycopg
                 raw_conn = await psycopg.AsyncConnection.connect(**self.connection_params)
@@ -150,7 +163,7 @@ class AsyncDatabaseManager:
             
             self._connection = await PostgresConnection.connect_async(raw_conn)
 
-        elif self.db_type == DatabaseDialect.MYSQL:
+        elif isinstance(self.db_type, MySQLDialect):
             if self.driver == "aiomysql":
                 from aiomysql import connect
 
