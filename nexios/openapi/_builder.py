@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import      Any, Dict, List, Optional, Tuple, Union
 
 from pydantic import BaseModel
 
@@ -20,9 +20,6 @@ from .models import Response as OpenAPIResponse
 from .models import (
     Schema,
 )
-
-if TYPE_CHECKING:
-    pass
 
 
 class APIDocumentation:
@@ -49,6 +46,8 @@ class APIDocumentation:
             <meta charset="utf-8"/>
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
+            <link rel="icon" href="https://nexioslabs.com/logo.png" type="image/png">
+
             <style>
                 body {{
                     margin: 0;
@@ -59,6 +58,7 @@ class APIDocumentation:
         <body>
             <div id="redoc"></div>
             <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+
             <script>
                 Redoc.init('{url}', {{
                     scrollYOffset: 50
@@ -77,6 +77,8 @@ class APIDocumentation:
         <head>
             <title>{self.config.openapi_spec.info.title} - Docs</title>
             <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4.18.3/swagger-ui.css">
+            <link rel="icon" href="https://nexioslabs.com/logo.png" type="image/png">
+
         </head>
         <body>
             <div id="swagger-ui"></div>
@@ -351,6 +353,7 @@ class APIDocumentation:
         """
         Create a response specification from a model.
         """
+        
         if isinstance(model, type) and issubclass(model, BaseModel):
             schema_dict = model.model_json_schema()
             processed_schema = self._extract_and_add_nested_schemas(schema_dict)
@@ -385,7 +388,7 @@ class APIDocumentation:
                 description=model.get(
                     "description", f"Response for status code {status_code}"
                 ),
-                content={"application/json": MediaType(schema=Schema(type="object"))},
+                content={"application/json": MediaType(schema=Schema(type="object",example=model))},
             )
 
         # Fallback
