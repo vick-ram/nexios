@@ -115,11 +115,10 @@ export default defineConfig({
 
       // Twitter Card tags
       ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-      ['meta', { name: 'twitter:title', content: pageTitle }],
       ['meta', { name: 'twitter:description', content: pageDescription }],
       ['meta', { name: 'twitter:image', content: ogImageUrl }],
       ['meta', { name: 'twitter:image:alt', content: `${pageData?.title || 'Nexios'} - Python Web Framework` }],
-      ['meta',{name: 'msvalidate.01',content: 'FB0815BA0CFEC5A40B567076CD30A364'}]
+      ['meta', { name: 'msvalidate.01', content: 'FB0815BA0CFEC5A40B567076CD30A364' }]
     ]
   },
 
