@@ -1,4 +1,3 @@
-from .benchmark import EventBenchmark
 from .core import Event
 from .emitter import AsyncEventEmitter, EventEmitter, EventNamespace
 from .enums import EventPhase, EventPriority
@@ -16,7 +15,6 @@ __all__ = [
     "EventEmitter",
     "EventNamespace",
     "AsyncEventEmitter",
-    "EventBenchmark",
     "EventPriority",
     "EventPhase",
     "EventError",
