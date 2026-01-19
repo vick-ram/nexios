@@ -143,20 +143,10 @@ class NexiosApp(object):
         self.config = config
         self.dependencies = dependencies or []
         try:
-            from nexios.cli.utils import get_config as get_nexios_config
-        except ImportError:
-
-            def get_nexios_config() -> Dict[str, Any]:
-                return {}
-
-        try:
             get_config()
         except RuntimeError:
             set_config(self.config)
-        if self.config:
-            self.config.update(
-                get_nexios_config(),
-            )
+        
         self.http_middleware: List[Middleware] = []
         self.startup_handlers: List[Callable[[], Awaitable[None]]] = []
         self.shutdown_handlers: List[Callable[[], Awaitable[None]]] = []
