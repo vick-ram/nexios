@@ -1,1 +1,0 @@
-C:/Users/USER-PC/documents/NEXIOS PROJECT/nexios/docs/docs/community/contribution-guide.md
