@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 import typing
 import uuid
@@ -37,7 +36,7 @@ class Channel:
         """
         assert isinstance(websocket, WebSocket)
         if expires:
-            assert isinstance(expires,int)
+            assert isinstance(expires, int)
         assert isinstance(payload_type, str) and payload_type in [
             PayloadTypeEnum.JSON.value,
             PayloadTypeEnum.TEXT.value,
@@ -75,9 +74,9 @@ class Channel:
 
 
 class ChannelBox:
-    CHANNEL_GROUPS: typing.Dict[str, typing.Any] = (
-        {}
-    )  # groups of channels ~ key: group_name, val: dict of channels
+    CHANNEL_GROUPS: typing.Dict[
+        str, typing.Any
+    ] = {}  # groups of channels ~ key: group_name, val: dict of channels
     HISTORY_SIZE: int = int(os.getenv("CHANNEL_BOX_HISTORY_SIZE", 1_048_576))
     HISTORY_MANAGER: BaseHistoryManager = InMemoryHistoryManager(
         history_size=int(os.getenv("CHANNEL_BOX_HISTORY_SIZE", 1_048_576))
@@ -140,10 +139,10 @@ class ChannelBox:
     @classmethod
     def set_history_manager(cls, manager: BaseHistoryManager) -> None:
         """Set a custom history manager.
-        
+
         Args:
             manager: Instance of a class that implements BaseHistoryManager
-        
+
         Example:
             >>> from nexios.websockets import ChannelBox, NoOpHistoryManager
             >>> ChannelBox.set_history_manager(NoOpHistoryManager())
@@ -169,7 +168,7 @@ class ChannelBox:
 
         if save_history:
             message = ChannelMessageDC(
-                payload=payload,  # type:ignore
+                payload=payload,  # type: ignore
             )
             await cls.HISTORY_MANAGER.save_message(group_name, message)
 
@@ -192,12 +191,14 @@ class ChannelBox:
     async def show_history(
         cls,
         group_name: str = "",
-    ) -> typing.Union[typing.List[ChannelMessageDC], typing.Dict[str, typing.List[ChannelMessageDC]]]:
+    ) -> typing.Union[
+        typing.List[ChannelMessageDC], typing.Dict[str, typing.List[ChannelMessageDC]]
+    ]:
         """Get message history for a group or all groups.
-        
+
         Args:
             group_name: Optional group name. If empty, returns all history.
-        
+
         Returns:
             List of messages if group_name is provided, otherwise dict of all histories
         """
@@ -206,7 +207,7 @@ class ChannelBox:
     @classmethod
     async def flush_history(cls, group_name: typing.Optional[str] = None) -> None:
         """Flush message history.
-        
+
         Args:
             group_name: Optional group name. If provided, only flushes that group's history.
                        If None, flushes all history.
