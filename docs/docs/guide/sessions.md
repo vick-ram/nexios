@@ -45,32 +45,59 @@ async def index(req, res):
 ## ⚙️ Session Configuration Options
 
 Nexios offers various configuration options for customizing session behavior:
+:::
 
-```python
+```py 
 from nexios import NexiosApp, MakeConfig
 from nexios.session import SessionConfig
 from nexios.session.middleware import SessionMiddleware
 from nexios.session.file import FileSessionInterface
 
+app = NexiosApp()
+app.config.secret_key = "secret-key"
+app.add_middleware(SessionMiddleware(config = SessionConfig(
+    session_cookie_name="nexios_session",
+    cookie_path="/",
+    cookie_domain=None,
+    cookie_secure=True,
+    cookie_httponly=True,
+    cookie_samesite="lax",
+    session_expiration_time=86400,  # 24 hours
+    manager=FileSessionInterface,
+    session_file_storage_path="sessions",
+    session_file_name="session_"
+)))
+
+```
+
+```python [Old Style]
+from nexios import NexiosApp, MakeConfig
+from nexios.session import SessionConfig
+from nexios.session.middleware import SessionMiddleware
+from nexios.session.file import FileSessionInterface
+
+session_config = SessionConfig(
+    session_cookie_name="nexios_session",
+    cookie_path="/",
+    cookie_domain=None,
+    cookie_secure=True,
+    cookie_httponly=True,
+    cookie_samesite="lax",
+    session_expiration_time=86400,  # 24 hours
+    manager=FileSessionInterface,
+    session_file_storage_path="sessions",
+    session_file_name="session_"
+)
+
 config = MakeConfig(
     secret_key="your-secure-secret-key",
-    session=SessionConfig(
-        session_cookie_name="nexios_session",
-        cookie_path="/",
-        cookie_domain=None,
-        cookie_secure=True,
-        cookie_httponly=True,
-        cookie_samesite="lax",
-        session_expiration_time=86400,  # 24 hours
-        manager=FileSessionInterface,
-        session_file_storage_path="sessions",
-        session_file_name="session_"
-    )
+    session=session_config
 )
 
 app = NexiosApp(config=config)
 app.add_middleware(SessionMiddleware())
 ```
+:::
 
 ## 📊 Configuration Options Reference
 
@@ -139,11 +166,11 @@ from nexios import MakeConfig
 from nexios.session import SessionConfig
 
 # Set global session expiration time
-config = MakeConfig(
-    session=SessionConfig(
-        session_expiration_time=3600  # 1 hour
-    )
+session_config = SessionConfig(
+    session_expiration_time=3600  # 1 hour
 )
+
+
 
 # Or set per-session expiration time
 @app.post("/login")
@@ -170,11 +197,10 @@ from nexios import MakeConfig
 from nexios.session import SessionConfig
 from nexios.session.signed_cookies import SignedSessionManager
 
-config = MakeConfig(
-    session=SessionConfig(
-        manager=SignedSessionManager
-    )
+session_config = SessionConfig(
+    manager=SignedSessionManager
 )
+
 ```
 
 **Pros**:
@@ -198,13 +224,12 @@ from nexios import MakeConfig
 from nexios.session import SessionConfig
 from nexios.session.file import FileSessionInterface
 
-config = MakeConfig(
-    session=SessionConfig(
-        manager=FileSessionInterface,
-        session_file_storage_path="sessions",  # Directory to store session files
-        session_file_name="session_"           # Prefix for session files
-    )
+session_config = SessionConfig(
+    manager=FileSessionInterface,
+    session_file_storage_path="sessions",  # Directory to store session files
+    session_file_name="session_"           # Prefix for session files
 )
+
 ```
 
 **Pros**:
@@ -282,13 +307,13 @@ app.config.secret_key = os.environ.get("SECRET_KEY")
 from nexios import MakeConfig
 from nexios.session import SessionConfig
 
-config = MakeConfig(
-    session=SessionConfig(
-        cookie_secure=True,      # Only send cookies over HTTPS
-        cookie_httponly=True,    # Prevent JavaScript access
-        cookie_samesite="lax"    # Mitigate CSRF attacks
-    )
+session_config = SessionConfig(
+    cookie_secure=True,      # Only send cookies over HTTPS
+    cookie_httponly=True,    # Prevent JavaScript access
+    cookie_samesite="lax"    # Mitigate CSRF attacks
 )
+
+
 ```
 
 #### Use Appropriate Session Expiration
