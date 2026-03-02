@@ -3,13 +3,14 @@ import typing
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from nexios.config import get_config
+from nexios.config import get_config, warn_deprecated_config_usage
 from nexios.config.base import MakeConfig
 from nexios.http import Request, Response
 from nexios.logging import getLogger
 
 # from typing_extensions import Annotated, Doc
 from nexios.middleware.base import BaseMiddleware
+from nexios.middleware.cors.config import CorsConfig
 
 logger = getLogger()
 
@@ -19,40 +20,21 @@ SAFELISTED_HEADERS = {"accept", "accept-language", "content-language", "content-
 
 
 class CORSMiddleware(BaseMiddleware):
-    def __init__(
-        self, config: Optional[Union[MakeConfig, Dict[str, Any]]] = None, **kwargs: Any
-    ):
-        super().__init__(**kwargs)
-
-        # Handle config parameter (new approach)
+    def __init__(self, config: Optional[CorsConfig] = None):
         if config is not None:
-            if isinstance(config, MakeConfig):
-                self.config = config
-            elif isinstance(config, dict):
-                self.config = MakeConfig(config)
-            else:
-                raise TypeError("config must be a MakeConfig instance or dictionary")
+            self.config = config
         else:
-            # Fallback to get_config() (old approach) with warning
-            warnings.warn(
-                "Using get_config() for CORS middleware is deprecated. "
-                "Please pass config directly to CORSMiddleware constructor.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            try:
-                self.config = get_config().cors
-            except RuntimeError:
+            warn_deprecated_config_usage("CORS")
+            app_config = get_config()
+            if not app_config.cors:
                 self.config = None
+                return
+            # Use existing config from app config
+            self.config = app_config.cors
 
         if not self.config:
             return
-
-        self._setup_cors_config()
-        self._setup_preflight_headers()
-
-    def _setup_cors_config(self) -> None:
-        """Setup CORS configuration from config object."""
+            
         self.allow_origins: List[str] = self.config.allow_origins or []
         self.blacklist_origins: List[str] = self.config.blacklist_origins or []
         self.allow_methods = self.config.allow_methods or ALL_METHODS
@@ -68,17 +50,19 @@ class CORSMiddleware(BaseMiddleware):
             if self.config.allow_origin_regex
             else None
         )
+        self.allow_headers = self.config.allow_headers or []
         self.expose_headers: List[str] = self.config.expose_headers or []
         self.max_age = self.config.max_age or 600
         self.strict_origin_checking = self.config.strict_origin_checking or False
         self.dynamic_origin_validator: Optional[Callable[[Optional[str]], bool]] = (
-            getattr(self.config, "dynamic_origin_validator", None)
+            getattr(config, "dynamic_origin_validator", None)
         )
         self.debug = self.config.debug or False
         self.custom_error_status = self.config.custom_error_status or 400
         self.custom_error_messages: Dict[str, Any] = (
             self.config.custom_error_messages or {}
         )
+        self._setup_preflight_headers()
 
     def _setup_preflight_headers(self) -> None:
         """Setup simple and preflight headers."""
@@ -98,7 +82,7 @@ class CORSMiddleware(BaseMiddleware):
         }
         if self.allow_credentials:
             self.preflight_headers["Access-Control-Allow-Credentials"] = "true"
-        if self.config.allow_headers:
+        if self.allow_headers:
             self.allow_headers: List[str] = [
                 *list(SAFELISTED_HEADERS),
                 *(self.config.allow_headers or []),
@@ -130,6 +114,7 @@ class CORSMiddleware(BaseMiddleware):
         if not config:
             await call_next()
             return
+            
         origin = request.origin
 
         method = request.scope["method"]
@@ -170,8 +155,6 @@ class CORSMiddleware(BaseMiddleware):
             config = self.config
 
         origin = request.origin
-        if not config:
-            return None
         server_error_headers = request.scope.get("server_error_headers", {})
         server_error_headers["Access-Control-Allow-Origin"] = origin
         request.scope["server_error_headers"] = server_error_headers
@@ -261,7 +244,7 @@ class CORSMiddleware(BaseMiddleware):
             allowed_requested_headers = []
             for header in requested_header_list:
                 # If allow_headers is "*", allow any header (except blacklisted)
-                if "*" in self.allow_headers:
+                if "*" in self.config.allow_headers:
                     if header in self.blacklist_headers:
                         if self.debug:
                             logger.error(
