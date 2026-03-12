@@ -869,7 +869,7 @@ class ServerErrorMiddleware(BaseMiddleware):
         self.current_request = request
         # Get debug mode from config
         try:
-            self.debug = get_config().debug or True
+            self.debug = True
         except Exception:  # pragma: no cover
             self.debug = True
         try:
@@ -894,10 +894,13 @@ class ServerErrorMiddleware(BaseMiddleware):
         self, request: Request, response: Response, exc: Exception
     ) -> Response:
         accept = request.headers.get("accept", "")
-        if "text/html" in accept:
-            content: str = self.generate_html(exc)
+        if not accept:
+            content = self.generate_plain_text(exc)
+        elif "text/html" in accept:
+            content = self.generate_html(exc)
             return response.html(content, status_code=500)
-        content = self.generate_plain_text(exc)
+        else:
+            content = self.generate_plain_text(exc)
         return response.text(content, status_code=500)
 
     def format_line(
