@@ -29,7 +29,7 @@ def _process_response(
         response_manager.json(func_result.value)
     elif isinstance(func_result, bytes):
         response_manager.resp(func_result)
-        
+
     return response_manager.get_response()
 
 
