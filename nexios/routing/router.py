@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import inspect
 import re
 import typing
 import warnings
@@ -35,7 +34,6 @@ from nexios._internals._route_builder import RouteBuilder
 from nexios.dependencies import Depend, inject_dependencies
 from nexios.events import EventEmitter
 from nexios.exceptions import NotFoundException
-from nexios.http import Request, Response
 from nexios.http.response import JSONResponse
 from nexios.objects import RouteParam, URLPath
 from nexios.openapi.models import Parameter
@@ -543,27 +541,7 @@ class Router(BaseRouter):
         route.tags = list(self.tags).extend(route.tags) if route.tags else self.tags
         if self.exclude_from_schema:
             route.exclude_from_schema = True
-        original_handler = route.handler
 
-        async def wrapped_handler(
-            request: Request, response: Response, **kwargs: Dict[str, Any]
-        ):
-            sig = inspect.signature(original_handler)
-            params = list(sig.parameters.keys())
-            handler_args = [request, response]
-            handler_kwargs = {}
-            if len(params) > 2:
-                # Get path parameters from request
-                path_params = request.path_params
-
-                # For parameters after the first two (request/response)
-                for param in params[2:]:
-                    if param in path_params:
-                        handler_kwargs[param] = path_params[param]
-
-            return await original_handler(*handler_args, **handler_kwargs)
-
-        route.handler = wrapped_handler
         self.routes.append(route)
         if getattr(route, "exclude_from_schema", False):
             return
@@ -591,8 +569,8 @@ class Router(BaseRouter):
                 Receives (request, response) and returns response or raw data.
                 
                 Example:
-                async def get_user(request, response):
-                    user = await get_user_from_db(request.path_params['user_id'])
+                async def get_user(request, response, user_id: str):
+                    user = await get_user_from_db(user_id)
                     return response.json(user)
             """),
         ] = None,
