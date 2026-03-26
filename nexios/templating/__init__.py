@@ -112,7 +112,9 @@ async def render(
         if hasattr(request, "base_app"):
             final_context.setdefault("url_for", request.base_app.url_for)
         if hasattr(request, "state"):
-            final_context.setdefault("csrf_token", getattr(request.state, "csrf_token", None))
+            final_context.setdefault(
+                "csrf_token", getattr(request.state, "csrf_token", None)
+            )
 
             # Merge with existing template context from middleware if available
             middleware_context = getattr(request.state, "template_context", None)
