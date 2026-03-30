@@ -23,7 +23,7 @@ class TestCRUDOperations:
     def test_insert_user(self, sync_session):
         """Test inserting a single user"""
         # Create tables
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
 
         sync_session.create_all(User)
 
@@ -55,7 +55,7 @@ class TestCRUDOperations:
 
     def test_insert_multiple_users(self, sync_session):
         """Test inserting multiple users"""
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
 
         sync_session.create_all(User)
 
@@ -78,7 +78,7 @@ class TestCRUDOperations:
 
     def test_update_user(self, sync_session):
         """Test updating a user"""
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
 
         sync_session.create_all(User)
 
@@ -106,7 +106,7 @@ class TestCRUDOperations:
 
     def test_delete_user(self, sync_session):
         """Test deleting a user"""
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
 
         sync_session.create_all(User)
 
@@ -136,7 +136,7 @@ class TestCRUDOperations:
 
     def test_where_clause(self, sync_session):
         """Test WHERE clause with various conditions"""
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
 
         sync_session.create_all(User)
 
@@ -175,7 +175,7 @@ class TestCRUDOperations:
 
     def test_order_by(self, sync_session):
         """Test ORDER BY clause"""
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
 
         sync_session.create_all(User)
 
@@ -201,7 +201,7 @@ class TestCRUDOperations:
 
     def test_limit_offset(self, sync_session):
         """Test LIMIT and OFFSET"""
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
 
         sync_session.create_all(User)
 
@@ -233,7 +233,7 @@ class TestCRUDOperations:
 
     def test_count(self, sync_session):
         """Test COUNT operation"""
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
 
         sync_session.create_all(User)
 
@@ -264,7 +264,7 @@ class TestCRUDOperations:
 
     def test_exists(self, sync_session):
         """Test EXISTS operation"""
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
 
         sync_session.create_all(User)
 

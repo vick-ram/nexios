@@ -8,7 +8,7 @@ async def test_aiosqlite_connection() -> None:
     cursor = await conn.cursor()
     try:
         # Test if connection exists
-        cursor.execute("SELECT 1")
+        await cursor.execute("SELECT 1")
         print("Connected")
     except Exception as err:
         print(f"Error occurred during test: {err}")

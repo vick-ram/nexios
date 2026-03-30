@@ -145,6 +145,6 @@ class BaseTestModel(NexiosModel):
 
     @classmethod
     def count(cls, session):
-        from nexios.orm.query import select
+        from nexios.orm.query.builder import select
         query = select(cls)
         return session.exec(query).count()

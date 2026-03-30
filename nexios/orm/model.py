@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 import types
-from matplotlib.pylab import f
 from packaging import version
 from enum import Enum
 from dataclasses import dataclass, field
@@ -24,6 +23,7 @@ from typing import (
     dataclass_transform,
     overload,
     cast,
+    TYPE_CHECKING,
 )
 from pydantic import ConfigDict, BaseModel as PydanticBaseModel
 import pydantic
@@ -36,8 +36,10 @@ from pydantic._internal._repr import Representation
 from pydantic._internal._model_construction import ModelMetaclass as ModelMetaclass
 from nexios.orm.misc.refs import ResolveForwardRefs
 from nexios.orm.misc.store import get_context_data
-from nexios.orm.query import Select
-from nexios.orm.sessions import AsyncSession
+
+if TYPE_CHECKING:
+    from nexios.orm.query.builder import Select
+    from nexios.orm.sessions import AsyncSession
 
 OnDeleteOrUpdate = Literal[
     "CASCADE", "SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION"
@@ -690,6 +692,9 @@ class NexiosModelMetaclass(ModelMetaclass):
 
         if rel_info.unique:
             rel_type = RelationshipType.ONE_TO_ONE
+        
+        if not parsed_info.get("is_list") and rel_type == RelationshipType.MANY_TO_ONE:
+            rel_type = RelationshipType.ONE_TO_ONE
 
         return rel_type
 
@@ -747,9 +752,9 @@ class NexiosModelMetaclass(ModelMetaclass):
         
         match (relationship_type):
             case RelationshipType.MANY_TO_ONE:
-                return fk
+                return fk if current_cls is not None and fk in get_model_fields(current_cls) else None
             case RelationshipType.ONE_TO_ONE:
-                return fk
+                return fk if current_cls is not None and fk in get_model_fields(current_cls) else None
             case RelationshipType.ONE_TO_MANY:
                 return None
             case RelationshipType.MANY_TO_MANY:
@@ -949,6 +954,7 @@ class RelationshipDescriptor:
     def _load_many_to_one(self, obj: NexiosModel, session: Any) -> Any:
         from nexios.orm.misc.event_loop import NexiosEventLoop
         from nexios.orm.query.builder import select
+        from nexios.orm.sessions import AsyncSession
 
         cached = self._get_cache(obj)
         if cached is not _NOT_LOADED:
@@ -995,6 +1001,7 @@ class RelationshipDescriptor:
     def _load_one_to_many(self, obj: NexiosModel, session: Any) -> Any:
         from nexios.orm.misc.event_loop import NexiosEventLoop
         from nexios.orm.query.builder import select
+        from nexios.orm.sessions import AsyncSession
 
         cached = self._get_cache(obj)
         if cached is not _NOT_LOADED:
@@ -1037,6 +1044,7 @@ class RelationshipDescriptor:
         # return self._load_many_to_one(obj, session)
         from nexios.orm.misc.event_loop import NexiosEventLoop
         from nexios.orm.query.builder import select
+        from nexios.orm.sessions import AsyncSession
 
         cached = self._get_cache(obj)
         print(f"Cached data: {cached}")
@@ -1095,6 +1103,7 @@ class RelationshipDescriptor:
     def _load_many_to_many(self, obj: NexiosModel, session: Any) -> List[Any]:
         from nexios.orm.misc.event_loop import NexiosEventLoop
         from nexios.orm.query.builder import select
+        from nexios.orm.sessions import AsyncSession
 
         cached = self._get_cache(obj)
         if cached is not _NOT_LOADED:
@@ -1140,6 +1149,8 @@ class RelationshipDescriptor:
         query_ids._bind(session)
 
         def _fetch_m2m():
+            from nexios.orm.sessions import AsyncSession
+            
             if isinstance(session, AsyncSession):
                 # This needs to be run inside the loop
                 async def _async_logic():
@@ -1165,7 +1176,8 @@ class RelationshipDescriptor:
         return results
 
     def _load_dynamic(self, obj: NexiosModel, session: Any) -> Select:
-        from nexios.orm.query.builder import select
+        from nexios.orm.query.builder import select, Select
+        from nexios.orm.sessions import AsyncSession
 
         from nexios.orm.misc.event_loop import NexiosEventLoop
 

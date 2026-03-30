@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from typing import Any, Generic, List, Optional, Self, Tuple, Type, TypeVar, Union, TYPE_CHECKING
-from nexios.orm.query.builder import Select
 
 if TYPE_CHECKING:
     from nexios.orm.config import Dialect
     from nexios.orm.model import NexiosModel
+    from nexios.orm.query.builder import Select
 
 
 Expression = Union["BinaryExpression", "CompoundExpression"]
@@ -27,10 +27,10 @@ class CompoundExpression:
         return CompoundExpression(self, "OR", other)
 
     def to_sql(
-        self, placeholder: str = "?", dialect: Optional[Any] = None
+        self, placeholder: str = "?", dialect: Optional[Any] = None, driver: Optional[Any] = None
     ) -> Tuple[str, List[Any]]:
-        left_sql, left_params = self.left.to_sql(placeholder, dialect)
-        right_sql, right_params = self.right.to_sql(placeholder, dialect)
+        left_sql, left_params = self.left.to_sql(placeholder, dialect, driver)
+        right_sql, right_params = self.right.to_sql(placeholder, dialect, driver)
 
         sql = f"({left_sql} {self.operator} {right_sql})"
         params = left_params + right_params
@@ -46,7 +46,7 @@ class TSVectorExpression:
         self.config = config
 
     def to_sql(
-        self, placeholder: str = "?", dialect: Optional[Any] = None
+        self, placeholder: str = "?", dialect: Optional[Any] = None, driver: Optional[Any] = None
     ) -> Tuple[str, List[Any]]:
         quoted_column = dialect.quote_identifier(self.column.field_name)  # type: ignore
         if self.config:
@@ -65,7 +65,7 @@ class MatchExpression:
         self.mode = mode
 
     def to_sql(
-        self, placeholder: str = "?", dialect: Optional[Any] = None
+        self, placeholder: str = "?", dialect: Optional[Any] = None, driver: Optional[Any] = None
     ) -> Tuple[str, List[Any]]:
         quoted_column = dialect.quote_identifier(self.column.field_name)  # type: ignore
         if self.mode == "BOOLEAN":
@@ -82,7 +82,7 @@ class BM25Expression:
         self.query = query
 
     def to_sql(
-        self, placeholder: str = "?", dialect: Optional[Any] = None
+        self, placeholder: str = "?", dialect: Optional[Any] = None, driver: Optional[Any] = None
     ) -> Tuple[str, List[Any]]:
         quoted_column = dialect.quote_identifier(self.column.field_name)  # type: ignore
         return f"{quoted_column} MATCH {placeholder}", [self.query]
@@ -116,6 +116,8 @@ class BinaryExpression:  # type: ignore
         dialect: Optional[Any] = None,
         driver: Optional[Any] = None,
     ) -> Tuple[str, List[Any]]:
+        from nexios.orm.query.builder import Select
+
         col = self.column.field_name
         if self.value is None:
             if self.operator == "=":

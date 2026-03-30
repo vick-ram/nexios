@@ -5,7 +5,6 @@ from typing import Dict
 
 import aiomysql
 import pg8000.dbapi
-import pg8000.dbapi
 from typing_extensions import Any, Optional
 
 from nexios.orm.config import DatabaseDetector, MySQLDriver, PostgreSQLDriver, SQLiteDialect, PostgreSQLDialect, \

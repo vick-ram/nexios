@@ -1,6 +1,6 @@
 import pytest
 from .test_models import User, Profile, Address, Post
-from nexios.orm.query import select
+from nexios.orm.query.builder import select
 
 
 class TestRelationshipOperations:

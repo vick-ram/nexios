@@ -1,6 +1,6 @@
 import pytest
 from .test_models import User, Post, Address, Profile
-from nexios.orm.query import select
+from nexios.orm.query.builder import select
 
 
 class TestAsyncOperations:
@@ -124,9 +124,10 @@ class TestAsyncOperations:
 
         # Query user with eager loading
         # query = select(User).where(User.username == "reluser").eager_load("posts")
-        query = select(User).where(User.username == "reluser")
+        query = select(User).where(User.username == "reluser").eager_load("posts")
         fetched_user = await async_session.exec(query).first()
-        fetched_posts = fetched_user.posts
+        fetched_posts = await async_session.exec(fetched_user.posts).all()
+        # fetched_posts = fetched_user.posts
         print(f"Fetched posts======================={fetched_posts}")
 
         # Posts should be loaded

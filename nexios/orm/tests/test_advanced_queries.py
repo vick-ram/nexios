@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from nexios.orm.query import select
+from nexios.orm.query.builder import select
 from .test_models import User, Post
 
 

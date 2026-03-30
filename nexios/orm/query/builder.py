@@ -621,28 +621,34 @@ class Select(Generic[_T]):
             first_instance = rel_instances[0]
             model_class = type(first_instance)
 
-            if rel_name not in model_class.__nexios_model_relationships__:
+            if rel_name not in model_class.__relationships__:
                 continue
 
-            rel_info = model_class.__nexios_model_relationships__[rel_name]
+            rel_info = model_class.__relationships__[rel_name]
 
             # Batch load based on relationship type
-            if rel_info.relationship_type == RelationshipType.MANY_TO_ONE:
+            if rel_info.relationship_type in (RelationshipType.MANY_TO_ONE, RelationshipType.ONE_TO_ONE):
                 self._batch_load_many_to_one(rel_instances, rel_name, rel_info, session)
             elif rel_info.relationship_type == RelationshipType.ONE_TO_MANY:
                 self._batch_load_one_to_many(rel_instances, rel_name, rel_info, session)
 
     def _batch_load_many_to_one(self, instances, rel_name, rel_info, session: Any):
         """Batch load many-to-one relationships to avoid N+1"""
-        if not rel_info.foreign_key:
-            return
-
         # Collect foreign key values
         fk_values = []
         instance_map = {}
+        
+        is_inverse_one_to_one = rel_info.relationship_type == RelationshipType.ONE_TO_ONE and not rel_info.foreign_key
+
+        if is_inverse_one_to_one:
+            # For inverse 1:1, we load like a 1:M but expect single result
+            return self._batch_load_one_to_many(instances, rel_name, rel_info, session)
+
+        if not rel_info.foreign_key:
+            return
 
         for instance in instances:
-            fk_value = getattr(instance, rel_info.foreign_key)
+            fk_value = getattr(instance, rel_info.foreign_key, None)
             if fk_value is not None:
                 fk_values.append(fk_value)
                 instance_map[fk_value] = instance
@@ -739,7 +745,7 @@ class Select(Generic[_T]):
 
             rel_info = model_class.__relationships__[rel_name]
 
-            if rel_info.relationship_type == RelationshipType.MANY_TO_ONE:
+            if rel_info.relationship_type in (RelationshipType.MANY_TO_ONE, RelationshipType.ONE_TO_ONE):
                 await self._async_batch_load_many_to_one(
                     rel_instances, rel_name, rel_info, self._session
                 )
@@ -755,6 +761,12 @@ class Select(Generic[_T]):
     async def _async_batch_load_many_to_one(
         self, instances, rel_name, rel_info, session
     ):
+        is_inverse_one_to_one = rel_info.relationship_type == RelationshipType.ONE_TO_ONE and not rel_info.foreign_key
+        
+        if is_inverse_one_to_one:
+            await self._async_batch_load_one_to_many(instances, rel_name, rel_info, session)
+            return
+
         if not rel_info.foreign_key:
             return
 
@@ -762,9 +774,7 @@ class Select(Generic[_T]):
         instance_map = {}
 
         for instance in instances:
-            print(f"Single instance: {instance}")
-            fk_value = getattr(instance, rel_info.foreign_key)
-            print(f"Foreign key obtained========:{fk_value}")
+            fk_value = getattr(instance, rel_info.foreign_key, None)
             if fk_value is not None:
                 fk_values.append(fk_value)
                 instance_map[fk_value] = instance
@@ -1100,4 +1110,3 @@ def select(
         >>> query = select(User.name, User.email)  # Select[Any] (tuple)
     """
     return Select(entity, *entities)
-
