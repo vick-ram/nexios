@@ -1,7 +1,10 @@
 from typing import Any, Optional, Tuple, List
+
 import pg8000
 import pg8000.dbapi
-from nexios.orm.connection import SyncCursor, SyncDatabaseConnection
+
+from nexios.orm.connection import SyncCursor, SyncDatabaseConnection, SyncQueryResult
+from nexios.orm.misc.row_to_tuple import convert_row, convert_rows
 
 
 class Pg8000Cursor(SyncCursor):
@@ -16,21 +19,25 @@ class Pg8000Cursor(SyncCursor):
     def rowcount(self) -> int:
         return self._cursor.rowcount
 
-    def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> Any:
-        return self._cursor.execute(sql, parameters)
+    def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> SyncQueryResult:
+        self._cursor.execute(sql, parameters)
+        return SyncQueryResult(self)
 
-    def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> Any:
-        return self._cursor.executemany(sql, seq_of_parameters)
+    def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> SyncQueryResult:
+        self._cursor.executemany(sql, seq_of_parameters)
+        return SyncQueryResult(self)
 
     def fetchone(self) -> Optional[Tuple[Any, ...]]:
         row = self._cursor.fetchone()
-        return tuple(row) if row else None
+        return convert_row(row)
 
     def fetchall(self) -> List[Tuple[Any, ...]]:
-        return [tuple(row) for row in self._cursor.fetchall()]
+        rows = self._cursor.fetchall()
+        return convert_rows(rows)
 
     def fetchmany(self, size: int = -1) -> List[Tuple[Any, ...]]:
-        return [tuple(row) for row in self._cursor.fetchmany(size)]
+        rows = self._cursor.fetchmany(size)
+        return convert_rows(rows)
 
 class Pg8000Connection(SyncDatabaseConnection):
     def __init__(self, connection: pg8000.dbapi.Connection):
@@ -55,7 +62,6 @@ class Pg8000Connection(SyncDatabaseConnection):
     
     @property
     def is_connection_open(self) -> bool:
-        # return not self._connection.closed
         try:
             stmt = "SELECT 1"
             cur = self._connection.cursor()

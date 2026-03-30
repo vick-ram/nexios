@@ -1,6 +1,9 @@
 from typing import Any, Tuple, List, Optional, LiteralString, cast
+
 import psycopg
-from nexios.orm.connection import SyncCursor, SyncDatabaseConnection
+
+from nexios.orm.connection import SyncCursor, SyncDatabaseConnection, SyncQueryResult
+from nexios.orm.misc.row_to_tuple import convert_row, convert_rows
 
 
 class PsycopgCursor(SyncCursor):
@@ -15,29 +18,27 @@ class PsycopgCursor(SyncCursor):
     def rowcount(self) -> int:
         return self._cursor.rowcount
     
-    def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> Any:
+    def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> SyncQueryResult:
         sql_to_execute = cast(LiteralString, sql)
-        return self._cursor.execute(sql_to_execute, parameters)
+        self._cursor.execute(sql_to_execute, parameters)
+        return SyncQueryResult(self)
     
-    def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> Any:
+    def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> SyncQueryResult:
         sql_to_execute = cast(LiteralString, sql)
-        return self._cursor.executemany(sql_to_execute, seq_of_parameters)
+        self._cursor.executemany(sql_to_execute, seq_of_parameters)
+        return SyncQueryResult(self)
     
     def fetchone(self) -> Optional[Tuple[Any, ...]]:
         row = self._cursor.fetchone()
-        return tuple(row) if row else None
+        return convert_row(row)
 
     def fetchall(self) -> List[Tuple[Any, ...]]:
         rows = self._cursor.fetchall()
-        return [tuple(row) for row in rows] if rows else []
+        return convert_rows(rows)
     
-    def fetchmany(self, size: int = -1) -> List[Tuple[Any, ...]]:
+    def fetchmany(self, size: int = 1) -> List[Tuple[Any, ...]]:
         rows = self._cursor.fetchmany(size)
-        return [tuple(row) for row in rows] if rows else []
-    
-    
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        self._cursor.close()
+        return convert_rows(rows)
 
 class PsycopgConnection(SyncDatabaseConnection):
     def __init__(self, connection: psycopg.Connection) -> None:

@@ -1,12 +1,13 @@
 from typing import Callable, Awaitable
+
+from nexios.orm.connection import SyncDatabaseConnection, AsyncDatabaseConnection
+from nexios.orm.pool.async_connection_pool import AsyncConnectionPool
 from nexios.orm.pool.base import (
     BaseConnectionPool,
     BaseAsyncConnectionPool,
     PoolConfig,
 )
-from nexios.orm.connection import SyncDatabaseConnection, AsyncDatabaseConnection
 from nexios.orm.pool.connection_pool import ConnectionPool
-from nexios.orm.pool.async_connection_pool import AsyncConnectionPool
 
 
 class ConnectionPoolFactory:

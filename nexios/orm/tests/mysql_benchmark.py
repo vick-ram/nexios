@@ -7,7 +7,7 @@ def run_benchmarks():
     """
     
     kwargs = {
-        'host': '127.0.0.1',
+        'host': 'localhost',
         'user': 'vickram',
         'password': 'Vickram9038',
         'database': 'test_db'

@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import Optional
+from typing import Optional, overload
 from typing_extensions import Tuple, Any
 from nexios.orm.manager import AsyncDatabaseManager, DatabaseManager
 from nexios.orm.connection import AsyncDatabaseConnection, SyncDatabaseConnection
@@ -37,7 +37,6 @@ class Engine:
 
         # Get detected dialect and driver from managers
         self.dialect = self.db_manager.db_type
-        print(f"Dialect called in engine: {self.dialect}")
         self.driver = self.db_manager.driver
 
         self.logger = getLogger(__name__)
@@ -49,6 +48,9 @@ class Engine:
     def return_connection(self, conn: SyncDatabaseConnection) -> None:
         """Return a sync connection to pool or close it"""
         self.db_manager.return_connection(conn)
+
+    def sync_cursor(self):
+        return self.db_manager.cursor()
 
     async def async_connect(self) -> AsyncDatabaseConnection:
         """Get an async connection from pool or create direct connection"""
@@ -70,6 +72,26 @@ class Engine:
     async def aclose(self) -> None:
         """Async close all connections and pools"""
         await self.async_db_manager.close()
+
+# with pool
+@overload
+def create_engine(
+        url: Optional[str] = None,
+        *,
+        echo: bool = False,
+        pool_size: int = 10,
+        min_pool_size: int = 1,
+        use_pool: bool = True,
+        **kwargs
+) -> Engine: ...
+
+@overload
+def create_engine(
+        url: Optional[str] = None,
+        *,
+        echo: bool = False,
+        **kwargs
+) -> Engine: ...
 
 def create_engine(
         url: Optional[str] = None,

@@ -1,5 +1,41 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing_extensions import Any, Optional, Tuple, List
+from typing import Any, Optional, Tuple, List
+
+
+class SyncQueryResult:
+    def __init__(self, cursor: SyncCursor) -> None:
+        self.cursor = cursor
+
+    def fetchone(self) -> Optional[Tuple[Any, ...]]:
+        return self.cursor.fetchone()
+
+    def fetchall(self) -> List[Tuple[Any, ...]]:
+        return self.cursor.fetchall()
+
+    def fetchmany(self, size: int = 1) -> List[Tuple[Any, ...]]:
+        return self.cursor.fetchmany(size=size)
+
+
+class AsyncQueryResult:
+    def __init__(self, cursor: AsyncCursor) -> None:
+        self.cursor = cursor
+
+    def __await__(self):
+        async def _await():
+            return self
+        return _await().__await__()
+
+    async def fetchone(self) -> Optional[Tuple[Any, ...]]:
+        return await self.cursor.fetchone()
+
+    async def fetchall(self) -> List[Tuple[Any, ...]]:
+        return await self.cursor.fetchall()
+
+    async def fetchmany(self, size: int = 1) -> List[Tuple[Any, ...]]:
+        return await self.cursor.fetchmany(size=size)
+
 
 class BaseCursor(ABC):
     @property
@@ -11,13 +47,12 @@ class BaseCursor(ABC):
     def rowcount(self) -> int: ...
 
 
-
 class SyncCursor(BaseCursor):
     @abstractmethod
-    def execute(self, sql: str, parameters: Tuple[Any, ...] = ...) -> Any: ...
+    def execute(self, sql: str, parameters: Tuple[Any, ...] = ...) -> SyncQueryResult: ...
 
     @abstractmethod
-    def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> Any: ...
+    def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> SyncQueryResult: ...
 
     @abstractmethod
     def fetchone(self) -> Optional[Tuple[Any, ...]]: ...
@@ -28,18 +63,12 @@ class SyncCursor(BaseCursor):
     @abstractmethod
     def fetchmany(self, size: int = ...) -> List[Tuple[Any, ...]]: ...
 
-    def __enter__(self) -> "SyncCursor":
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        pass
-
 class AsyncCursor(BaseCursor):
     @abstractmethod
-    async def execute(self, sql: str, parameters: Tuple[Any, ...] = ...) -> Any: ...
+    async def execute(self, sql: str, parameters: Tuple[Any, ...] = ...) -> AsyncQueryResult: ...
 
     @abstractmethod
-    async def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> Any: ...
+    async def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> AsyncQueryResult: ...
 
     @abstractmethod
     async def fetchone(self) -> Optional[Tuple[Any, ...]]: ...

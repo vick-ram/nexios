@@ -1,7 +1,10 @@
 from typing import Any, List, Optional, Tuple, cast, LiteralString
+
 import psycopg
 
-from nexios.orm.connection import AsyncCursor, AsyncDatabaseConnection
+from nexios.orm.connection import AsyncCursor, AsyncDatabaseConnection, AsyncQueryResult
+from nexios.orm.misc.row_to_tuple import convert_row, convert_rows
+
 
 class AsyncPsycopgCursor(AsyncCursor):
     def __init__(self, cursor: psycopg.AsyncCursor) -> None:
@@ -15,25 +18,27 @@ class AsyncPsycopgCursor(AsyncCursor):
     def rowcount(self) -> int:
         return self._cursor.rowcount
 
-    async def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> Any:
+    async def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> AsyncQueryResult:
         sql_to_execute = cast(LiteralString, sql)
-        return await self._cursor.execute(sql_to_execute, *parameters)
+        await self._cursor.execute(query=sql_to_execute, params=parameters)
+        return AsyncQueryResult(self)
 
-    async def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> Any:
+    async def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> AsyncQueryResult:
         sql_to_execute = cast(LiteralString, sql)
-        return await self._cursor.executemany(sql_to_execute, seq_of_parameters)
+        await self._cursor.executemany(sql_to_execute, seq_of_parameters)
+        return AsyncQueryResult(self)
 
     async def fetchone(self) -> Optional[Tuple[Any, ...]]:
         row = await self._cursor.fetchone()
-        return tuple(row) if row else None
+        return convert_row(row)
 
     async def fetchall(self) -> List[Tuple[Any, ...]]:
         rows = await self._cursor.fetchall()
-        return [tuple(row) for row in rows] if rows else []
+        return convert_rows(rows)
 
     async def fetchmany(self, size: int = -1) -> List[Tuple[Any, ...]]:
         rows = await self._cursor.fetchmany(size)
-        return [tuple(row) for row in rows] if rows else []
+        return convert_rows(rows)
 
 class AsyncPsycopgConnection(AsyncDatabaseConnection):
     def __init__(self, connection: psycopg.AsyncConnection) -> None:

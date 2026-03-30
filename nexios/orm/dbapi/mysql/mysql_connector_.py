@@ -1,12 +1,13 @@
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, List, Optional, Tuple
 
-import mysql
 import mysql.connector
 import mysql.connector.cursor
 
-from nexios.orm.connection import SyncCursor, SyncDatabaseConnection
+from nexios.orm.connection import SyncCursor, SyncDatabaseConnection, SyncQueryResult
+from nexios.orm.misc.row_to_tuple import convert_row, convert_rows
 
-class MySQLonnectorCursor:
+
+class MySQLConnectorCursor(SyncCursor):
     def __init__(self, cursor: mysql.connector.cursor.MySQLCursor) -> None:
         self._cursor = cursor
 
@@ -18,25 +19,24 @@ class MySQLonnectorCursor:
     def rowcount(self) -> int:
         return self._cursor.rowcount
     
-    def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> Any:
-        return self._cursor.execute(sql, parameters)
+    def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> SyncQueryResult:
+        self._cursor.execute(sql, parameters)
+        return SyncQueryResult(self)
     
-    def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> Any:
-        return self._cursor.executemany(sql, seq_of_parameters)
+    def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> SyncQueryResult:
+        self._cursor.executemany(sql, seq_of_parameters)
+        return SyncQueryResult(self)
     
     def fetchone(self) -> Optional[Tuple[Any, ...]]:
         row = self._cursor.fetchone()
-        if row is None:
-            return None
-        return tuple(row)
-    
+        return  convert_row(row)
     def fetchall(self) -> List[Tuple[Any, ...]]:
         rows = self._cursor.fetchall()
-        return [tuple(row) for row in rows]
+        return convert_rows(rows)
     
     def fetchmany(self, size: int = 1) -> List[Tuple[Any, ...]]:
         rows = self._cursor.fetchmany(size)
-        return [tuple(row) for row in rows]
+        return convert_rows(rows)
 
 class MySQLConnectorConnection(SyncDatabaseConnection):
     def __init__(self, connection: mysql.connector.connection.MySQLConnection) -> None:
@@ -44,7 +44,10 @@ class MySQLConnectorConnection(SyncDatabaseConnection):
 
     def cursor(self) -> SyncCursor:
         cursor = self._connection.cursor()
-        return MySQLonnectorCursor(cursor) # type: ignore
+        return MySQLConnectorCursor(cursor) # type: ignore
+
+    def begin(self):
+        self._connection
 
     def commit(self) -> None:
         self._connection.commit()

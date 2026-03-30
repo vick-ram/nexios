@@ -1,8 +1,13 @@
+from __future__ import annotations
+
+import importlib
+import importlib.util
+import inspect
+import uuid
 from abc import ABC, abstractmethod
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from enum import Enum, StrEnum
-import inspect
 from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 from pathlib import Path
 from typing import (
@@ -16,29 +21,38 @@ from typing import (
     Union,
     get_args,
     get_origin,
+    Callable,
 )
 from urllib.parse import urlparse
 from uuid import UUID
 
-from pydantic import EmailStr
-from nexios.orm.model import BaseModel, ColumnInfo
+from pydantic_core import PydanticUndefined as Undefined
+
+from nexios.orm.model import InstanceOrType, NexiosModel, FieldInfo
+from nexios.orm.query.expressions import ColumnExpression
 
 
 class PostgreSQLDriver(StrEnum):
     ASYNCPG = "asyncpg"
     PG8000 = "pg8000"
     PSYCOPG3 = "psycopg3"
+    PSYCOPG3_ASYNC = "psycopg3_async"
+    AIOPG = "aiopg"
 
 
 class MySQLDriver(StrEnum):
     MYSQL_CONNECTOR = "mysql-connector"
     PYMySQL = "pymysql"
     AIOMYSQL = "aiomysql"
+    ASYNCMY = "asyncmy"
+    MARIADB = "mariadb"
+    MYSQL_CLIENT = "mysqlclient"
 
 
 class SQLiteDriver(StrEnum):
     AIOSQLITE = "aiosqlite"
     SQLITE3 = "sqlite3"
+    APSW = "apsw"
 
 
 class Dialect(ABC):
@@ -58,8 +72,37 @@ class Dialect(ABC):
     @abstractmethod
     def quote_identifier(self, identifier: str) -> str: ...
 
+    @abstractmethod
+    def format_datetime_default(self, dt: datetime) -> str: ...
+
+    @abstractmethod
+    def current_timestamp(self) -> str: ...
+
+    @abstractmethod
+    def current_date(self) -> str: ...
+
+    @abstractmethod
+    def generate_uuid(self) -> str: ...
+
+    @abstractmethod
+    def get_limit_offset_sql(
+        self, limit: Optional[int], offset: Optional[int]
+    ) -> str: ...
+
 
 class SQLiteDialect(Dialect):
+    def current_timestamp(self) -> str:
+        return "(DATETIME('now'))"
+
+    def current_date(self) -> str:
+        return "(DATE('now'))"
+
+    def generate_uuid(self) -> str:
+        return f"'{uuid.uuid4()}'"
+
+    def format_datetime_default(self, dt: datetime) -> str:
+        return f"'{dt.isoformat()}'"
+
     def get_type_mapping(
         self,
         max_digits: Optional[int] = None,
@@ -90,8 +133,30 @@ class SQLiteDialect(Dialect):
     def quote_identifier(self, identifier: str) -> str:
         return f'"{identifier}"'
 
+    def get_limit_offset_sql(self, limit: int | None, offset: int | None) -> str:
+        if limit is not None and offset is not None:
+            return f"LIMIT {limit} OFFSET {offset}"
+        elif limit is not None:
+            return f"LIMIT {limit}"
+        elif offset is not None:
+            return f"LIMIT -1 OFFSET {offset}"
+        else:
+            return ""
+
 
 class PostgreSQLDialect(Dialect):
+    def current_timestamp(self) -> str:
+        return "CURRENT_TIMESTAMP"
+
+    def format_datetime_default(self, dt: datetime) -> str:
+        return f"'{dt.isoformat()}'::TIMESTAMP"
+
+    def current_date(self) -> str:
+        return "CURRENT_DATE"
+
+    def generate_uuid(self) -> str:
+        return "gen_random_uuid()"
+
     def get_type_mapping(
         self,
         max_digits: Optional[int] = None,
@@ -130,8 +195,28 @@ class PostgreSQLDialect(Dialect):
     def quote_identifier(self, identifier: str) -> str:
         return f'"{identifier}"'
 
+    def get_limit_offset_sql(self, limit: int | None, offset: int | None) -> str:
+        parts = []
+        if limit is not None:
+            parts.append(f"LIMIT {limit}")
+        if offset is not None:
+            parts.append(f"OFFSET {offset}")
+        return " ".join(parts)
+
 
 class MySQLDialect(Dialect):
+    def format_datetime_default(self, dt: datetime) -> str:
+        return f"'{dt.strftime('%Y-%m-%d %H:%M:%S')}'"
+
+    def current_timestamp(self) -> str:
+        return "CURRENT_TIMESTAMP"
+
+    def current_date(self) -> str:
+        return "CURRENT()"
+
+    def generate_uuid(self) -> str:
+        return "UUID()"
+
     def get_type_mapping(
         self,
         max_digits: Optional[int] = None,
@@ -150,8 +235,9 @@ class MySQLDialect(Dialect):
                     return "LONGTEXT"
             else:
                 return "'TEXT"
+
         string_type = resolve_str()
-        
+
         return {
             int: "BIGINT",
             str: string_type,
@@ -180,180 +266,369 @@ class MySQLDialect(Dialect):
     def quote_identifier(self, identifier: str) -> str:
         return f"`{identifier}`"
 
+    def get_limit_offset_sql(self, limit: int | None, offset: int | None) -> str:
+        if limit is None and offset is None:
+            return ""
+
+        if limit is not None and offset is not None:
+            return f"LIMIT {limit} OFFSET {offset}"
+        elif limit is not None:
+            return f"LIMIT {limit}"
+        elif offset is not None:
+            # Only offset - MySQL requires LIMIT
+            # Use a very large number as "unlimited"
+            # 18446744073709551615 is max for BIGINT UNSIGNED in MySQL
+            return f"LIMIT 18446744073709551615 OFFSET {offset}"
+
+        return ""
+
+
+def is_true(attr_value):
+    return attr_value is not Undefined and bool(attr_value)
+
+def _normalize_driver(driver: Any):
+    if isinstance(driver, StrEnum):
+        return driver
+
+    if isinstance(driver, str):
+        low = driver.lower()
+        for enum in (PostgreSQLDriver, MySQLDriver, SQLiteDriver):
+            for member in enum:
+                if low in (member.value, member.name.lower()):
+                    return member
+
+    return driver
+
+def get_param_placeholder(
+    driver: str, index: int = 1, name: Optional[str] = None
+) -> str:
+    """
+    Returns the correct placeholder syntax based on the driver's paramstyle.
+    Args:
+        driver: Database driver (e.g., 'postgres', 'sqlite')
+        index: The 1-based position for numeric/dollar styles ($1, :1)
+        name: Named parameter name (optional)
+    Returns:
+        Placeholder syntax based on the driver's paramstyle
+    """
+    if isinstance(driver, PostgreSQLDriver):
+        if driver == PostgreSQLDriver.ASYNCPG:
+            if name:
+                raise ValueError("asyncpg doesn't support named parameters")
+            if index is None:
+                raise ValueError(f"{driver.value} requires index for positional params")
+            return f"${index}"
+        elif driver == PostgreSQLDriver.PG8000:
+            if name:
+                return f":{name}"
+            return "%s"
+        elif driver == PostgreSQLDriver.PSYCOPG3:
+            if name:
+                return f"%({name})s"
+            return "%s"
+        else:
+            return "%s"
+    elif isinstance(driver, MySQLDriver):
+        if name:
+            return f"%({name})s"
+        return "%s"
+    elif isinstance(driver, SQLiteDriver):
+        if name:
+            return f":{name}"
+        return "?"
+    else:
+        return "?"
+
+
+def generate_placeholders(driver: str, count, start_index: int = 1):
+    driver = _normalize_driver(driver)
+    placeholders = []
+    for i in range(count):
+        placeholders.append(get_param_placeholder(driver=driver, index=start_index + i))
+    return ", ".join(placeholders)
+
 
 class DDLGenerator:
     """Generate DDL statements from ORM model"""
 
-    def __init__(self, dialect: Dialect) -> None:
+    def __init__(self, dialect: Dialect, driver: str) -> None:
         self.dialect = dialect or SQLiteDialect()
+        self.driver = _normalize_driver(driver or SQLiteDriver.SQLITE3)
 
-    def create_table(self, model_class: Type[BaseModel]) -> str:
+    def _get_tablename(self, model_class: InstanceOrType[NexiosModel]) -> str:
+        if not isinstance(model_class, type):
+            model_class = model_class.__class__
+
+        tbname = getattr(model_class, "__tablename__", None)
+
+        if tbname is None and hasattr(model_class, "__tablename__"):
+            tbname = model_class.__tablename__
+
+        return tbname if tbname else ""
+
+    def _get_primary_key(self, model_class: NexiosModel) -> Any:
+        return model_class.get_primary_key()
+
+    def create_table(self, model_class: Type[NexiosModel]) -> str:
         """Generate CREATE TABLE statements"""
-        table_name = model_class.__orm_config__.table_name
+        table_name = self._get_tablename(model_class)
         columns = self._get_column_definitions(model_class)
         constraints = self._get_table_constraints(model_class)
 
         column_defs = ",\n    ".join(columns + constraints)
 
-        return f"CREATE TABLE IF NOT EXISTS {self.dialect.quote_identifier(table_name)} (\n    {column_defs}\n);"  # type: ignore
+        return f"CREATE TABLE IF NOT EXISTS {self.dialect.quote_identifier(table_name)} (\n    {column_defs}\n);"
 
-    def delete(self, model_class: Type[BaseModel]) -> str:
+    def delete(self, model_class: NexiosModel) -> tuple[str, tuple[Any, ...]]:
         """Delete statement
         model_class: Instance of the BaseModel
         name: is any field value that matches the condition
         """
-        from nexios.orm.query import ColumnExpression
+        from nexios.orm.query.expressions import ColumnExpression, BinaryExpression
 
-        tablename = model_class.__orm_config__.table_name
-        assert tablename is not None
-        assert model_class.__orm_config__.primary_key is not None
-        condition = ColumnExpression(
-            model_class, model_class.__orm_config__.primary_key
-        )
-        sql = (
-            f"DELETE FROM {self.dialect.quote_identifier(tablename)} WHERE {condition}"
-        )
+        tablename = self._get_tablename(model_class)
+        primary_key = self._get_primary_key(model_class)
 
-        return sql
+        if isinstance(primary_key, ColumnExpression):
+            primary_key_field = primary_key.field_name
+        else:
+            primary_key_field = primary_key
 
-    def upsert(self, model_class: Type[BaseModel]) -> Tuple[str, tuple]:
+        primary_key_value = getattr(model_class, primary_key_field, None)
+
+        if primary_key_value is None:
+            raise ValueError(
+                f"Cannot delete {model_class.__name__} with null primary key"
+            )
+
+        col_expr = ColumnExpression(model_class.__class__, primary_key_field)
+        condition = BinaryExpression(col_expr, "=", primary_key_value)
+        sql_condition, params = condition.to_sql(get_param_placeholder(self.driver))
+        sql = f"DELETE FROM {self.dialect.quote_identifier(tablename)} WHERE {sql_condition}"
+        return sql, tuple(params)
+
+    def upsert(self, model_class: NexiosModel) -> Tuple[str, tuple]:
         """Insert or update statement"""
-        insert_sql, params = self._insert(model_class)
-        sql = insert_sql + " " + self._update(model_class)
+        insert_sql, params, returning_clause = self._insert(model_class)
+        update_clause = self._update(model_class)
+
+        if update_clause:
+            sql = insert_sql + " " + update_clause + returning_clause
+        else:
+            sql = insert_sql + returning_clause
+
         return sql, params
 
-    def drop_table(self, model_class: Type[BaseModel]) -> str:
+    def drop_table(self, model_class: Type[NexiosModel]) -> str:
         """Generate DROP TABLE statement"""
-        table_name = model_class.__orm_config__.table_name
-        return f"DROP TABLE IF EXISTS {self.dialect.quote_identifier(table_name)};"  # type: ignore
+        table_name = self._get_tablename(model_class)
+        return f"DROP TABLE IF EXISTS {self.dialect.quote_identifier(table_name)};"
 
-    def create_indexes(self, model_class: Type[BaseModel]) -> List[str]:
+    def create_indexes(self, model_class: Type[NexiosModel]) -> List[str]:
         """Generate CREATE INDEX statements"""
         indexes = []
-        table_name = model_class.__orm_config__.table_name
+        table_name = self._get_tablename(model_class)
 
-        for field_name, column_info in model_class.get_fields().items():
-            if column_info.index and not column_info.unique:
+        def _get_search_sql() -> str:
+            """MySQL uses CREATE FULLTEXT INDEX, postgres appends GIN and SQLite requires creation of virtual table"""
+            return f"USING GIN(to_tsvector('english', {table_name}))"
+
+        for field_name, field_info in model_class.get_fields().items():
+            index = getattr(field_info, "index", Undefined)
+
+            if isinstance(index, ColumnExpression):
+                index_field = index.field_name
+            else:
+                index_field = index
+
+            if is_true(index_field) and not field_info.unique:
                 index_name = f"idx_{table_name}_{field_name}"
                 indexes.append(
                     f"CREATE INDEX {self.dialect.quote_identifier(index_name)} "
-                    f"ON {self.dialect.quote_identifier(table_name)} "  # type: ignore
+                    f"ON {self.dialect.quote_identifier(table_name)} "
                     f"({self.dialect.quote_identifier(field_name)})"
                 )
 
-        for i, index_def in enumerate(model_class.__orm_config__.indexes):
-            columns = ", ".join(
-                self.dialect.quote_identifier(col) for col in index_def["columns"]
-            )
-            index_name = index_def.get("name", f"idx_{table_name}_{i}")
-            unique = "UNIQUE " if index_def.get("unique", False) else ""
-            indexes.append(
-                f"CREATE {unique}INDEX {self.dialect.quote_identifier(index_name)} "
-                f"ON {self.dialect.quote_identifier(table_name)} ({columns});"  # type: ignore
-            )
-
         return indexes
 
-    def _get_param_placeholder(self) -> str:
-        placeholder = ""
+    def _insert(self, model_instance: NexiosModel) -> tuple[str, tuple[Any, ...], str]:
+        """Generate INSERT statement"""
+        from nexios.orm.query.expressions import ColumnExpression
 
-        if isinstance(self.dialect, PostgreSQLDialect):
-            placeholder = "%s"
-        elif isinstance(self.dialect, MySQLDialect):
-            placeholder = "%s"
-        else:
-            placeholder = "?"
-
-        return placeholder
-
-    def _insert(self, model_class: Type[BaseModel]) -> Tuple[str, tuple]:
+        model_class = model_instance.__class__
         fields_to_save: Dict[str, Any] = {}
-        tablename = model_class.__orm_config__.table_name
-        placeholder = self._get_param_placeholder()
-        fields = model_class.get_fields()
+        tablename = self._get_tablename(model_class)
+        fields = model_instance.get_fields()
+
+        primary_key = self._get_primary_key(model_instance)
+        if isinstance(primary_key, ColumnExpression):
+            primary_key_field = primary_key.field_name
+        else:
+            primary_key_field = primary_key
 
         for field_name, field_info in fields.items():
-            value = getattr(model_class, field_name, None)
+            value = getattr(model_instance, field_name, None)
+
+            auto_increment = getattr(field_info, "auto_increment", False)
+            is_primary_key = is_true(primary_key)
+
+            if is_primary_key and auto_increment:
+                if value is None or isinstance(value, int) and value <= 0:
+                    continue  # Let database generate the auto_increment
+
+                else:
+                    fields_to_save[field_name] = value
+                    continue
+
             if value is not None:
                 fields_to_save[field_name] = value
 
         field_names = list(fields_to_save.keys())
-        placeholders = ", ".join(len(field_names) * [placeholder])
+        field_count = len(field_names)
+
+        placeholders = generate_placeholders(self.driver, field_count, 1)
         field_names_str = ", ".join(field_names)
-        assert tablename is not None
-        sql = f"INSERT INTO {self.dialect.quote_identifier(tablename)} ({field_names_str}) VALUES ({placeholders});"
-        params = tuple(getattr(model_class, fname) for fname in field_names)
+        sql = f"INSERT INTO {self.dialect.quote_identifier(tablename)} ({field_names_str}) VALUES ({placeholders})"
 
-        return sql, params
+        field_info = fields.get(primary_key_field)
+        auto_increment = getattr(field_info, "auto_increment", False)
 
-    def _update(self, model_class: Type[BaseModel]):
-        # To be fixed: not a complete implementation
-        fields = model_class.get_fields()
-        update_sql = ""
+        returning_clause = ""
+
+        if auto_increment and isinstance(self.dialect, PostgreSQLDialect):
+            returning_clause = " RETURNING " + self.dialect.quote_identifier(
+                primary_key_field
+            )
+
+        params = tuple(getattr(model_instance, fname) for fname in field_names)
+
+        return sql, params, returning_clause
+
+    def _update(self, model_instance: NexiosModel):
+        fields = model_instance.get_fields()
+        primary_key = self._get_primary_key(model_instance)
+
         fields_to_update = []
 
-        for field_name, field_info in fields.items():
-            if not field_info.primary_key:
+        for field_name in fields.keys():
+            if isinstance(primary_key, ColumnExpression):
+                is_pk = field_name == primary_key.field_name
+            else:
+                is_pk = field_name == primary_key
+
+            # is_primary_key = is_true(primary_key)
+            if not is_pk:
                 fields_to_update.append(field_name)
 
-        for field in fields_to_update:
-            if isinstance(self.dialect, PostgreSQLDialect):
-                update_sql = f"ON CONFLICT ({model_class.__orm_config__.primary_key}) DO UPDATE SET {field}"
-            elif isinstance(self.dialect, MySQLDialect):
-                update_sql = f"ON DUPLICATE KEY UPDATE {field} = VALUES({field})"
-            else:
-                update_sql = f"ON CONFLICT ({model_class.__orm_config__.primary_key}) DO UPDATE SET {field} = excluded.{field}"
-        return update_sql
+        if isinstance(self.dialect, PostgreSQLDialect):
+            update_parts = []
+            for field in fields_to_update:
+                update_parts.append(f"{field} = excluded.{field}")
+            if update_parts:
+                return f"ON CONFLICT ({primary_key}) DO UPDATE SET {','.join(update_parts)}"
+            return ""
 
-    def _get_column_definitions(self, model_class: Type[BaseModel]) -> List[str]:
+        elif isinstance(self.dialect, MySQLDialect):
+            update_parts = []
+
+            for field in fields_to_update:
+                update_parts.append(f"{field} = VALUES({field})")
+
+            if update_parts:
+                return f"ON DUPLICATE KEY UPDATE {', '.join(update_parts)}"
+
+            return ""
+
+        else:
+            # SQLite: field = excluded.field (same as PostgreSQL syntax)
+            update_parts = []
+            for field in fields_to_update:
+                update_parts.append(f"{field} = excluded.{field}")
+            if update_parts:
+                return f"ON CONFLICT ({primary_key}) DO UPDATE SET {', '.join(update_parts)}"
+            return ""
+
+        # for field in fields_to_update:
+        #     if isinstance(self.dialect, PostgreSQLDialect):
+        #         update_sql = f"ON CONFLICT ({primary_key}) DO UPDATE SET {field}"
+        #     elif isinstance(self.dialect, MySQLDialect):
+        #         update_sql = f"ON DUPLICATE KEY UPDATE {field} = VALUES({field})"
+        #     else:
+        #         update_sql = f"ON CONFLICT ({primary_key}) DO UPDATE SET {field} = excluded.{field}"
+        # return update_sql
+
+    def _get_column_definitions(self, model_class: Type[NexiosModel]) -> List[str]:
         """Generate column definitions for CREATE TABLE"""
         columns = []
         fields = model_class.get_fields()
 
-        for field_name, column_info in fields.items():
+        for field_name, field_info in fields.items():
             column_def = self._build_column_definition(
-                field_name, column_info, model_class
+                field_name, field_info, model_class
             )
             columns.append(column_def)
 
         return columns
 
     def _build_column_definition(
-        self, field_name: str, column_info: ColumnInfo, model_class: Type[BaseModel]
+        self, field_name: str, field_info: FieldInfo, model_class: Type[NexiosModel]
     ) -> str:
         """Build a single column definition"""
+        max_digits = getattr(field_info, "max_length", 255)
+        precision = getattr(field_info, "precision", 0)  # precision is not in FieldInfo
+        scale = getattr(field_info, "decimal_places", 1)
         parts = [self.dialect.quote_identifier(field_name)]
 
         field_type = self._get_field_type(model_class, field_name)
-        db_type = column_info.db_type or self._map_python_type(field_type)
+        db_type = self._map_python_type(field_type, max_digits, precision, scale)
 
         parts.append(db_type)
 
-        if column_info.primary_key:
-            parts.append("PRIMARY KEY")
-            if column_info.auto_increment:
-                if db_type.upper() in (
-                    "INTEGER",
-                    "INT",
-                    "BIGINT",
-                    "SMALLINT",
-                    "SERIAL",
-                    "BIGSERIAL",
-                ):
-                    parts.append(self.dialect.auto_increment_keyword())
-        elif not column_info.nullable:
-            parts.append("NOT NULL")
+        is_primary_key = is_true(getattr(field_info, "primary_key", Undefined))
 
-        if column_info.unique and not column_info.primary_key:
+        if is_primary_key:
+            parts.append("PRIMARY KEY")
+
+        if field_info.auto_increment and field_info.primary_key:
+            if db_type.upper() in ("INTEGER", "INT", "BIGINT", "SMALLINT"):
+                parts.append(self.dialect.auto_increment_keyword())
+            elif db_type.upper() in ("SERIAL", "BIGSERIAL"):
+                # serial types are already auto-incremented in postgres
+                pass
+
+        nullable = getattr(field_info, "nullable", Undefined)
+        default = getattr(field_info, "default", Undefined)
+        default_factory = getattr(field_info, "default_factory", None)
+        auto_inc = is_true(getattr(field_info, "auto_increment", False))
+
+        if is_primary_key:
+            parts.append("NOT NULL")
+        elif nullable is True:
+            pass
+        elif nullable is False:
+            parts.append("NOT NULL")
+        elif nullable is Undefined:
+            has_default = default is not Undefined or default_factory is not None
+            if not has_default and not auto_inc:
+                parts.append("NOT NULL")
+
+        unique = getattr(field_info, "unique", Undefined)
+        if is_true(unique) and not is_primary_key:
             parts.append("UNIQUE")
 
         default_value = self._get_default_value(model_class, field_name)
-        if default_value is not None:
+        has_default = default is not Undefined or default_factory is not None
+        if (
+            default_value is not None
+            and not is_primary_key
+            and not auto_inc
+            and has_default
+        ):
             parts.append(f"DEFAULT {default_value}")
 
         return " ".join(parts)
 
-    def _get_field_type(self, model_class: Type[BaseModel], field_name: str) -> type:
+    def _get_field_type(self, model_class: Type[NexiosModel], field_name: str) -> type:
         """Get the python type for a field"""
         annotation = model_class.__annotations__.get(field_name, str)
 
@@ -375,9 +650,15 @@ class DDLGenerator:
 
         return annotation
 
-    def _map_python_type(self, python_type: type) -> str:
+    def _map_python_type(
+        self,
+        python_type: type,
+        max_digits: Optional[int] = None,
+        precision: Optional[int] = None,
+        scale: Optional[int] = None,
+    ) -> str:
         """Map python type to database type"""
-        type_mapping = self.dialect.get_type_mapping()
+        type_mapping = self.dialect.get_type_mapping(max_digits, precision, scale)
 
         if python_type in type_mapping:
             return type_mapping[python_type]
@@ -389,85 +670,254 @@ class DDLGenerator:
         return type_mapping.get(object, "TEXT")
 
     def _get_default_value(
-        self, model_class: Type[BaseModel], field_name: str
+        self, model_class: Type[NexiosModel], field_name: str
     ) -> Optional[str]:
         """Get SQL default value for a field"""
-        # field = model_class.__orm_config__.fields.get(field_name)
         field = model_class.get_fields().get(field_name)
 
         if not field:
             return None
 
-        default = field.default
+        default = getattr(field, "default", Undefined)
+        default_factory = getattr(field, "default_factory", None)
 
-        if default is None:
-            return None
+        if default is not Undefined:
+            return self._format_default_value(default)
+        elif default_factory is not None:
+            return self._format_default_factory(default_factory)
+        return None
 
-        if callable(default):
-            return None
+    def _format_default_value(self, value: Any):
+        if value is None:
+            return "NULL"
 
-        if isinstance(default, str):
-            return f"'{default}'"
+        if isinstance(value, str):
+            escaped = value.replace("'", "''")
+            return f"'{escaped}'"
 
-        if isinstance(default, Enum):
-            return f"'{default.value}'"
+        if isinstance(value, Enum):
+            return f"'{value.value}'"
 
-        if isinstance(default, bool):
-            return "TRUE" if default else "FALSE"
+        if isinstance(value, bool):
+            return "TRUE" if value else "FALSE"
 
-        if isinstance(default, (dict, list)):
+        if isinstance(value, (dict, list)):
             import json
 
-            return f"'{json.dumps(default)}'"
+            return f"'{json.dumps(value)}'"
 
-        if isinstance(default, (int, float, Decimal)):
-            return str(default)
+        if isinstance(value, (int, float, Decimal)):
+            return str(value)
 
-        if isinstance(default, UUID):
-            return f"'{default}'"
+        if isinstance(value, UUID):
+            return f"'{value}'"
 
-        if isinstance(default, (datetime, date, time)):
-            return f"'{default.isoformat()}'"
-        return f"'{str(default)}'"
+        if isinstance(value, (datetime, date, time)):
+            if isinstance(value, datetime):
+                return self.dialect.format_datetime_default(value)
+            elif isinstance(value, date):
+                return self.dialect.current_date()
+            elif isinstance(value, time):
+                return self.dialect.current_timestamp()
+        escaped = str(value).replace("'", "''")
+        return f"'{escaped}'"
 
-    def _get_table_constraints(self, model_class: Type[BaseModel]) -> List[str]:
-        """Generate table-level constraints"""
-        constraints = []
+    def _format_default_factory(self, factory: Callable):
+        def utcnow():
+            return datetime.now(timezone.utc)
 
-        for i, unique_cols in enumerate(model_class.__orm_config__.unique_constraints):
-            columns = ", ".join(
-                self.dialect.quote_identifier(col) for col in unique_cols
-            )
-            constraints.append(
-                f"CONSTRAINT uk_{model_class.__orm_config__.table_name}_{i} UNIQUE ({columns})"
-            )
-        constraints.extend(self._get_foreign_key_constraints(model_class))
-        return constraints
+        if factory is datetime.now or factory is utcnow:
+            return self.dialect.current_timestamp()
+        if factory is date.today:
+            return self.dialect.current_date()
+        if factory is UUID:
+            return self.dialect.generate_uuid()
+        try:
+            result = factory()
+            return self._format_default_value(result)
+        except TypeError:
+            return "NULL"
 
-    def _get_foreign_key_constraints(self, model_class: Type[BaseModel]) -> List[str]:
-        """Generate FOREIGN KEY constraints"""
-        constraints = []
+    # def _get_table_constraints(self, model_class: Type[NexiosModel]) -> List[str]:
+    #     """Generate FOREIGN KEY constraints"""
+    #     constraints: List[str] = []
+    #     model_name = model_class.__name__.lower()
+    #
+    #     for rel_info in model_class.get_relationships().values():
+    #         if not isinstance(rel_info, RelationshipInfo):
+    #             continue
+    #
+    #         if not rel_info.foreign_key or not rel_info.related_model_name:
+    #             continue
+    #
+    #         if rel_info.relationship_type in [RelationshipType.ONE_TO_MANY, RelationshipType.ONE_TO_ONE]:
+    #             continue
+    #
+    #         foreign_key_str = rel_info.foreign_key
+    #         if '.' in foreign_key_str:
+    #             parts = foreign_key_str.split('.')
+    #             related_table, related_column = parts[0].lower(), parts[1]
+    #             fk_column_name = f"{related_table}_id"
+    #             constraint_name = f"fk_{model_name}_{rel_info.field_name}"
+    #             ref_table_name = f"{rel_info.related_model_name.lower()}s"
+    #
+    #             sql_parts = [
+    #                 f"CONSTRAINT {constraint_name}",
+    #                 f"FOREIGN KEY ({self.dialect.quote_identifier(fk_column_name)})",
+    #                 f"REFERENCES {self.dialect.quote_identifier(ref_table_name)}(id)",
+    #             ]
+    #             if rel_info.ondelete:
+    #                 sql_parts.append(f"ON DELETE {rel_info.ondelete}")
+    #             if rel_info.onupdate:
+    #                 sql_parts.append(f"ON UPDATE {rel_info.onupdate}")
+    #             if isinstance(self.dialect, PostgreSQLDialect):
+    #                 if rel_info.deferrable is not None:
+    #                     sql_parts.append("DEFERRABLE" if rel_info.deferrable else "NOT DEFERRABLE")
+    #                 if rel_info.initially_deferred is not None:
+    #                     sql_parts.append(
+    #                         "INITIALLY DEFERRED"
+    #                         if rel_info.initially_deferred
+    #                         else "INITIALLY IMMEDIATE"
+    #                     )
+    #             constraints.append(" ".join(sql_parts))
+    #     return constraints
+
+    def _get_table_constraints(self, model_class: Type[NexiosModel]) -> List[str]:
+        """Generate FOREIGN KEY constraints from FIELD definitions only"""
+        constraints: List[str] = []
+
+        # Get all fields of this model
         fields = model_class.get_fields()
 
-        for field_name, column_info in fields.items():
-            if column_info.foreign_key:
-                fk_parts = column_info.foreign_key.split(".")
-                ref_table = fk_parts[0]
-                ref_column = fk_parts[1] if len(fk_parts) > 1 else "id"
+        for field_name, field_info in fields.items():
+            # Check if this field has a foreign key attribute
+            foreign_key = getattr(field_info, "foreign_key", Undefined)
+            if foreign_key is Undefined or not foreign_key:
+                continue  # This field is not a foreign key
 
-                constraint_name = (
-                    f"fk_{model_class.__orm_config__.table_name}_{field_name}"
-                )
-                constraints.append(
-                    f"CONSTRAINT {constraint_name} "
-                    f"FOREIGN KEY ({self.dialect.quote_identifier(field_name)}) "
-                    f"REFERENCES {self.dialect.quote_identifier(ref_table)} ({self.dialect.quote_identifier(ref_column)})"
-                )
+            print(
+                f"DEBUG: Generating FK constraint for {model_class.__name__}.{field_name} -> {foreign_key}"
+            )
+
+            # Parse foreign key reference (e.g., "User.id" or "users.id")
+            if "." not in foreign_key:  # type: ignore
+                print(f"ERROR: Invalid foreign key format: {foreign_key}")
+                continue
+
+            ref_model_name, ref_column = foreign_key.split(".")  # type: ignore
+            ref_model_name = ref_model_name.lower()  # "User" -> "user"
+            ref_column = ref_column.lower()  # "id"
+
+            # Get the referenced table name
+            # We need to map model name to table name
+            ref_table_name = self._model_name_to_table_name(ref_model_name, model_class)
+
+            if not ref_table_name:
+                # Fallback: simple pluralization
+                ref_table_name = f"{ref_model_name}s"
+                print(f"WARNING: Using fallback table name: {ref_table_name}")
+
+            # Generate constraint
+            constraint_name = f"fk_{model_class.__tablename__}_{field_name}"
+
+            sql_parts = [
+                f"CONSTRAINT {self.dialect.quote_identifier(constraint_name)}",
+                f"FOREIGN KEY ({self.dialect.quote_identifier(field_name)})",
+                f"REFERENCES {self.dialect.quote_identifier(ref_table_name)}({self.dialect.quote_identifier(ref_column)})",
+            ]
+
+            # Add ON DELETE/UPDATE if specified
+            ondelete = getattr(field_info, "ondelete", Undefined)
+            if ondelete is not Undefined and ondelete:
+                sql_parts.append(f"ON DELETE {ondelete}")
+
+            onupdate = getattr(field_info, "onupdate", Undefined)
+            if onupdate is not Undefined and onupdate:
+                sql_parts.append(f"ON UPDATE {onupdate}")
+
+            constraints.append(" ".join(sql_parts))
+
         return constraints
+
+    def _model_name_to_table_name(
+        self, model_name_lower: str, source_model: Type[NexiosModel]
+    ) -> Optional[str]:
+        """Convert a model name to its table name"""
+        # Look in the model registry
+        if hasattr(source_model, "__registry__"):
+            registry = source_model.__registry__
+            for model_cls in registry.values():
+                if model_cls.__name__.lower() == model_name_lower:
+                    return model_cls.__tablename__
+
+        # Also check if we have the model directly
+        if hasattr(source_model, "__relationships__"):
+            for rel_info in source_model.__relationships__.values():
+                if (
+                    rel_info.related_model_name
+                    and rel_info.related_model_name.lower() == model_name_lower
+                ):
+                    # Try to get the actual model
+                    try:
+                        model_cls = source_model.__registry__.get(
+                            rel_info.related_model_name
+                        )
+                        # model_cls = registry.get(rel_info.related_model_name)
+                        if model_cls:
+                            return model_cls.__tablename__
+                    except Exception:
+                        pass
+
+        return None
+
+
+DRIVER_REGISTRY = {
+    "postgresql": {
+        True: [
+            PostgreSQLDriver.PSYCOPG3,
+            PostgreSQLDriver.ASYNCPG,
+            PostgreSQLDriver.AIOPG,
+        ],
+        False: [PostgreSQLDriver.PSYCOPG3, PostgreSQLDriver.PG8000],
+    },
+    "mysql": {
+        True: [MySQLDriver.AIOMYSQL, MySQLDriver.ASYNCMY],
+        False: [
+            MySQLDriver.MYSQL_CONNECTOR,
+            MySQLDriver.PYMySQL,
+            MySQLDriver.MYSQL_CLIENT,
+            MySQLDriver.MARIADB,
+        ],
+    },
+    "sqlite": {
+        True: [SQLiteDriver.AIOSQLITE],
+        False: [SQLiteDriver.SQLITE3, SQLiteDriver.APSW],
+    },
+}
+
+DIALECT_MAP = {
+    "postgresql": PostgreSQLDialect,
+    "postgres": PostgreSQLDialect,
+    "mysql": MySQLDialect,
+    "mariadb": MySQLDialect,
+    "sqlite": SQLiteDialect,
+}
 
 
 class DatabaseDetector:
     """Automatically detects database type and driver from connection parameters."""
+
+    @staticmethod
+    def __is_installed(module_name: str) -> bool:
+        return importlib.util.find_spec(module_name) is not None
+
+    @staticmethod
+    def _find_installed(candidates: List[Tuple[Any, List[str]]], error_message: str):
+        for driver_enum, packages in candidates:
+            for package in packages:
+                if DatabaseDetector.__is_installed(package):
+                    return driver_enum
+        raise ImportError(error_message)
 
     @staticmethod
     def detect_from_url(
@@ -497,6 +947,14 @@ class DatabaseDetector:
 
         scheme = scheme.split("+")[-1]
 
+        kwargs = {
+            "host": parsed.hostname or "localhost",
+            "port": parsed.port,
+            "database": parsed.path.lstrip("/"),
+            "user": parsed.username,
+            "password": parsed.password,
+        }
+
         if scheme == "sqlite":
             db_type = SQLiteDialect()
             driver = DatabaseDetector._detect_sqlite_driver(is_async)
@@ -506,24 +964,14 @@ class DatabaseDetector:
         elif scheme in ["postgres", "postgresql"]:
             db_type = PostgreSQLDialect()
             driver = DatabaseDetector._detect_postgres_driver(is_async)
-            kwargs = {
-                "host": parsed.hostname or "localhost",
-                "port": parsed.port or 5432,
-                "dbname": parsed.path.lstrip("/"),
-                "user": parsed.username,
-                "password": parsed.password,
-            }
+            kwargs["port"] = kwargs["port"] or 5432
+            if driver != PostgreSQLDriver.ASYNCPG:
+                kwargs["dbname"] = kwargs.pop("database")
 
         elif scheme in ["mysql", "mariadb"]:
             db_type = MySQLDialect()
             driver = DatabaseDetector._detect_mysql_driver(is_async)
-            kwargs = {
-                "host": parsed.hostname or "localhost",
-                "port": parsed.port or 3306,
-                "database": parsed.path.lstrip("/"),
-                "user": parsed.username,
-                "password": parsed.password,
-            }
+            kwargs["port"] = kwargs["port"] or 3306
 
         else:
             raise ValueError(f"Unsupported database URL scheme: {scheme}")
@@ -538,7 +986,7 @@ class DatabaseDetector:
     @staticmethod
     def detect_from_kwargs(
         kwargs: Dict[str, Any], is_async: bool = False
-    ) -> Tuple[Dialect, str]:
+    ) -> Tuple[Dialect, Any]:
         """Detect database type from connection kwargs."""
         if "driver" in kwargs:
             driver = kwargs["driver"]
@@ -593,7 +1041,7 @@ class DatabaseDetector:
             "postgres" in str(kwargs.get("dsn", "")),
             "postgres" in str(kwargs.get("host", "")),
             "postgres" in str(kwargs.get("dbname", "")),
-            any(key in kwargs for key in ["sslmode", "application_name"]),
+            any(key in kwargs for key in ["sslmode", "nexios"]),
         ]
 
         if any(pg_indicators):
@@ -602,7 +1050,10 @@ class DatabaseDetector:
 
         mysql_indicators = [
             kwargs.get("port") == 3306,
-            any(key in kwargs for key in ["unix_socket", "auth_plugin", "charset"]),
+            any(
+                key in kwargs
+                for key in ["unix_socket", "auth_plugin", "charset", "cursorclass"]
+            ),
             "mysql" in str(kwargs.get("host", "")),
             "mysql" in str(kwargs.get("database", "")),
         ]
@@ -638,76 +1089,89 @@ class DatabaseDetector:
     def _detect_sqlite_driver(is_async: bool = False):
         """Detect which SQLite driver is available."""
         if is_async:
-            try:
-                import aiosqlite  # noqa
-
-                return SQLiteDriver.AIOSQLITE
-            except ImportError:
-                raise ImportError("aiosqlite is required for async SQLite operations")
-        else:
-            try:
-                import sqlite3  # noqa
-
-                return SQLiteDriver.SQLITE3
-            except ImportError:
-                raise ImportError("sqlite3 is required for sync SQLite operations")
+            return DatabaseDetector._find_installed(
+                [(SQLiteDriver.AIOSQLITE, ["aiosqlite"])],
+                "aiosqlite is required for async SQLite operations",
+            )
+        return DatabaseDetector._find_installed(
+            [(SQLiteDriver.SQLITE3, ["sqlite3"]), (SQLiteDriver.APSW, ["apsw"])],
+            "sqlite3 or apsw is required for sync SQLite operations",
+        )
 
     @staticmethod
     def _detect_postgres_driver(is_async: bool = False):
         """Detect which PostgreSQL driver is available."""
         if is_async:
-            try:
-                import asyncpg  # noqa
-
-                return PostgreSQLDriver.ASYNCPG
-            except ImportError:
-                try:
-                    import psycopg  # noqa
-
-                    return PostgreSQLDriver.PSYCOPG3
-                except ImportError:
-                    raise ImportError(
-                        "No async PostgreSQL driver found. Please install one of: "
-                        "psycopg3 or asyncpg"
-                    )
-        else:
-            try:
-                import psycopg  # noqa
-
-                return PostgreSQLDriver.PSYCOPG3
-            except ImportError:
-                try:
-                    import pg8000  # noqa
-
-                    return PostgreSQLDriver.PG8000
-                except ImportError:
-                    raise ImportError(
-                        "No PostgreSQL driver found. Please install one of: "
-                        "psycopg3, or pg8000"
-                    )
+            return DatabaseDetector._find_installed(
+                [
+                    (PostgreSQLDriver.PSYCOPG3_ASYNC, ["psycopg"]),
+                    (PostgreSQLDriver.ASYNCPG, ["asyncpg"]),
+                    (PostgreSQLDriver.AIOPG, ["aiopg"]),
+                ],
+                "No async PostgreSQL driver found. Please install one of: "
+                "psycopg3, asyncpg, or aiopg",
+            )
+        return DatabaseDetector._find_installed(
+            [
+                (PostgreSQLDriver.PSYCOPG3, ["psycopg"]),
+                (PostgreSQLDriver.PG8000, ["pg8000"]),
+            ],
+            "No PostgreSQL driver found. Please install one of: "
+            "psycopg3, or pg8000",
+        )
 
     @staticmethod
     def _detect_mysql_driver(is_async: bool = False):
         """Detect which MySQL driver is available."""
         if is_async:
-            try:
-                import aiomysql  # noqa
+            return DatabaseDetector._find_installed(
+                [
+                    (MySQLDriver.AIOMYSQL, ["aiomysql"]),
+                    (MySQLDriver.ASYNCMY, ["asyncmy"]),
+                ],
+                "No async MySQL driver found. Please install one of: "
+                "aiomysql or asyncmy",
+            )
+        return DatabaseDetector._find_installed(
+            [
+                (MySQLDriver.MYSQL_CONNECTOR, ["mysql.connector"]),
+                (MySQLDriver.PYMySQL, ["pymysql"]),
+                (MySQLDriver.MYSQL_CLIENT, ["MySQLdb"]),
+                (MySQLDriver.MARIADB, ["mariadb"]),
+            ],
+            "No MySQL driver found. Please install one of: "
+            "mysql-connector-python, pymysql, MySQLclient, or mariadb",
+        )
 
-                return MySQLDriver.AIOMYSQL
-            except ImportError:
-                raise ImportError("aiomysql is required for async MySQL operations")
+
+class FTSConfig:
+    def __init__(
+        self,
+        language: str = "english",
+        weights: Optional[list] = None,
+        dictionary: Optional[str] = None,
+    ):
+        self.language = language
+        self.weights = weights or []
+        self.dictionary = dictionary or {}
+
+
+class TSVector:
+    def __init__(
+        self,
+        source_fields: Optional[list] = None,
+        config: Optional[FTSConfig] = None,
+        **kwargs,
+    ):
+        self.source_fields = source_fields or []
+        self.config = config or FTSConfig()
+
+    def get_column_type(self, dialect: Dialect) -> str:
+        if isinstance(dialect, PostgreSQLDialect):
+            return "TSVECTOR"
+        elif isinstance(dialect, MySQLDialect):
+            return "TEXT"
+        elif isinstance(dialect, SQLiteDialect):
+            return "TEXT"
         else:
-            try:
-                import mysql.connector  # noqa
-
-                return MySQLDriver.MYSQL_CONNECTOR
-            except ImportError:
-                try:
-                    import pymysql  # noqa
-
-                    return MySQLDriver.PYMySQL
-                except ImportError:
-                    raise ImportError(
-                        "No MySQL driver found. Please install one of: "
-                        "mysql-connector-python or pymysql"
-                    )
+            raise NotImplementedError()

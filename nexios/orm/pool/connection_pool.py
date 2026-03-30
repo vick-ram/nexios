@@ -59,10 +59,10 @@ class ConnectionPool(BaseConnectionPool):
         
         self._initialize_pool()
         self._start_background_workers()
-        
-        self.logger.info(
-            f"Connection pool initialized: min={self.config.min_size}, max={self.config.max_size}"
-        )
+
+        # self.logger.info(
+        #     f"Connection pool initialized: min={self.config.min_size}, max={self.config.max_size}"
+        # )
 
     def _initialize_pool(self):
         """Initialize with minimum connections"""

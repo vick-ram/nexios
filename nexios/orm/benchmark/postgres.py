@@ -1,14 +1,14 @@
-import time
+import logging
 import statistics
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict
+
+import matplotlib.pyplot as plt
+import numpy as np
 import psycopg
 from psycopg_pool import ConnectionPool as PsycopgPool
-import matplotlib.pyplot as plt
-import pandas as pd
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
-import numpy as np
-from typing import Dict
 
 # Disable verbose logging for clean benchmark output
 logging.getLogger().setLevel(logging.ERROR)

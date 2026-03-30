@@ -14,6 +14,8 @@ from typing import Any, Coroutine, List, Optional, TypeVar, Union
 import concurrent
 import warnings
 
+import nest_asyncio
+
 T = TypeVar("T")
 
 PYTHON_VERSION = sys.version_info
@@ -111,10 +113,6 @@ class NexiosEventLoop:
                     self._loop.set_default_executor(self._thread_pool)
 
                 self._ready_event.set()
-
-                # while not self._shutdown_event.is_set():
-                #     if self._loop is not None:
-                #         self._loop.run_until_complete(asyncio.sleep(0.1))
                 self._loop.run_forever()
             except Exception as e:
                 warnings.warn(f"Event loop crushed: {e}")
@@ -140,12 +138,22 @@ class NexiosEventLoop:
             raise RuntimeError("Failed to start event loop with timeout")
 
     def run(self, coro: Coroutine[Any, Any, T], timeout: Optional[float] = None) -> T:
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        if running_loop:
+            nest_asyncio.apply(running_loop)
+            return running_loop.run_until_complete(coro)
+
         if PYTHON_311_PLUS and self._loop is None:
             with asyncio.Runner() as runner:
                 return runner.run(coro)
 
         if self._loop is None or self._loop.is_closed():
-            raise RuntimeError("Event loop is not running")
+            # raise RuntimeError("Event loop is not running")
+            return asyncio.run(coro)
 
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
 
@@ -212,6 +220,9 @@ class NexiosEventLoop:
     def stop(self, timeout: float = 5.0):
         if not self._initialized:
             return
+
+        if self._loop and self._loop.is_running():
+            self._loop.call_soon_threadsafe(self._loop.stop)
         
         self._shutdown_event.set()
 

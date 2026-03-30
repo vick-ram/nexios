@@ -1,8 +1,10 @@
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, List, Optional, Tuple
 
 import aiosqlite
 
-from nexios.orm.connection import AsyncCursor, AsyncDatabaseConnection
+from nexios.orm.connection import AsyncCursor, AsyncDatabaseConnection, AsyncQueryResult
+from nexios.orm.misc.row_to_tuple import convert_row, convert_rows
+
 
 class AioSQLiteCursor(AsyncCursor):
     def __init__(self, cursor: aiosqlite.Cursor) -> None:
@@ -16,25 +18,25 @@ class AioSQLiteCursor(AsyncCursor):
     def rowcount(self) -> int:
         return self._cursor.rowcount
     
-    async def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> Any:
-        return await self._cursor.execute(sql, parameters)
+    async def execute(self, sql: str, parameters: Tuple[Any, ...] = ()) -> AsyncQueryResult:
+        await self._cursor.execute(sql, parameters)
+        return AsyncQueryResult(self)
     
-    async def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> Any:
-        return await self._cursor.executemany(sql, seq_of_parameters)
+    async def executemany(self, sql: str, seq_of_parameters: List[Tuple[Any, ...]]) -> AsyncQueryResult:
+        await self._cursor.executemany(sql, seq_of_parameters)
+        return AsyncQueryResult(self)
     
     async def fetchone(self) -> Optional[Tuple[Any, ...]]:
         row = await self._cursor.fetchone()
-        if row is None:
-            return None
-        return tuple(row)
+        return convert_row(row)
     
     async def fetchall(self) -> List[Tuple[Any, ...]]:
         rows = await self._cursor.fetchall()
-        return [tuple(row) for row in rows]
+        return convert_rows(rows)
     
     async def fetchmany(self, size: int = 1) -> List[Tuple[Any, ...]]:
         rows = await self._cursor.fetchmany(size)
-        return [tuple(row) for row in rows]
+        return convert_rows(rows)
     
 
 class AioSQLiteConnection(AsyncDatabaseConnection):
@@ -59,10 +61,10 @@ class AioSQLiteConnection(AsyncDatabaseConnection):
         return self._connection
     
     @property
-    def is_connection_open(self) -> bool:
+    async def is_connection_open(self) -> bool:
         try:
             stmt = "SELECT 1"
-            self._connection.execute(stmt)
+            await self._connection.execute(stmt)
             return True
         except aiosqlite.ProgrammingError:
             return False
