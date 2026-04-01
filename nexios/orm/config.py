@@ -27,8 +27,9 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic_core import PydanticUndefined as Undefined
-
-from nexios.orm.model import InstanceOrType, NexiosModel, FieldInfo
+from nexios.orm.fields import FieldInfo
+from nexios.orm.model import NexiosModel
+from nexios.orm.utils import InstanceOrType
 from nexios.orm.query.expressions import ColumnExpression
 
 

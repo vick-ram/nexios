@@ -292,3 +292,4 @@ class ColumnExpression(Generic[_T]):
 
     def __str__(self) -> str:
         return f"{self.field_name}"
+

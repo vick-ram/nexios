@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from collections import defaultdict
 import re
+
+from collections import defaultdict
 from typing import TypeAlias, cast, Callable, Any
 
 from typing_extensions import (
     Type,
     TypeVar,
-    Any,
     Tuple,
     List,
     Union,
@@ -22,12 +22,12 @@ from typing_extensions import (
 from pydantic_core import PydanticUndefined as Undefined
 from nexios.orm.query.expressions import ColumnExpression, BinaryExpression, AlwaysTrueExpression, AlwaysFalseExpression
 from nexios.orm.sessions import Session, AsyncSession
+from nexios.orm.relationships import RelationshipType
 
 if TYPE_CHECKING:
     from nexios.orm.config import Dialect
     from nexios.orm.model import NexiosModel
-    from nexios.orm.model import RelationshipType
-    from nexios.orm.model import InstanceOrType
+    from nexios.orm.utils import InstanceOrType
 
 _T = TypeVar("_T", bound="NexiosModel")
 _M = TypeVar("_M", bound="NexiosModel")
@@ -596,8 +596,6 @@ class Select(Generic[_T]):
 
     def _load_eager_relationships(self, instances: List[Any]):
         """Load eager relationships for a list of instances"""
-        from nexios.orm.model import RelationshipType
-
         if not instances:
             return
 
@@ -715,8 +713,6 @@ class Select(Generic[_T]):
             )
 
     async def _async_load_eager_relationships(self, instances: List[Any]):
-        from nexios.orm.model import RelationshipType
-
         if not instances or not self._eager_load:
             return
         relationships_to_load = defaultdict(list)

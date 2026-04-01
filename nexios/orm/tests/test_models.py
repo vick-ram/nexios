@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional, List
 
-from nexios.orm.model import Field, Relationship
+from nexios.orm.relationships import Relationship
+from nexios.orm.fields import Field
 from nexios.orm.tests.conftest import BaseTestModel
 
 
@@ -9,7 +10,7 @@ class Profile(BaseTestModel):
     __tablename__ = 'profiles'
 
     id: Optional[int] = Field(primary_key=True, auto_increment=True, default=None)
-    user_id: int = Field(foreign_key="User.id")
+    user_id: int = Field(foreign_key="User.id", unique=True)
     bio: Optional[str] = Field(nullable=True, max_length=500)
     website: Optional[str] = Field(nullable=True)
     created_at: datetime = Field(default_factory=datetime.now)

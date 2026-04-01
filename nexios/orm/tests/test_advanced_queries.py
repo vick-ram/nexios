@@ -192,7 +192,7 @@ class TestAdvancedQueries:
 
         sync_session.create_all(User)
 
-        now = datetime.now()
+        now = datetime.now().replace(microsecond=0)
 
         users = [
             User(
