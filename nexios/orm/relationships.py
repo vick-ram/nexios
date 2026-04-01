@@ -21,7 +21,7 @@ class RelationshipInfo(Representation):
 
     field_name: str
     related_model_name: str  # Store as string to avoid circular imports
-    relationship_type: RelationshipType
+    relationship_type: Optional[RelationshipType] = None
     foreign_key: Optional[str] = None
     related_field_name: Optional[str] = None
     through: Optional[str] = None  # Store as string
@@ -145,10 +145,14 @@ def Relationship(
             else None
         )
 
+    rel_type = relationship_type
+    if rel_type is None and through:
+        rel_type = RelationshipType.MANY_TO_MANY
+
     return RelationshipInfo(
         field_name="",
         related_model_name=rel_model_str or "",
-        relationship_type=relationship_type or RelationshipType.MANY_TO_ONE,
+        relationship_type=rel_type,
         foreign_key=foreign_key,
         related_field_name=related_field_name,
         through=through_model_str,

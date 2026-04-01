@@ -6,7 +6,7 @@ from typing import Type, Optional, Any, List, overload, cast, TYPE_CHECKING
 from pydantic_core import PydanticUndefined as Undefined
 
 from nexios.orm.relationships import RelationshipInfo, RelationshipType
-from nexios.orm.misc.store import get_context_data
+from nexios.orm.misc.context import get_context_data
 
 if TYPE_CHECKING:
     from nexios.orm.model import NexiosModel
@@ -101,24 +101,10 @@ class RelationshipDescriptor:
                     setattr(obj, fk_field, None)
             return
 
-        # set the new value in cache
-        # self._set_cache(obj, value)
-
         local_fk = self._relationship_info.foreign_key or self._find_local_foreign_key()
         if local_fk:
             pk_val = getattr(value, self._get_pk_field(value), None)
             setattr(obj, local_fk, pk_val)
-
-        # update foreign key on the owning side
-        # if self._relationship_info.foreign_key:
-        #     fk_field = self._relationship_info.foreign_key
-        #     if hasattr(obj, fk_field):
-        #         if value is None:
-        #             setattr(obj, fk_field, None)
-        #         else:
-        #             pk_name = self._get_pk_field(value)
-        #             pk_value = getattr(value, pk_name, None)
-        #             setattr(obj, fk_field, pk_value)
 
         if self._relationship_info.back_populates:
             back_field = self._relationship_info.back_populates
@@ -167,48 +153,11 @@ class RelationshipDescriptor:
         pk = model.get_primary_key()
         return pk[0] if isinstance(pk, (list, tuple)) else pk
 
-    # def _find_foreign_key_on_related(self, related_model: Type[NexiosModel], current_model_class: Type[NexiosModel]) -> str:
-    #     expected_name = f"{_to_snake_case(current_model_class.__name__)}_id"
-    #     pk_name = self._get_pk_field(current_model_class)
-    #     related_fields = get_model_fields(related_model)
-
-    #     # Check explicit foreign key metadata first
-    #     for field_name, field_info in related_fields.items():
-    #         fk = getattr(field_info, "foreign_key", Undefined)
-    #         if fk is not Undefined and fk:
-    #             # fk could be "table.col" or just "col"
-    #             if isinstance(fk, str):
-    #                 fk_s = fk.strip()
-    #                 if "." in fk_s:
-    #                     left, _ = fk_s.rsplit(".", 1)
-    #                     left_l = left.lower()
-    #                     tablename = (get_tablename_for_class(current_model_class) or "").lower()
-    #                     candidates = {current_model_class.__name__.lower(), _to_snake_case(current_model_class.__name__), tablename}
-    #                     if left_l in candidates:
-    #                         return field_name
-    #                 else:
-    #                     # matches column name (id, user_id, etc)
-    #                     if fk_s == expected_name or fk_s == str(pk_name) or fk_s == field_name:
-    #                         return field_name
-
-    #     # fallback: find by naming convention on the related model's field names
-    #     for field_name in related_fields.keys():
-    #         if field_name == expected_name:
-    #             return field_name
-    #         if pk_name and field_name.endswith(f"_{pk_name}"):
-    #             return field_name
-
-    #     # last resort: if attribute exists on the related model, return it, else return the convention name
-    #     if hasattr(related_model, expected_name):
-    #         return expected_name
-
-    #     return expected_name
-
     def _find_foreign_key_on_related(
         self, related_model: Type[NexiosModel], current_model_class: Type[NexiosModel]
     ) -> str:
         """Find foreign key on related model that points to current model"""
-        from nexios.orm.utils import to_snake_case, get_model_fields
+        from nexios.orm.utils import to_snake_case, get_model_fields, get_tablename_for_class
 
 
         # For one-to-one, the foreign key could be on either side
@@ -286,10 +235,6 @@ class RelationshipDescriptor:
 
     def _load_select_lazy(self, obj: NexiosModel, session: Any) -> Any:
         rel_type = self._relationship_info.relationship_type
-
-        print(
-            f"Loading relationship '{self.field_name}' of type '{rel_type.value}' using select lazy strategy."
-        )
 
         if rel_type == RelationshipType.MANY_TO_ONE:
             return self._load_many_to_one(obj, session)

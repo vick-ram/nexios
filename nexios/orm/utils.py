@@ -1,13 +1,10 @@
 from __future__ import annotations
 import re
-from typing import Literal, Optional, TypeVar, Any, Type, Union, Dict, TYPE_CHECKING
+from typing import Literal, Optional, TypeVar, Any, Type, Union, Dict
 from packaging import version
 from pydantic import ConfigDict, BaseModel as PydanticBaseModel
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 import pydantic
-
-if TYPE_CHECKING:
-    from nexios.orm.model import NexiosModel
 
 
 _TNexiosModel = TypeVar("_TNexiosModel", bound=Any)

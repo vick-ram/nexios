@@ -9,7 +9,7 @@ from nexios.orm.connection import (
     AsyncCursor,
     SyncDatabaseConnection,
 )
-from nexios.orm.misc.store import set_context_data, reset_context_data
+from nexios.orm.misc.context import set_context_data, reset_context_data
 
 if TYPE_CHECKING:
     from nexios.orm.engine import Engine

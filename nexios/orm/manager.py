@@ -249,10 +249,6 @@ class AsyncDatabaseManager:
             await conn.close()
 
     async def cursor(self) -> AsyncCursor:
-        # if not self._connection:
-        #     self._connection = await self.connect()
-        # cursor = await self._connection.cursor()
-        # return cursor
         if self._connection is None:
             print("WARNING: Connection is None, trying to establish connection...")
             self._connection = await self.connect()

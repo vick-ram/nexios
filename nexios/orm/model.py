@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import types
 from typing import (
-    TYPE_CHECKING,
     Union,
     Optional,
     List,
@@ -362,27 +361,26 @@ class NexiosModelMetaclass(ModelMetaclass):
                         return True
             return False
 
-        # For one-to-one, check both sides
+        # For one-to-one, we only return the foreign key name IF it's on the CURRENT model.
         if relationship_type == RelationshipType.ONE_TO_ONE:
-            # First check if current model has FK to related
             if current_cls is not None:
                 for field_name, field_info in get_model_fields(current_cls).items():
-                    fk = getattr(field_info, "foreign_key", Undefined)
-                    if fk is not Undefined and fk:
-                        if fk_matches_target(fk, related_model_name):
+                    fk_val = getattr(field_info, "foreign_key", Undefined)
+                    if fk_val is not Undefined and fk_val:
+                        if fk_matches_target(fk_val, related_model_name):
                             return field_name
-
-            # Then check if related model has FK to current
+            
             if related_cls is not None:
                 for field_name, field_info in get_model_fields(related_cls).items():
-                    fk = getattr(field_info, "foreign_key", Undefined)
-                    if fk is not Undefined and fk:
-                        if fk_matches_target(fk, current_model_name):
-                            # Return the FK field name on the related model
-                            return field_name
-
-            # Fallback to convention - assume FK on current model
-            return f"{to_snake_case(related_model_name)}_id"
+                    fk_val = getattr(field_info, "foreign_key", Undefined)
+                    if fk_val is not Undefined and fk_val:
+                        if fk_matches_target(fk_val, current_model_name):
+                            return None # FK is on the other side
+            
+            conv = f"{to_snake_case(related_model_name)}_id"
+            if current_cls is not None and conv in get_model_fields(current_cls):
+                return conv
+            return None
 
         # Rest of your existing logic for other relationship types...
         current = to_snake_case(current_model_name)
@@ -413,84 +411,6 @@ class NexiosModelMetaclass(ModelMetaclass):
                 return None
             case _:
                 return None
-
-    # @classmethod
-    # def _determine_foreign_key(
-    #         mcs,
-    #         rel_info: RelationshipInfo,
-    #         relationship_type: RelationshipType,
-    #         current_model_name: str,
-    #         related_model_name: str
-    # ) -> Optional[str]:
-
-    #     if rel_info.foreign_key:
-    #         return rel_info.foreign_key
-
-    #     current_cls = None
-    #     try:
-    #         current_cls = mcs.__registry__.get(current_model_name)  # User
-    #     except AttributeError:
-    #         current_cls = None
-
-    #     related_cls = mcs.__registry__.get(related_model_name)  # Profile
-
-    #     def fk_matches_target(fk_val: Any, target_name: str, target_cls: Optional[Type] = None) -> bool:
-    #         if not fk_val:
-    #             return False
-    #         if isinstance(fk_val, str):
-    #             fk_s = fk_val.strip()
-    #             if "." in fk_s:
-    #                 left, _ = fk_s.rsplit(".", 1)
-    #                 left_l = left.lower()
-    #                 candidates = {
-    #                     target_name.lower(),
-    #                     _to_snake_case(target_name),
-    #                 }
-    #                 if target_cls:
-    #                     tablename = (get_tablename_for_class(target_cls) or "").lower()
-    #                     candidates.add(tablename)
-    #                 return left_l in candidates
-    #             else:
-    #                 if fk_s == f"{_to_snake_case(target_name)}_id" or fk_s == "id":
-    #                     return True
-    #         return False
-
-    #     # For one-to-one relationships
-    #     if relationship_type == RelationshipType.ONE_TO_ONE:
-    #         # Check if related model (Profile) has a foreign key to current model (User)
-    #         if related_cls is not None:
-    #             for field_name, field_info in get_model_fields(related_cls).items():
-    #                 fk = getattr(field_info, "foreign_key", Undefined)
-    #                 if fk is not Undefined and fk:
-    #                     if fk_matches_target(fk, current_model_name, current_cls):
-    #                         # Return the field name on the related model that holds the FK
-    #                         return field_name
-
-    #         # Check if current model (User) has a foreign key to related model (Profile)
-    #         if current_cls is not None:
-    #             for field_name, field_info in get_model_fields(current_cls).items():
-    #                 fk = getattr(field_info, "foreign_key", Undefined)
-    #                 if fk is not Undefined and fk:
-    #                     if fk_matches_target(fk, related_model_name, related_cls):
-    #                         return field_name
-
-    #         # Fallback: assume foreign key is on related model with naming convention
-    #         return f"{_to_snake_case(current_model_name)}_id"
-
-    #     # For MANY_TO_ONE relationships
-    #     if relationship_type == RelationshipType.MANY_TO_ONE:
-    #         fk = f"{_to_snake_case(related_model_name)}_id"
-    #         if current_cls is not None and fk in get_model_fields(current_cls):
-    #             return fk
-    #         return None
-
-    #     # For ONE_TO_MANY, foreign key is on the related model
-    #     if relationship_type == RelationshipType.ONE_TO_MANY:
-    #         # Return the field name on the related model that points to current model
-    #         fk = f"{_to_snake_case(current_model_name)}_id"
-    #         return fk
-
-    #     return None
 
     @classmethod
     def _resolve_through_model(mcs, rel_info: RelationshipInfo) -> Optional[str]:
@@ -530,6 +450,10 @@ class NexiosModel(
 
         tablename = get_tablename_for_class(cls)
         cls.__tablename__ = tablename
+
+    def model_post_init(self, __context: Any) -> None:
+        """Pydantic v2 hook for post-initialization."""
+        self.__dict__["__relationship_cache__"] = {} # type: ignore
 
     def __setattr__(self, name: str, value: Any) -> types.NoneType:
         if name not in self.__relationships__:

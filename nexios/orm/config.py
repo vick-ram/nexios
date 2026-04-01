@@ -549,15 +549,6 @@ class DDLGenerator:
                 return f"ON CONFLICT ({primary_key}) DO UPDATE SET {', '.join(update_parts)}"
             return ""
 
-        # for field in fields_to_update:
-        #     if isinstance(self.dialect, PostgreSQLDialect):
-        #         update_sql = f"ON CONFLICT ({primary_key}) DO UPDATE SET {field}"
-        #     elif isinstance(self.dialect, MySQLDialect):
-        #         update_sql = f"ON DUPLICATE KEY UPDATE {field} = VALUES({field})"
-        #     else:
-        #         update_sql = f"ON CONFLICT ({primary_key}) DO UPDATE SET {field} = excluded.{field}"
-        # return update_sql
-
     def _get_column_definitions(self, model_class: Type[NexiosModel]) -> List[str]:
         """Generate column definitions for CREATE TABLE"""
         columns = []
@@ -738,50 +729,6 @@ class DDLGenerator:
             return self._format_default_value(result)
         except TypeError:
             return "NULL"
-
-    # def _get_table_constraints(self, model_class: Type[NexiosModel]) -> List[str]:
-    #     """Generate FOREIGN KEY constraints"""
-    #     constraints: List[str] = []
-    #     model_name = model_class.__name__.lower()
-    #
-    #     for rel_info in model_class.get_relationships().values():
-    #         if not isinstance(rel_info, RelationshipInfo):
-    #             continue
-    #
-    #         if not rel_info.foreign_key or not rel_info.related_model_name:
-    #             continue
-    #
-    #         if rel_info.relationship_type in [RelationshipType.ONE_TO_MANY, RelationshipType.ONE_TO_ONE]:
-    #             continue
-    #
-    #         foreign_key_str = rel_info.foreign_key
-    #         if '.' in foreign_key_str:
-    #             parts = foreign_key_str.split('.')
-    #             related_table, related_column = parts[0].lower(), parts[1]
-    #             fk_column_name = f"{related_table}_id"
-    #             constraint_name = f"fk_{model_name}_{rel_info.field_name}"
-    #             ref_table_name = f"{rel_info.related_model_name.lower()}s"
-    #
-    #             sql_parts = [
-    #                 f"CONSTRAINT {constraint_name}",
-    #                 f"FOREIGN KEY ({self.dialect.quote_identifier(fk_column_name)})",
-    #                 f"REFERENCES {self.dialect.quote_identifier(ref_table_name)}(id)",
-    #             ]
-    #             if rel_info.ondelete:
-    #                 sql_parts.append(f"ON DELETE {rel_info.ondelete}")
-    #             if rel_info.onupdate:
-    #                 sql_parts.append(f"ON UPDATE {rel_info.onupdate}")
-    #             if isinstance(self.dialect, PostgreSQLDialect):
-    #                 if rel_info.deferrable is not None:
-    #                     sql_parts.append("DEFERRABLE" if rel_info.deferrable else "NOT DEFERRABLE")
-    #                 if rel_info.initially_deferred is not None:
-    #                     sql_parts.append(
-    #                         "INITIALLY DEFERRED"
-    #                         if rel_info.initially_deferred
-    #                         else "INITIALLY IMMEDIATE"
-    #                     )
-    #             constraints.append(" ".join(sql_parts))
-    #     return constraints
 
     def _get_table_constraints(self, model_class: Type[NexiosModel]) -> List[str]:
         """Generate FOREIGN KEY constraints from FIELD definitions only"""
