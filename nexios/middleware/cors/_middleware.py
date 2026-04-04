@@ -84,7 +84,7 @@ class CORSMiddleware(BaseMiddleware):
         if self.allow_headers:
             self.allow_headers: List[str] = [
                 *list(SAFELISTED_HEADERS),
-                *(self.config.allow_headers or []),
+                *(self.allow_headers or []),
             ]
         else:
             self.allow_headers = list(SAFELISTED_HEADERS)
@@ -171,7 +171,7 @@ class CORSMiddleware(BaseMiddleware):
         if "*" in self.allow_origins:
             return True
         try:
-            if self.allow_origin_regex and self.allow_origin_regex.fullmatch(origin):
+            if self.allow_origin_regex and self.allow_origin_regex.fullmatch(origin):  # ty: ignore
                 return True
         except re.error:
             return False
@@ -207,7 +207,7 @@ class CORSMiddleware(BaseMiddleware):
                 status_code=self.custom_error_status,
             )
 
-        headers["Access-Control-Allow-Origin"] = origin  # type: ignore
+        headers["Access-Control-Allow-Origin"] = origin
 
         if not self.is_allowed_method(requested_method):
             if self.debug:
@@ -230,7 +230,7 @@ class CORSMiddleware(BaseMiddleware):
             allowed_requested_headers = []
             for header in requested_header_list:
                 # If allow_headers is "*", allow any header (except blacklisted)
-                if "*" in self.config.allow_headers:
+                if "*" in self.config.allow_headers:  # ty: ignore
                     if header in self.blacklist_headers:
                         if self.debug:
                             logger.error(

@@ -7,10 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.networks import AnyUrl
 
 try:
-    import email_validator  # type: ignore # noqa: F401
+    import email_validator  # noqa: F401
     from pydantic import EmailStr
 except ImportError:  # pragma: no cover
-    EmailStr = str  # type: ignore
+    EmailStr = str
 
 
 from typing import Annotated, Literal
@@ -390,7 +390,7 @@ class OpenAPI(BaseModel):
     paths: Annotated[Dict[str, Union[PathItem, Extension]], Field(default_factory=dict)]
     servers: Optional[List[Server]] = None
     # Using Any for Specification Extensions
-    components: Optional[Components] = None
+    components: Components = Components()
     security: Optional[List[Dict[str, List[str]]]] = None
     tags: Optional[List[Tag]] = None
     externalDocs: Optional[ExternalDocumentation] = None

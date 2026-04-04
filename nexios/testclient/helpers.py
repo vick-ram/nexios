@@ -2,11 +2,12 @@
 Helper functions for creating sync and async test clients for Nexios applications.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from nexios import MakeConfig, NexiosApp
 from nexios.dependencies import Depend
 from nexios.routing import Route
+from nexios.routing.base import BaseRoute
 from nexios.testclient import AsyncTestClient, TestClient
 from nexios.types import ExceptionHandlerType
 
@@ -18,7 +19,7 @@ def create_client(
     description: Optional[str] = None,
     server_error_handler: Optional[ExceptionHandlerType] = None,
     lifespan: Optional[Any] = None,
-    routes: Optional[List[Route]] = None,
+    routes: Sequence[BaseRoute] = [],
     dependencies: Optional[List[Depend]] = None,
     client_config: Optional[Dict[str, Any]] = None,
 ) -> TestClient:
@@ -72,7 +73,7 @@ def create_async_client(
     description: Optional[str] = None,
     server_error_handler: Optional[ExceptionHandlerType] = None,
     lifespan: Optional[Any] = None,
-    routes: Optional[List[Route]] = None,
+    routes: Sequence[Route] = [],
     dependencies: Optional[List[Depend]] = None,
     client_config: Optional[Dict[str, Any]] = None,
 ) -> AsyncTestClient:

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import sys
 import typing
 from collections.abc import Iterator
-from typing import Any, AsyncIterable, Mapping, MutableMapping, Protocol
+from typing import Any, AsyncIterable, Callable, Mapping, MutableMapping
 
 import anyio
 
@@ -12,41 +11,25 @@ from nexios.http.response import (
     BaseResponse,
 )
 from nexios.http.response import NexiosResponse as Response
-from nexios.http.response import (
-    StreamingResponse,
-)
-from nexios.types import ASGIApp, Message, Receive, Scope, Send
+from nexios.types import ASGIApp, Message, MiddlewareType, Receive, Scope, Send
 from nexios.utils.async_helpers import collapse_excgroups
 from nexios.websockets import WebSocket
 
-if sys.version_info >= (3, 10):  # pragma: no cover
-    from typing import ParamSpec
-else:  # pragma: no cover
-    from typing_extensions import ParamSpec
-
 RequestResponseEndpoint = typing.Callable[[Request], typing.Awaitable[Response]]
-DispatchFunction = typing.Callable[
-    [Request, Response, typing.Callable[[], typing.Awaitable[Response]]],
-    typing.Awaitable[Response],
-]
+
 T = typing.TypeVar("T")
-P = ParamSpec("P")
 
 AsyncContentStream = AsyncIterable[str | bytes | memoryview | MutableMapping[str, Any]]
 
-
-class _MiddlewareFactory(Protocol[P]):
-    def __call__(
-        self, app: ASGIApp, /, *args: P.args, **kwargs: P.kwargs
-    ) -> ASGIApp: ...  # pragma: no cover
+MiddlewareFactory = Callable[..., ASGIApp]
 
 
 class DefineMiddleware:
     def __init__(
         self,
-        cls: _MiddlewareFactory[P],
-        *args: P.args,
-        **kwargs: P.kwargs,
+        cls: MiddlewareFactory,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         self.cls = cls
         self.args = args
@@ -142,7 +125,7 @@ class _CachedRequest(Request):
 
 
 class ASGIRequestResponseBridge:
-    def __init__(self, app: ASGIApp, dispatch: DispatchFunction) -> None:
+    def __init__(self, app: ASGIApp, dispatch: MiddlewareType) -> None:
         self.app = app
         self.dispatch_func = dispatch
 
@@ -159,9 +142,7 @@ class ASGIRequestResponseBridge:
         wrapped_receive = request.wrapped_receive
         response_sent = anyio.Event()
 
-        async def call_next(
-            *_,
-        ) -> StreamingResponse:
+        async def call_next(*_):
             app_exc: Exception | None = None
 
             async def receive_or_disconnect() -> Message:
@@ -227,7 +208,7 @@ class ASGIRequestResponseBridge:
             response._response = response_object
             return response_object
 
-        streams: anyio.create_memory_object_stream[Message] = (  # type: ignore
+        streams: anyio.create_memory_object_stream[Message] = (
             anyio.create_memory_object_stream()
         )
         send_stream, recv_stream = streams
@@ -235,7 +216,7 @@ class ASGIRequestResponseBridge:
             async with anyio.create_task_group() as task_group:
                 returned_response = await self.dispatch_func(
                     request, response, call_next
-                )  # type: ignore
+                )
                 await returned_response(scope, wrapped_receive, send)
                 response_sent.set()
                 recv_stream.close()
@@ -286,11 +267,5 @@ WebSocketDispatchFunction = typing.Callable[
 ]
 
 
-MiddlewareType = typing.Callable[
-    [Request, Response, typing.Awaitable[None]],
-    typing.Callable[[], typing.Awaitable[None]],
-]
-
-
-def wrap_middleware(middleware_function: DispatchFunction) -> DefineMiddleware:
+def wrap_middleware(middleware_function: MiddlewareType) -> DefineMiddleware:
     return DefineMiddleware(ASGIRequestResponseBridge, dispatch=middleware_function)

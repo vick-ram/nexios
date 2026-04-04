@@ -17,6 +17,7 @@ from typing import (
     Sequence,
     Type,
     Union,
+    cast,
 )
 
 from pydantic import BaseModel
@@ -214,7 +215,7 @@ class Route(BaseRoute):
         def apply_middleware(app: ASGIApp) -> ASGIApp:
             middleware: typing.List[Middleware] = []
             for mdw in self.middleware:
-                middleware.append(wrap_middleware(mdw))  # type: ignore
+                middleware.append(wrap_middleware(mdw))
             for cls, args, kwargs in reversed(middleware):
                 app = cls(app, *args, **kwargs)
             return app
@@ -240,9 +241,7 @@ class Route(BaseRoute):
         if match:
             matched_params = match.groupdict()
             for key, value in matched_params.items():
-                matched_params[key] = self.route_info.convertor[  # type: ignore
-                    key
-                ].convert(value)
+                matched_params[key] = self.route_info.convertor[key].convert(value)
             is_method_allowed = method.lower() in (m.lower() for m in self.methods)
             if not is_method_allowed:
                 return MatchStatus.PARTIAL, matched_params
@@ -250,7 +249,7 @@ class Route(BaseRoute):
             return MatchStatus.FULL, matched_params
         return MatchStatus.NONE, {}
 
-    def url_path_for(self, _name: str, **path_params: Dict[str, Any]) -> URLPath:
+    def url_path_for(self, name: str, **path_params: Dict[str, Any]) -> URLPath:
         """
         Generate a URL path for the route with the given name and parameters.
 
@@ -264,9 +263,9 @@ class Route(BaseRoute):
         Raises:
             ValueError: If the route name does not match or if required parameters are missing.
         """
-        if _name != self.name:
+        if name != self.name:
             raise ValueError(
-                f"Route name '{_name}' does not match the current route name '{self.name}'."
+                f"Route name '{name}' does not match the current route name '{self.name}'."
             )
 
         required_params = set(self.param_names)
@@ -343,7 +342,7 @@ class Router(BaseRouter):
         exclude_from_schema: bool = False,
         name: Optional[str] = None,
         dependencies: Optional[list[Depend]] = None,
-        route_class: Optional[Route] = Route,
+        route_class: Type[Route] = Route,
     ):
         self.prefix = prefix or ""
         self.prefix.rstrip("/")
@@ -572,7 +571,7 @@ class Router(BaseRouter):
     def add_middleware(self, middleware: MiddlewareType) -> None:
         """Add middleware to the router"""
         if callable(middleware):
-            mdw = Middleware(ASGIRequestResponseBridge, dispatch=middleware)  # type: ignore
+            mdw = Middleware(ASGIRequestResponseBridge, dispatch=middleware)
             self.middleware.insert(0, mdw)
 
     def get(
@@ -1959,8 +1958,8 @@ class Router(BaseRouter):
             The route handler function (when used as decorator)
         """
 
-        def decorator(handler: HandlerType) -> HandlerType:
-            route = self.route_class(
+        def decorator(handler: HandlerType):
+            route_instance = self.route_class(
                 path=path,
                 handler=handler,
                 methods=methods,
@@ -1979,8 +1978,7 @@ class Router(BaseRouter):
                 exclude_from_schema=exclude_from_schema,
                 **kwargs,
             )
-            self.add_route(route)
-            return handler
+            self.add_route(route_instance)
 
         if handler is None:
             return decorator
@@ -2086,7 +2084,7 @@ class Router(BaseRouter):
             route_name = name_parts[0]
             for route in self.routes:
                 if getattr(route, "name", None) == route_name:
-                    route_path = route.url_path_for(_name=route_name, **path_params)
+                    route_path = route.url_path_for(name=route_name, **path_params)
                     return URLPath(path=str(route_path), protocol="http")
             raise ValueError(f"Route '{route_name}' not found in router")
 
@@ -2122,7 +2120,7 @@ class Router(BaseRouter):
         if len(remaining_parts) == 0:
             for route in self.routes:
                 if getattr(route, "name", None) == current_part:
-                    route_path = route.url_path_for(_name=current_part, **path_params)
+                    route_path = route.url_path_for(name=current_part, **path_params)
                     path_segments.append(str(route_path).strip("/"))
                     full_path = "/" + "/".join(filter(None, path_segments))
                     return URLPath(path=full_path, protocol="http")
@@ -2165,7 +2163,7 @@ class Router(BaseRouter):
         receive: Receive,
         send: Send,
     ) -> Any:
-        app = self.build_middleware_stack(self.app)
+        app = self.build_middleware_stack(cast(ASGIApp, self.app))
         await app(scope, receive, send)
 
     async def app(self, scope: Scope, receive: Receive, send: Send):
@@ -2174,10 +2172,10 @@ class Router(BaseRouter):
         path_match = None
 
         for route in self.routes:
-            match, matched_params = route.match(scope)  # type: ignore
+            match, matched_params = route.match(scope)
             if match == MatchStatus.FULL:
                 scope["route_params"] = RouteParam(matched_params)
-                await route.handle(scope, receive, send)  # type: ignore
+                await route.handle(scope, receive, send)
                 return
             elif match == MatchStatus.PARTIAL and path_match is None:
                 path_match = route
@@ -2258,7 +2256,7 @@ class Router(BaseRouter):
             middleware_cls: An ASGI middleware class or callable that follows the ASGI interface
             **kwargs: Additional keyword arguments to pass to the middleware
         """
-        self.app = middleware_cls(self.app, **kwargs)
+        self.app = middleware_cls(self.app, **kwargs)  # ty: ignore[invalid-argument-type]
 
 
 Routes = Route  # for backward compatibilty

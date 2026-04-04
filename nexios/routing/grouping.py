@@ -1,5 +1,6 @@
 import re
 import typing
+from typing import Any
 
 from nexios._internals._middleware import DefineMiddleware as Middleware
 from nexios._internals._route_builder import RouteBuilder
@@ -16,7 +17,7 @@ class Group(BaseRoute):
         self,
         path: str = "",
         app: typing.Optional[ASGIApp] = None,
-        routes: typing.Optional[typing.List[BaseRoute]] = None,
+        routes: typing.List[BaseRoute] = [],
         name: typing.Optional[str] = None,
         *,
         middleware: typing.List[Middleware] = [],
@@ -35,9 +36,9 @@ class Group(BaseRoute):
         else:
             from .router import Router
 
-            self._base_app = Router(routes=routes)  # type: ignore
+            self._base_app = Router(routes=routes)
 
-        self.app = self._base_app  # type: ignore
+        self.app = self._base_app
         for cls, args, kwargs in reversed(middleware):
             self.app = cls(self.app, *args, **kwargs)
 
@@ -52,7 +53,7 @@ class Group(BaseRoute):
     def routes(self) -> list[BaseRoute]:
         return getattr(self._base_app, "routes", [])
 
-    def match(self, scope: Scope) -> typing.Tuple[typing.Any, typing.Any, typing.Any]:
+    def match(self, scope: Scope) -> typing.Tuple[MatchStatus, dict[str, Any]]:
         """
         Match a path against this mounted route's pattern.
         """
@@ -90,13 +91,13 @@ class Group(BaseRoute):
                 scope["root_path"] = scope["root_path"][: -len(matched_path)]
             raise
 
-    def url_path_for(self, _name: str, **path_params: typing.Any) -> URLPath:
+    def url_path_for(self, name: str, **path_params: typing.Any) -> URLPath:
         """
         Generate a URL path for the mounted route.
         """
-        if _name != self.name:
+        if name != self.name:
             raise ValueError(
-                f"Route name '{_name}' does not match the mounted route name '{self.name}'."
+                f"Route name '{name}' does not match the mounted route name '{self.name}'."
             )
 
         path = self.path.rstrip("/")

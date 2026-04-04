@@ -48,7 +48,7 @@ class BasePaginationStrategy(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def calculate_offset_limit(self, *args: List[int]) -> Tuple[int, int]:
+    def calculate_offset_limit(self, *args: Any, **kwargs: Any) -> Tuple[int, int]:
         pass
 
     @abc.abstractmethod
@@ -138,7 +138,7 @@ class PageNumberPagination(BasePaginationStrategy):
 
         return page, page_size
 
-    def calculate_offset_limit(self, page: int, page_size: int) -> Tuple[int, int]:  # type: ignore
+    def calculate_offset_limit(self, page: int, page_size: int) -> Tuple[int, int]:
         return (page - 1) * page_size, page_size
 
     def generate_metadata(
@@ -208,7 +208,7 @@ class LimitOffsetPagination(BasePaginationStrategy):
 
         return limit, offset
 
-    def calculate_offset_limit(self, limit: int, offset: int) -> Tuple[int, int]:  # type: ignore
+    def calculate_offset_limit(self, limit: int, offset: int) -> Tuple[int, int]:
         return offset, limit
 
     def generate_metadata(
@@ -293,9 +293,9 @@ class CursorPagination(BasePaginationStrategy):
         cursor_data = {self.sort_field: value}
         return base64.b64encode(json.dumps(cursor_data).encode("utf-8")).decode("utf-8")
 
-    def calculate_offset_limit(  # type: ignore
+    def calculate_offset_limit(
         self, cursor: Optional[str], page_size: int
-    ) -> Tuple[int, int]:  # type: ignore
+    ) -> Tuple[int, int]:
         decoded_cursor = urllib.parse.unquote(cursor) if cursor else None
         if decoded_cursor:
             try:
@@ -356,8 +356,11 @@ class SyncPaginator:
         self.request_params = request_params
         self.validate_total_items = validate_total_items
 
-    def paginate(self) -> Dict[str, Any]:
-        params = self.pagination_strategy.parse_parameters(self.request_params)
+    def paginate(self, **kwargs: Any) -> Dict[str, Any]:
+        # Merge request params with kwargs to allow direct overrides
+        request_params = {**self.request_params, **kwargs}
+
+        params = self.pagination_strategy.parse_parameters(request_params)
         offset, limit = self.pagination_strategy.calculate_offset_limit(*params)
 
         total_items = self.data_handler.get_total_items()
@@ -366,7 +369,7 @@ class SyncPaginator:
 
         items = self.data_handler.get_items(offset, limit)
         metadata = self.pagination_strategy.generate_metadata(
-            total_items, items, self.base_url, self.request_params
+            total_items, items, self.base_url, request_params
         )
 
         return {"items": items, "pagination": metadata}
@@ -387,8 +390,11 @@ class AsyncPaginator:
         self.request_params = request_params
         self.validate_total_items = validate_total_items
 
-    async def paginate(self) -> Dict[str, Any]:
-        params = self.pagination_strategy.parse_parameters(self.request_params)
+    async def paginate(self, **kwargs: Any) -> Dict[str, Any]:
+        # Merge request params with kwargs to allow direct overrides
+        request_params = {**self.request_params, **kwargs}
+
+        params = self.pagination_strategy.parse_parameters(request_params)
         offset, limit = self.pagination_strategy.calculate_offset_limit(*params)
 
         total_items = await self.data_handler.get_total_items()
@@ -397,7 +403,7 @@ class AsyncPaginator:
 
         items = await self.data_handler.get_items(offset, limit)
         metadata = self.pagination_strategy.generate_metadata(
-            total_items, items, self.base_url, self.request_params
+            total_items, items, self.base_url, request_params
         )
 
         return {"items": items, "pagination": metadata}

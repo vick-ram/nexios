@@ -38,7 +38,7 @@ class auth(RouteDecorator):
         if getattr(handler, "_is_wrapped", False):
             return handler
 
-        @wraps(handler)  # type: ignore
+        @wraps(handler)
         async def wrapper(
             *args: typing.List[typing.Any], **kwargs: typing.Dict[str, typing.Any]
         ) -> typing.Any:
@@ -50,7 +50,7 @@ class auth(RouteDecorator):
             if not request.scope.get("user"):
                 return self._handle_401(request, response)
 
-            scopes = request.scope.get("auth")  # type: ignore
+            scopes = request.scope.get("auth")
             if not scopes:  # pragma: no cover
                 return self._handle_401(request, response)
 
@@ -66,7 +66,7 @@ class auth(RouteDecorator):
                 return await handler(*args, **kwargs)
             return handler(*args, **kwargs)
 
-        wrapper._is_wrapped = True  # type: ignore
+        wrapper._is_wrapped = True  # ty: ignore[unresolved-attribute]
         return wrapper
 
 
@@ -76,7 +76,7 @@ class has_permission(RouteDecorator):
         if isinstance(permissions, str):
             self.permissions = [permissions]
         elif permissions is None:
-            self.permissions = []  # Allow authentication with any scope
+            self.permissions = []
         else:
             self.permissions = permissions
 
@@ -90,7 +90,7 @@ class has_permission(RouteDecorator):
         if getattr(handler, "_is_wrapped", False):
             return handler
 
-        @wraps(handler)  # type: ignore
+        @wraps(handler)
         async def wrapper(
             *args: typing.List[typing.Any], **kwargs: typing.Dict[str, typing.Any]
         ) -> typing.Any:
@@ -111,5 +111,5 @@ class has_permission(RouteDecorator):
                 return await handler(*args, **kwargs)
             return handler(*args, **kwargs)
 
-        wrapper._is_wrapped = True  # type: ignore
+        wrapper._is_wrapped = True  # ty: ignore[unresolved-attribute]
         return wrapper
