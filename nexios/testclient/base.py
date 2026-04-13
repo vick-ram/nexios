@@ -99,7 +99,7 @@ class TestClient(httpx.Client):
         )
         if headers is None:
             headers = {}
-        headers.setdefault("user-agent", "testclient")
+        cast(dict[str, str], headers).setdefault("user-agent", "testclient")
         super().__init__(
             base_url=base_url,
             headers=headers,
@@ -231,7 +231,11 @@ class TestClient(httpx.Client):
             }
             kwargs.update(remaining_kwargs)
 
-        return self.request(method=method, url=url, **kwargs)  # ty: ignore[invalid-argument-type]
+        return self.request(
+            method=method,
+            url=url,
+            **kwargs,  # ty: ignore[invalid-argument-type]
+        )
 
     def get(
         self,
