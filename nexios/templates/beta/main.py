@@ -1,8 +1,8 @@
-from nexios import NexiosApp
-from nexios.routing import Routes
-
 from config import app_config
 from routes.index import index
+
+from nexios import NexiosApp
+from nexios.routing import Route
 
 # Create the application
 app = NexiosApp(title="{{project_name_title}}", config=app_config)
@@ -21,5 +21,5 @@ async def shutdown():
 
 
 app.add_route(
-    Routes("/", index, summary="Homepage route", description="Homepage route"),
+    Route("/", index, summary="Homepage route", description="Homepage route"),
 )

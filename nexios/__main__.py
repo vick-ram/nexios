@@ -1,15 +1,15 @@
-__version__: str = "2.11.10"
+__version__: str = "3.3.1"
 
 # Version bump test - this comment will be removed after testing
 ascii_art = f"""
-  _   _                 _
+  _   _                  _
  | \\ | |               (_)
  |  \\| |   ___  __  __  _    ___    ___
  | . ` |  / _ \\ \\ \\/ / | |  / _ \\  / __|
  | |\\  | |  __/  >  <  | | | (_) | \\__ \\
  |_| \\_|  \\___| /_/\\_\\ |_|  \\___/  |___/
 
-    🚀 Welcome to Nexios 🚀
+     Welcome to Nexios 
       The sleek ASGI Backend Framework
       Version: {__version__}
 """

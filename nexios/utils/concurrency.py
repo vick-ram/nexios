@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from typing import (
@@ -12,11 +13,11 @@ from typing import (
     List,
     Optional,
     Set,
-    Tuple,
     TypeVar,
-    Union,
 )
 task_group = asyncio.TaskGroup
+
+import anyio
 
 T = TypeVar("T")
 
@@ -54,6 +55,7 @@ class TaskGroup:
         await self.cancel_all()
 
 
+@asynccontextmanager
 async def create_task_group() -> AsyncGenerator[TaskGroup, None]:
     """Create a task group context manager."""
     async with TaskGroup() as group:
@@ -79,64 +81,117 @@ async def run_in_threadpool(func: Callable[..., T], *args: Any, **kwargs: Any) -
     return await loop.run_in_executor(get_threadpool(), func, *args)
 
 
-async def run_until_first_complete(
-    *args: Union[
-        Tuple[Callable[[], Coroutine[Any, Any, T]], dict],
-        Callable[[], Coroutine[Any, Any, T]],
-    ],
-) -> T:
-    """Run multiple coroutines and return when the first one completes."""
-    tasks: List[asyncio.Task] = []
-    for item in args:
-        if callable(item):
-            task = asyncio.create_task(item())
-        else:
-            func, kwargs = item
-            task = asyncio.create_task(func(**kwargs))
-        tasks.append(task)
+async def run_until_first_complete(*args: tuple[Callable, dict]) -> None:  # type: ignore[type-arg]
+    warnings.warn(
+        "run_until_first_complete is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+    )
 
-    try:
-        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-        # Get the result or raise exception from the first completed task
-        result = next(iter(done)).result()
-    finally:
-        # Cancel any pending tasks
-        for task in pending:
-            task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
+    async with anyio.create_task_group() as task_group:
 
-    return result
+        async def run(func: Callable[[], Coroutine]) -> None:  # type: ignore[type-arg]
+            await func()
+            task_group.cancel_scope.cancel()
+
+        for func, kwargs in args:
+            task_group.start_soon(run, functools.partial(func, **kwargs))
 
 
-@asynccontextmanager
-async def create_background_task(
+def create_background_task(
     coro: Coroutine[Any, Any, Any], *, name: Optional[str] = None
-) -> AsyncGenerator[asyncio.Task, None]:
-    """Create a background task that will be cancelled when the context exits."""
-    task = asyncio.create_task(coro, name=name)
-    try:
-        yield task
-    finally:
-        if not task.done():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+) -> asyncio.Task:
+    """Create a background task."""
+    return asyncio.create_task(coro, name=name)
 
 
 class AsyncLazy(Generic[T]):
-    """Lazy async value that is computed only when needed."""
+    """Lazy async value that is computed only when needed.
+
+    AsyncLazy provides lazy evaluation with caching for expensive async operations.
+    The computation runs only once when first accessed, and subsequent calls return
+    the cached result. This is perfect for expensive database aggregations,
+    configuration loading, external API calls for reference data, machine learning
+    model loading, and file parsing operations.
+
+    The class is thread-safe and uses asyncio.Lock to ensure that the computation
+    is only performed once, even if multiple coroutines try to access the value
+    simultaneously.
+
+    Attributes:
+        func: The async function that computes the value
+        _value: The cached computed value (None if not computed yet)
+        _lock: Async lock for thread-safe initialization
+        _initialized: Flag indicating if the value has been computed
+
+    Example:
+        ```python
+        from nexios.utils.concurrency import AsyncLazy
+        import asyncio
+
+        # Create a lazy-loaded configuration
+        config = AsyncLazy(lambda: load_config_from_database())
+
+        async def handler():
+            # Value computed only on first access
+            cfg = await config.get()
+            return cfg
+
+        # Later calls return cached value
+        cached_cfg = await config.get()
+
+        # Reset to force recomputation
+        config.reset()
+        ```
+    """
 
     def __init__(self, func: Callable[[], Awaitable[T]]):
+        """Initialize AsyncLazy with an async function.
+
+        Args:
+            func: An async callable that returns the value to be cached.
+                  The function should take no arguments.
+
+        Example:
+            ```python
+            # Simple case
+            lazy_value = AsyncLazy(lambda: fetch_expensive_data())
+
+            # With lambda wrapping
+            lazy_config = AsyncLazy(
+                lambda: load_config_with_params("config.yaml")
+            )
+            ```
+        """
         self.func = func
         self._value: Optional[T] = None
         self._lock = asyncio.Lock()
         self._initialized = False
 
     async def get(self) -> T:
-        """Get the value, computing it if necessary."""
+        """Get the value, computing it if necessary.
+
+        This method ensures that the value is computed only once, even if multiple
+        coroutines call it simultaneously. The first caller will trigger the
+        computation, while subsequent callers will wait for the computation to
+        complete and then return the cached result.
+
+        Returns:
+            The computed value of type T.
+
+        Raises:
+            Any exception raised by the underlying function during computation.
+
+        Example:
+            ```python
+            # First call triggers computation
+            result1 = await lazy_value.get()
+
+            # Subsequent calls return cached result
+            result2 = await lazy_value.get()  # Instant, no recomputation
+
+            assert result1 is result2  # Same cached object
+            ```
+        """
         if not self._initialized:
             async with self._lock:
                 if not self._initialized:
@@ -146,20 +201,59 @@ class AsyncLazy(Generic[T]):
         return self._value
 
     def reset(self) -> None:
-        """Reset the value so it will be recomputed next time."""
+        """Reset the value so it will be recomputed next time.
+
+        This method clears the cached value and resets the initialization flag.
+        The next call to get() will trigger recomputation. This is useful for
+        refreshing cached data or when the underlying data source has changed.
+
+        Note: This method is not thread-safe with respect to ongoing get() calls.
+        If you need to reset while other coroutines might be accessing the value,
+        ensure proper synchronization.
+
+        Example:
+            ```python
+            # Reset cache periodically
+            async def refresh_cache():
+                while True:
+                    await asyncio.sleep(3600)  # Every hour
+                    lazy_config.reset()
+
+            # Reset after data update
+            await update_database()
+            lazy_stats.reset()  # Force fresh stats on next access
+            ```
+        """
         self._initialized = False
         self._value = None
 
 
 class AsyncEvent:
-    """An async event that can be used to coordinate coroutines."""
+    """An async event that can be used to coordinate coroutines.
+
+    Allows multiple coroutines to wait for an event to be set.
+    Useful for shutdown coordination, signaling, and workflow synchronization.
+
+    Example:
+        ```python
+        event = AsyncEvent()
+
+        async def waiter():
+            await event.wait()  # Blocks until set() is called
+            print("Event occurred!")
+
+        # In another coroutine:
+        event.set()  # Unblocks all waiters
+        ```
+    """
 
     def __init__(self):
+        """Create a new AsyncEvent in cleared state."""
         self._waiters: List[asyncio.Future] = []
         self._value = False
 
     def set(self) -> None:
-        """Set the event."""
+        """Set the event and wake up all waiting coroutines."""
         self._value = True
         for waiter in self._waiters:
             if not waiter.done():
@@ -167,11 +261,11 @@ class AsyncEvent:
         self._waiters.clear()
 
     def clear(self) -> None:
-        """Clear the event."""
+        """Clear the event so future wait() calls will block."""
         self._value = False
 
     async def wait(self) -> bool:
-        """Wait for the event to be set."""
+        """Wait for the event to be set. Returns True when event occurs."""
         if self._value:
             return True
         waiter = asyncio.Future()

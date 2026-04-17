@@ -27,9 +27,10 @@ class OpenAPIConfig:
         title: str = "API Documentation",
         version: str = "1.0.0",
         description: str = "",
-        servers: Optional[List[Server]] = None,
+        servers: Optional[List[Server]] = [],
         contact: Optional[Contact] = None,
         license: Optional[License] = None,
+        termsOfService: Optional[str] = None,
         openapi_version: str = "3.0.0",
     ):
         self.openapi_spec = OpenAPI(
@@ -40,9 +41,10 @@ class OpenAPIConfig:
                 description=description,
                 contact=contact,
                 license=license,
+                termsOfService=termsOfService,
             ),
             paths={},
-            servers=servers or [Server(url="/")],
+            servers=servers,
             components=Components(),
         )
         self.security_schemes: Dict[str, SecurityScheme] = {}
@@ -94,13 +96,13 @@ class OpenAPIConfig:
 
     def add_example(self, name: str, example: Example):
         """Add an example to the OpenAPI components section"""
-        if not self.openapi_spec.components:
+        if self.openapi_spec.components is None:
             self.openapi_spec.components = Components()
 
-        if not self.openapi_spec.components.examples:
+        if self.openapi_spec.components.examples is None:
             self.openapi_spec.components.examples = {}
 
-        self.openapi_spec.components.examples[name] = example
+        self.openapi_spec.components.examples[name] = example  # ty: igore[unresolved-attribute]  # ty:ignore[invalid-assignment]
 
     def add_tag(self, tag: Tag):
         """Add a tag to the OpenAPI specification"""

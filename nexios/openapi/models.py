@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.networks import AnyUrl
 
 try:
-    import email_validator  # type: ignore # noqa: F401
+    import email_validator  # noqa f401
     from pydantic import EmailStr
-except ImportError:  # pragma: no cover
-    EmailStr = str  # type: ignore
+except ImportError:
+    EmailStr = str  # ty:ignore[invalid-assignment]
 
 
 from typing import Annotated, Literal
@@ -102,7 +102,7 @@ class Schema(BaseModel):
     minProperties: Annotated[Optional[int], Field(ge=0)] = None
     required: Optional[List[str]] = None
     enum: Optional[List[Any]] = None
-    type: Optional[str] = "object"
+    type: Optional[str] = None
     allOf: Optional[List[Schema]] = None
     oneOf: Optional[List[Schema]] = None
     anyOf: Optional[List[Schema]] = None
@@ -123,6 +123,24 @@ class Schema(BaseModel):
     example: Optional[Any] = None
     examples: Optional[Examples] = None
 
+    @field_validator("type", mode="before")
+    @classmethod
+    def validate_type(cls, v, info):
+        """Validate type field - if anyOf/oneOf/allOf is present, type should not be set"""
+        if v is not None:
+            return v
+
+        # Only set default type "object" if no composition keywords are present
+        data = info.data if hasattr(info, "data") else {}
+        has_composition = any(
+            data.get(key) is not None for key in ["anyOf", "oneOf", "allOf"]
+        )
+
+        if not has_composition:
+            return "object"
+
+        return None
+
 
 class Example(BaseModel):
     summary: Optional[str] = None
@@ -142,7 +160,9 @@ class Encoding(BaseModel):
 
 
 class MediaType(BaseModel):
-    schema_: Annotated[Optional[Union[Schema, Reference]], Field(alias="schema")]
+    spec: Optional[Union[Schema, Reference]] = Field(
+        default=None, serialization_alias="schema"
+    )
     examples: Optional[Examples] = None
     encoding: Optional[Dict[str, Encoding]] = None
 
@@ -151,12 +171,13 @@ class ParameterBase(BaseModel):
     description: Optional[str] = None
     required: Optional[bool] = None
     deprecated: Optional[bool] = None
-    # Serialization rules for simple scenarios
     style: Optional[str] = None
     explode: Optional[bool] = None
-    schema_: Annotated[Optional[Union[Schema, Reference]], Field(alias="schema")]
+    spec: Annotated[
+        Optional[Union[Schema, Reference]],
+        Field(default=None, serialization_alias="schema"),
+    ] = None
     examples: Optional[Examples] = None
-    # Serialization rules for more complex scenarios
     content: Optional[Dict[str, MediaType]] = None
 
 
@@ -166,24 +187,26 @@ class ConcreteParameter(ParameterBase):
 
 
 class Header(ConcreteParameter):
-    in_: Literal["header"] = Field(default="header", alias="in")
+    in_: Literal["header"] = Field(default="header", serialization_alias="in")
     style: HeaderParamStyles = "simple"
     explode: bool = False
-    schema_: Annotated[Optional[Union[Schema, Reference]], Field(alias="schema")] = (
-        Schema(type="string")
-    )
+    spec: Annotated[
+        Optional[Union[Schema, Reference]],
+        Field(default=None, serialization_alias="schema"),
+    ] = Schema(type="string")
 
 
 class Query(ConcreteParameter):
     in_: Literal["query"] = Field(
-        default="query",  # Explicit default
-        alias="in",  # Explicit alias for OpenAPI compliance
+        default="query",
+        serialization_alias="in",
     )
     style: QueryParamStyles = "form"
     explode: bool = True
-    schema_: Annotated[Optional[Union[Schema, Reference]], Field(alias="schema")] = (
-        Schema(type="string")
-    )
+    spec: Annotated[
+        Optional[Union[Schema, Reference]],
+        Field(default=None, serialization_alias="schema"),
+    ] = Schema(type="string")
 
 
 class Path(ConcreteParameter):
@@ -220,12 +243,13 @@ class Link(BaseModel):
 class ResponseHeader(BaseModel):
     description: Optional[str] = None
     deprecated: Optional[bool] = None
-    # Serialization rules for simple scenarios
     style: HeaderParamStyles = "simple"
     explode: bool = False
-    schema_: Annotated[Optional[Union[Schema, Reference]], Field(alias="schema")] = None
+    spec: Annotated[
+        Optional[Union[Schema, Reference]],
+        Field(default=None, serialization_alias="schema"),
+    ] = None
     examples: Optional[Examples] = None
-    # Serialization rules for more complex scenarios
     content: Optional[Dict[str, MediaType]] = None
 
 
@@ -372,7 +396,7 @@ class OpenAPI(BaseModel):
     paths: Annotated[Dict[str, Union[PathItem, Extension]], Field(default_factory=dict)]
     servers: Optional[List[Server]] = None
     # Using Any for Specification Extensions
-    components: Optional[Components] = None
+    components: Components = Components()
     security: Optional[List[Dict[str, List[str]]]] = None
     tags: Optional[List[Tag]] = None
     externalDocs: Optional[ExternalDocumentation] = None

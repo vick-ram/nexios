@@ -6,11 +6,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from tempfile import SpooledTemporaryFile
 
-from nexios.structs import FormData, Headers, UploadedFile
+from nexios.objects import FormData, Headers, UploadedFile
 
 if typing.TYPE_CHECKING:
-    import multipart  # type:ignore
-    from multipart.multipart import (  # type:ignore
+    import multipart
+    from multipart.multipart import (
         parse_options_header,
     )
 else:
@@ -180,12 +180,12 @@ class MultiPartParser:
             self._current_part.data.extend(message_bytes)
         else:
             # Check file size limit when writing file parts
-            if self._current_part.file and self._current_part.file.size is not None:
-                new_size = self._current_part.file.size + len(message_bytes)
-                # if new_size > self.max_file_size:
-                #     raise MultiPartException(
-                #         f"File too large. Maximum size is {self.max_file_size} bytes"
-                #     ) might reimplemented in further versions
+            # if self._current_part.file and self._current_part.file.size is not None:
+            # new_size = self._current_part.file.size + len(message_bytes)
+            # if new_size > self.max_file_size:
+            #     raise MultiPartException(
+            #         f"File too large. Maximum size is {self.max_file_size} bytes"
+            #     ) might reimplemented in further versions
             self._file_parts_to_write.append((self._current_part, message_bytes))
 
     def on_part_end(self) -> None:
@@ -195,7 +195,7 @@ class MultiPartParser:
                     self._current_part.field_name,
                     _user_safe_decode(
                         self._current_part.data,
-                        self._charset,  # type: ignore
+                        self._charset,
                     ),
                 )
             )
@@ -227,7 +227,7 @@ class MultiPartParser:
         try:
             self._current_part.field_name = _user_safe_decode(
                 options[b"name"],
-                self._charset,  # type: ignore
+                self._charset,
             )
         except KeyError:
             raise MultiPartException(
@@ -241,12 +241,12 @@ class MultiPartParser:
                 )
             filename = _user_safe_decode(
                 options[b"filename"],
-                self._charset,  # type: ignore
-            )  # type:ignore
+                self._charset,
+            )
             tempfile = SpooledTemporaryFile(max_size=self.max_file_size)
             self._files_to_close_on_error.append(tempfile)
             self._current_part.file = UploadedFile(
-                file=tempfile,  # type: ignore[arg-type]
+                file=tempfile,
                 size=0,
                 filename=filename,
                 headers=Headers(raw=self._current_part.item_headers),
@@ -277,7 +277,7 @@ class MultiPartParser:
         charset = params.get(b"charset")
         self._charset = charset.decode("latin-1") if charset else "utf-8"
 
-        callbacks: typing.Dict[str, typing.Callable[..., typing.Any]] = {
+        callbacks = {
             "on_part_begin": self.on_part_begin,
             "on_part_data": self.on_part_data,
             "on_part_end": self.on_part_end,
@@ -288,11 +288,14 @@ class MultiPartParser:
             "on_end": self.on_end,
         }
 
-        parser = multipart.MultipartParser(boundary, callbacks)  # type:ignore
+        parser = multipart.MultipartParser(
+            boundary,
+            callbacks,  # ty:ignore[invalid-argument-type]
+        )
         try:
             # Feed the parser with data from the request.
             async for chunk in self.stream:
-                parser.write(chunk)  # type:ignore
+                parser.write(chunk)
                 # Write file data, it needs to use await with the UploadedFile methods
                 # that call the corresponding file methods *in a threadpool*,
                 # otherwise, if they were called directly in the callback methods above
@@ -300,7 +303,7 @@ class MultiPartParser:
                 # the main thread.
                 for part, data in self._file_parts_to_write:
                     # assert part.file  # for type checkers
-                    await part.file.write(data)  # type:ignore
+                    await part.file.write(data)  # ty: ignore[unresolved-attribute]
                 for part in self._file_parts_to_finish:
                     assert part.file  # for type checkers
                     await part.file.seek(0)
@@ -312,5 +315,5 @@ class MultiPartParser:
                 file.close()
             raise exc
 
-        parser.finalize()  # type:ignore
+        parser.finalize()
         return FormData(self.items)

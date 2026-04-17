@@ -8,9 +8,9 @@ import sys
 import traceback
 import typing
 import uuid
+from typing import cast
 
 from nexios.__main__ import __version__ as nexios_version
-from nexios.config import get_config
 from nexios.http import Request, Response
 from nexios.logging import DEBUG, create_logger
 from nexios.middleware.base import BaseMiddleware
@@ -666,7 +666,7 @@ JS = """
         const errorHeader = document.querySelector('.error-header');
         if (errorHeader) {
             const copyButton = document.createElement('button');
-            copyButton.innerHTML = '📋 Copy Error';
+            copyButton.innerHTML = ' Copy Error';
             copyButton.style.cssText = `
                 background: rgba(255, 255, 255, 0.2);
                 color: white;
@@ -760,7 +760,7 @@ TEMPLATE = """
             <!-- Traceback Section (Always visible) -->
             <div class="section">
                 <div class="section-title" onclick="toggleSection('traceback-section')">
-                    <span>🔍 Traceback & Stack Trace</span>
+                    <span> Traceback & Stack Trace</span>
                     <button class="collapse-btn" data-section="traceback-section" onclick="event.stopPropagation(); toggleSection('traceback-section')">&#8210;</button>
                 </div>
                 <div id="traceback-section" class="section-content">
@@ -771,7 +771,7 @@ TEMPLATE = """
             <!-- Request Information Section -->
             <div class="section">
                 <div class="section-title" onclick="toggleSection('request-section')">
-                    <span>📡 Request Information</span>
+                    <span> Request Information</span>
                     <button class="collapse-btn" data-section="request-section" onclick="event.stopPropagation(); toggleSection('request-section')">+</button>
                 </div>
                 <div id="request-section" class="section-content">
@@ -782,7 +782,7 @@ TEMPLATE = """
             <!-- System Information Section -->
             <div class="section">
                 <div class="section-title" onclick="toggleSection('system-section')">
-                    <span>⚙️ System Information</span>
+                    <span> System Information</span>
                     <button class="collapse-btn" data-section="system-section" onclick="event.stopPropagation(); toggleSection('system-section')">+</button>
                 </div>
                 <div id="system-section" class="section-content">
@@ -793,7 +793,7 @@ TEMPLATE = """
             <!-- Debugging Suggestions Section -->
             <div class="section">
                 <div class="section-title" onclick="toggleSection('suggestions-section')">
-                    <span>💡 Debugging Suggestions</span>
+                    <span> Debugging Suggestions</span>
                     <button class="collapse-btn" data-section="suggestions-section" onclick="event.stopPropagation(); toggleSection('suggestions-section')">+</button>
                 </div>
                 <div id="suggestions-section" class="section-content">
@@ -804,7 +804,7 @@ TEMPLATE = """
             <!-- JSON Data Section -->
             <div class="section">
                 <div class="section-title" onclick="toggleSection('json-section')">
-                    <span>📄 Error JSON Data</span>
+                    <span> Error JSON Data</span>
                     <button class="collapse-btn" data-section="json-section" onclick="event.stopPropagation(); toggleSection('json-section')">+</button>
                 </div>
                 <div id="json-section" class="section-content">
@@ -823,7 +823,7 @@ FRAME_TEMPLATE = """
 <div class="frame-container">
     <div class="frame-title" onclick="collapse(this.querySelector('.collapse-btn'))">
         <div class="frame-info">
-            <span class="frame-icon">📁</span>
+            <span class="frame-icon"></span>
             <span class="frame-filename">{frame_filename}</span>
             <span class="frame-separator">:</span>
             <span class="frame-lineno">{frame_lineno}</span>
@@ -863,14 +863,17 @@ class ServerErrorMiddleware(BaseMiddleware):
         self,
         request: Request,
         response: Response,
-        next_middleware: typing.Callable[[], typing.Awaitable[Response]],
-    ) -> typing.Any:
+        call_next: typing.Callable[[], typing.Awaitable[Response]],
+    ):
         # Store the current request for error context
         self.current_request = request
         # Get debug mode from config
-        self.debug = get_config().debug or True
         try:
-            return await next_middleware()
+            self.debug = True
+        except Exception:  # pragma: no cover
+            self.debug = True
+        try:
+            return await call_next()
         except Exception as exc:
             if self.handler:
                 response = await self.handler(request, response, exc)
@@ -878,7 +881,8 @@ class ServerErrorMiddleware(BaseMiddleware):
                 response = self.get_debug_response(request, response, exc)
             else:
                 response = self.error_response(response)
-
+            headers = request.scope.get("server_error_headers", {})
+            response.set_headers(headers)
             err = traceback.format_exc()
             logger.error(err)
             return response
@@ -890,14 +894,21 @@ class ServerErrorMiddleware(BaseMiddleware):
         self, request: Request, response: Response, exc: Exception
     ) -> Response:
         accept = request.headers.get("accept", "")
-        if "text/html" in accept:
-            content: str = self.generate_html(exc)
+        if not accept:
+            content = self.generate_plain_text(exc)
+        elif "text/html" in accept:
+            content = self.generate_html(exc)
             return response.html(content, status_code=500)
-        content = self.generate_plain_text(exc)
+        else:
+            content = self.generate_plain_text(exc)
         return response.text(content, status_code=500)
 
     def format_line(
-        self, index: int, line: str, frame_lineno: int, frame_index: int
+        self,
+        index: int,
+        line: str,
+        frame_lineno: int,
+        frame_index: int,
     ) -> str:
         values: typing.Dict[str, typing.Any] = {
             # HTML escape - line could contain < or >
@@ -934,14 +945,14 @@ class ServerErrorMiddleware(BaseMiddleware):
         return locals_html
 
     def generate_frame_html(self, frame: inspect.FrameInfo, is_collapsed: bool) -> str:
-        code_context: str = "".join(  # type:ignore
+        code_context: str = "".join(
             self.format_line(
                 index,
                 line,
                 frame.lineno,
-                frame.index,  # type:ignore
+                cast(int, frame.index),
             )
-            for index, line in enumerate(frame.code_context or [])  # type:ignore
+            for index, line in enumerate(frame.code_context or [])
         )
 
         # Format local variables if available

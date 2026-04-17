@@ -1,13 +1,12 @@
 from .base import BaseRouter
 from .grouping import Group
-from .http import Router, Routes
-from .websocket import WebsocketRoutes, WSRouter
+from .router import Route, Router
+from .websocket import WebsocketRoute
 
 __all__ = [
     "Router",
-    "Routes",
-    "WSRouter",
-    "WebsocketRoutes",
+    "Route",
+    "WebsocketRoute",
     "BaseRouter",
     "Group",
 ]

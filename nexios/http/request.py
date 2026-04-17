@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import typing
 from http import cookies as http_cookies
+from typing import Any
+from urllib.parse import urlencode
 
 import anyio
 
@@ -12,8 +14,8 @@ from nexios._internals._formparsers import (
     MultiPartParser,
     UploadedFile,
 )
+from nexios.objects import URL, Address, FormData, Headers, QueryParams, State
 from nexios.session.base import BaseSessionInterface
-from nexios.structs import URL, Address, FormData, Headers, QueryParams, State
 from nexios.utils.async_helpers import (
     AwaitableOrContextManager,
     AwaitableOrContextManagerWrapper,
@@ -21,13 +23,15 @@ from nexios.utils.async_helpers import (
 
 if typing.TYPE_CHECKING:
     from nexios import NexiosApp
+    from nexios.auth.users.base import BaseUser
 
 
 try:
-    from python_multipart.multipart import parse_options_header  # type:ignore
+    from python_multipart.multipart import parse_options_header
 
 except ImportError:
-    parse_options_header = None
+    parse_options_header = None  # ty:ignore[invalid-assignment]
+
 Scope = typing.MutableMapping[str, typing.Any]
 Message = typing.MutableMapping[str, typing.Any]
 
@@ -69,7 +73,7 @@ def cookie_parser(cookie_string: str) -> dict[str, str]:
         key, val = key.strip(), val.strip()
         if key or val:
             # unquote using Python's algorithm.
-            cookie_dict[key] = http_cookies._unquote(val)  # type:ignore
+            cookie_dict[key] = http_cookies._unquote(val)
     return cookie_dict
 
 
@@ -209,8 +213,6 @@ class HTTPConnection(object):
             uri = f"{base_url}/{path}"
 
         if query_params:
-            from urllib.parse import urlencode
-
             query_string = urlencode(query_params)
             uri = f"{uri}?{query_string}"
 
@@ -226,6 +228,80 @@ async def empty_send(message: Message) -> typing.NoReturn:
 
 
 class Request(HTTPConnection):
+    """
+    HTTP request object providing access to request data and metadata.
+
+    The Request object encapsulates all information about an incoming HTTP request,
+    including headers, body, query parameters, path parameters, cookies, and more.
+    It provides both synchronous and asynchronous access to request data with
+    convenient methods for common operations.
+
+    Key Features:
+    - Lazy loading of request body and form data
+    - Support for JSON, form data, and file uploads
+    - Path and query parameter access
+    - Cookie and session management
+    - User authentication integration
+    - Content type detection and validation
+
+    Examples:
+        1. Basic request handling:
+        ```python
+        @app.post("/users")
+        async def create_user(request: Request, response: Response):
+            # Access JSON data
+            data = await request.json
+
+            # Access path parameters
+            user_id = request.path_params.get('id')
+
+            # Access query parameters
+            limit = request.query_params.get('limit', '10')
+
+            # Access headers
+            auth_header = request.headers.get('Authorization')
+
+            return response.json({"created": True})
+        ```
+
+        2. File upload handling:
+        ```python
+        @app.post("/upload")
+        async def upload_file(request: Request, response: Response):
+            # Check if request has files
+            if not request.has_files:
+                return response.json({"error": "No files uploaded"}, status=400)
+
+            # Access uploaded files
+            files = await request.files
+            uploaded_file = files.get('file')
+
+            if uploaded_file:
+                # Save file
+                content = await uploaded_file.read()
+                with open(f"uploads/{uploaded_file.filename}", "wb") as f:
+                    f.write(content)
+
+            return response.json({"uploaded": uploaded_file.filename})
+        ```
+
+        3. Form data handling:
+        ```python
+        @app.post("/contact")
+        async def contact_form(request: Request, response: Response):
+            # Access form data
+            form = await request.form
+            name = form.get('name')
+            email = form.get('email')
+            message = form.get('message')
+
+            # Process form data
+            await send_contact_email(name, email, message)
+
+            return response.json({"message": "Contact form submitted"})
+        ```
+    """
+
     def __init__(
         self, scope: Scope, receive: Receive = empty_receive, send: Send = empty_send
     ):
@@ -235,7 +311,7 @@ class Request(HTTPConnection):
         self._send = send
         self._stream_consumed = False
         self._is_disconnected = False
-        self._form = None  # type: ignore
+        self._form: FormData | Any = None
 
     @property
     def method(self) -> str:
@@ -248,9 +324,10 @@ class Request(HTTPConnection):
     @property
     def content_type(self) -> typing.Optional[str]:
         content_type_header = self.headers.get("Content-Type")
-        content_type: str
-        content_type, _ = parse_options_header(content_type_header)  # type:ignore
-        return content_type  # type:ignore
+        if content_type_header is None:
+            return None
+        content_type, _ = parse_options_header(content_type_header)
+        return content_type.decode("utf-8") if content_type else None
 
     async def stream(self) -> typing.AsyncGenerator[bytes, None]:
         if hasattr(self, "_body"):
@@ -285,14 +362,7 @@ class Request(HTTPConnection):
     async def json(self) -> typing.Dict[str, JSONType]:
         if not hasattr(self, "_json"):
             _body = await self.body
-            try:
-                body = _body.decode()
-            except UnicodeDecodeError:
-                return {}
-            try:
-                self._json = json.loads(body)
-            except json.JSONDecodeError:
-                self._json = {}
+            self._json = json.loads(_body)
         return self._json
 
     @property
@@ -317,13 +387,13 @@ class Request(HTTPConnection):
         max_files: typing.Optional[int] = 1000,
         max_fields: typing.Optional[int] = 1000,
     ) -> FormData:
-        if self._form is None:  # type:ignore
+        if self._form is None:
             assert parse_options_header is not None, (
                 "The `python-multipart` library must be installed to use form parsing."
             )
             content_type_header = self.headers.get("Content-Type")
             content_type: bytes
-            content_type, _ = parse_options_header(content_type_header)  # type:ignore
+            content_type, _ = parse_options_header(content_type_header)
             if content_type == b"multipart/form-data":
                 try:
                     multipart_parser = MultiPartParser(
@@ -334,38 +404,31 @@ class Request(HTTPConnection):
                     )
                     self._form = await multipart_parser.parse()
                 except MultiPartException as _:
-                    self._form = {}  # type: ignore
+                    self._form = {}
             elif content_type == b"application/x-www-form-urlencoded":
                 form_parser = FormParser(self.headers, self.stream())
 
                 self._form = await form_parser.parse()
             else:
                 self._form: FormData = FormData()
-        return self._form  # type:ignore
+        return self._form  # ty : ignore[invalid-return-type]
 
     @property
-    def form_data(
-        self,
-        *,
-        max_files: typing.Optional[int] = 1000,
-        max_fields: typing.Optional[int] = 1000,
-    ) -> AwaitableOrContextManager[FormData]:
-        return AwaitableOrContextManagerWrapper(
-            self._get_form(max_files=max_files, max_fields=max_fields)
-        )
+    def form_data(self) -> AwaitableOrContextManager[FormData]:
+        return AwaitableOrContextManagerWrapper(self._get_form())
 
     async def close(self) -> None:
-        if self._form is not None:  # type: ignore
+        if self._form is not None:
             await self._form.close()
 
     async def is_disconnected(self) -> bool:
         if not self._is_disconnected:
-            message: typing.Dict[str, typing.Any] = {}
+            message = {}
 
             # If message isn't immediately available, move on
-            with anyio.CancelScope() as cs:  # type: ignore
-                cs.cancel()  # type: ignore
-                message = await self._receive()  # type:ignore
+            with anyio.CancelScope() as cs:
+                cs.cancel()
+                message = await self._receive()
 
             if message.get("type") == "http.disconnect":
                 self._is_disconnected = True
@@ -393,8 +456,8 @@ class Request(HTTPConnection):
         files_dict: typing.Dict[str, typing.Any] = {}
         for key, value in form_data.items():
             if isinstance(value, (list, tuple)):
-                for item in value:  # type: ignore
-                    if hasattr(item, "filename"):  # type: ignore
+                for item in value:
+                    if hasattr(item, "filename"):
                         files_dict[key] = item
             elif hasattr(value, "filename"):
                 files_dict[key] = value
@@ -432,15 +495,11 @@ class Request(HTTPConnection):
         return typing.cast(BaseSessionInterface, self.scope["session"])
 
     @property
-    def user(self):
+    def user(self) -> typing.Optional[BaseUser]:
         return self.scope.get("user", None)
 
     def url_for(self, _name: str, **path_params: typing.Dict[str, typing.Any]) -> str:
         return self.base_app.url_for(_name, **path_params)
-
-    @user.setter
-    def user(self, value: str):
-        self.scope["user"] = value
 
     def __str__(self) -> str:
         return f"<Request {self.method} {self.url}>"
@@ -461,15 +520,6 @@ class Request(HTTPConnection):
         return self.url.scheme == "https"
 
     @property
-    def accepts_json(self) -> bool:
-        """
-        Check if the request accepts JSON response.
-        Returns True if the Accept header includes application/json.
-        """
-        accept = self.headers.get("accept", "")
-        return "application/json" in accept or "*/*" in accept
-
-    @property
     def accepts_html(self) -> bool:
         """
         Check if the request accepts HTML response.
@@ -478,12 +528,134 @@ class Request(HTTPConnection):
         accept = self.headers.get("accept", "")
         return "text/html" in accept or "*/*" in accept
 
+    @property
+    def is_json(self) -> bool:
+        """
+        Check if the request content type is JSON.
+        Returns True if Content-Type header starts with application/json.
+        """
+        content_type = self.content_type
+        return content_type is not None and "application/json" in content_type
+
+    @property
+    def is_form(self) -> bool:
+        """
+        Check if the request is form data (either URL-encoded or multipart).
+        Returns True if Content-Type is application/x-www-form-urlencoded or multipart/form-data.
+        """
+        content_type = self.content_type
+        return content_type is not None and (
+            content_type.startswith("application/x-www-form-urlencoded")
+            or content_type.startswith("multipart/form-data")
+        )
+
+    @property
+    def is_multipart(self) -> bool:
+        """
+        Check if the request is multipart form data.
+        Returns True if Content-Type starts with multipart/form-data.
+        """
+        content_type = self.content_type
+        return content_type is not None and content_type.startswith(
+            "multipart/form-data"
+        )
+
+    @property
+    def is_urlencoded(self) -> bool:
+        """
+        Check if the request is URL-encoded form data.
+        Returns True if Content-Type is application/x-www-form-urlencoded.
+        """
+        content_type = self.content_type
+        return (
+            content_type is not None
+            and content_type == "application/x-www-form-urlencoded"
+        )
+
+    @property
+    def has_cookie(self) -> bool:
+        """
+        Check if the request has cookies.
+        Returns True if Cookie header exists and has content.
+        """
+        cookie_header = self.headers.get("cookie")
+        return cookie_header is not None and cookie_header.strip() != ""
+
+    @property
+    def has_files(self) -> bool:
+        """
+        Check if the request contains uploaded files.
+        Returns True if the request has multipart form data with files.
+        """
+        try:
+            # This will check if there are any files in the form data
+            import asyncio
+
+            if self.is_multipart:
+                # Try to get form data to check for files
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If we're in an async context, we can't use asyncio.run
+                    # Just check if the content type suggests files might be present
+                    return True
+                else:
+                    # Safe to use asyncio.run
+                    form_data = loop.run_until_complete(self.form_data)
+                    for value in form_data.values():
+                        if hasattr(value, "filename") and value.filename:
+                            return True
+                    return False
+            return False
+        except Exception:
+            return False
+
+    @property
+    def has_body(self) -> bool:
+        """
+        Check if the request has a body.
+        Returns True if Content-Length > 0 or if body contains data.
+        """
+        content_length = self.content_length
+        if content_length > 0:
+            return True
+
+        # For methods that typically have bodies
+        if self.method in ("POST", "PUT", "PATCH"):
+            return True
+
+        return False
+
+    @property
+    def is_authenticated(self) -> bool:
+        """
+        Check if the request is authenticated (has user in scope).
+        Returns True if user is set in the request scope.
+        """
+        return self.user is not None
+
+    @property
+    def has_session(self) -> bool:
+        """
+        Check if session middleware is available.
+        Returns True if session is available in the request scope.
+        """
+        return "session" in self.scope
+
+    @property
+    def accepts_json(self) -> bool:
+        """
+        Check if the request accepts JSON response.
+        Returns True if the Accept header includes application/json.
+        """
+        accept = self.headers.get("accept", "")
+        return "application/json" in accept or "*/*" in accept
+
     def get_header(self, key: str, default: typing.Any = None) -> typing.Any:
         """
         Get a header value with a default if not found.
         Case-insensitive header lookup.
         """
-        return self.headers.get(key.lower(), default)
+        return self.headers.get(key.lower()) or default
 
     def has_header(self, key: str) -> bool:
         """
@@ -557,35 +729,3 @@ class Request(HTTPConnection):
         if flat:
             return {k: v[0] if isinstance(v, list) else v for k, v in params.items()}
         return params
-
-    @property
-    def basic_auth(self) -> typing.Tuple[str, str]:
-        """
-        Get HTTP Basic Authentication credentials.
-        Returns a tuple of (username, password) or ("", "").
-        """
-        auth = self.headers.get("authorization", "")
-        if not auth.startswith("Basic "):
-            return ("", "")
-
-        try:
-            import base64
-
-            credentials = base64.b64decode(auth[6:]).decode("utf-8")
-            username, password = credentials.split(":")
-            return (username, password)
-        except Exception:
-            return ("", "")
-
-    @property
-    def bearer_token(self) -> str:
-        """
-        Get the Bearer token from Authorization header.
-        Returns the token or empty string if not found.
-        """
-        auth = self.headers.get("authorization", "")
-        if not auth.startswith("Bearer "):
-            return ""
-        return auth[7:]
-
-    

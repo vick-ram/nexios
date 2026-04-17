@@ -11,14 +11,25 @@ from email.utils import format_datetime, formatdate
 from functools import partial
 from hashlib import sha1
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, Generator, List, Optional, Tuple, Union
+from typing import (
+    Annotated,
+    Any,
+    AsyncIterator,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 from urllib.parse import quote
 
 import anyio
 import anyio.to_thread
 from anyio import AsyncFile
+from typing_extensions import Doc
 
 from nexios.http.request import ClientDisconnect, Request
+from nexios.objects import MutableHeaders
 from nexios.pagination import (
     AsyncListDataHandler,
     AsyncPaginator,
@@ -29,7 +40,6 @@ from nexios.pagination import (
     SyncListDataHandler,
     SyncPaginator,
 )
-from nexios.structs import MutableHeaders
 
 Scope = typing.MutableMapping[str, typing.Any]
 Message = typing.MutableMapping[str, typing.Any]
@@ -78,27 +88,31 @@ class BaseResponse:
     ):
         self.charset = "utf-8"
         self.status_code: int = status_code
-        self._headers: List[Tuple[bytes, bytes]] = []
+        self.raw_headers: List[Tuple[bytes, bytes]] = []
         self._body = self.render(body)
-        self.headers = headers or {}
-
         self.content_type: typing.Optional[str] = content_type
+        self._init_headers(headers)
 
     def render(self, content: typing.Any) -> typing.Union[bytes, memoryview]:
         if content is None:
             return b""
         if isinstance(content, (bytes, memoryview)):
-            return content  # type: ignore
-        return content.encode(self.charset)  # type: ignore
+            return content
+        return content.encode(self.charset)
 
-    def _init_headers(self):
-        raw_headers = [
-            (k.lower().encode("latin-1"), v.encode("latin-1"))
-            for k, v in self.headers.items()
-        ]
-        keys = [h[0] for h in raw_headers]
-        populate_content_length = b"content-length" not in keys
-        populate_content_type = b"content-type" not in keys
+    def _init_headers(self, headers: Optional[Dict[str, str]] = None):
+        if headers is None:
+            raw_headers: list[tuple[bytes, bytes]] = []
+            populate_content_length = True
+            populate_content_type = True
+        else:
+            raw_headers = [
+                (k.lower().encode("latin-1"), v.encode("latin-1"))
+                for k, v in headers.items()
+            ]
+            keys = [h[0] for h in raw_headers]
+            populate_content_length = b"content-length" not in keys
+            populate_content_type = b"content-type" not in keys
         body = getattr(self, "_body", None)
         if (
             body is not None
@@ -114,9 +128,15 @@ class BaseResponse:
                 and "charset=" not in content_type.lower()
             ):
                 content_type += "; charset=" + self.charset
-            self._headers.append((b"content-type", content_type.encode("latin-1")))
+            self.raw_headers.append((b"content-type", content_type.encode("latin-1")))
 
-        self._headers.extend(raw_headers)
+        self.raw_headers.extend(raw_headers)
+
+    @property
+    def headers(self) -> MutableHeaders:
+        if not hasattr(self, "_headers"):
+            self._headers = MutableHeaders(raw=self.raw_headers)
+        return self._headers
 
     def set_cookie(
         self,
@@ -178,29 +198,29 @@ class BaseResponse:
             cache_control.append("public")
 
         cache_control.append(f"max-age={max_age}")
-        self.headers["cache-control"] = ", ".join(cache_control)
+        self.set_header("cache-control", ", ".join(cache_control))
 
         etag = self._generate_etag()
-        self.headers["etag"] = etag
+        self.set_header("etag", etag)
 
-        expires = datetime.utcnow() + timedelta(seconds=max_age)  # type: ignore
-        self.headers["expires"] = formatdate(expires.timestamp(), usegmt=True)
+        expires = datetime.now(timezone.utc) + timedelta(seconds=max_age)
+        self.set_header("expires", formatdate(expires.timestamp(), usegmt=True))
 
     def disable_caching(self) -> None:
         """Disable caching for this response."""
-        self.headers["cache-control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        self.headers["pragma"] = "no-cache"
-        self.headers["expires"] = "0"
+        self.set_header(
+            "cache-control", "no-store, no-cache, must-revalidate, max-age=0"
+        )
+        self.set_header("pragma", "no-cache")
+        self.set_header("expires", "0")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Make the response callable as an ASGI application."""
-        self._init_headers()
-
         await send(
             {
                 "type": "http.response.start",
                 "status": self.status_code,
-                "headers": self._headers,
+                "headers": self.raw_headers,
             }
         )
 
@@ -215,14 +235,10 @@ class BaseResponse:
     def body(self):
         return self._body
 
-    @property
-    def raw_headers(self):
-        return self._headers
-
     def _generate_etag(self) -> str:
         """Generate an ETag for the response content."""
         content_hash = sha1()
-        content_hash.update(self._body)  # type:ignore
+        content_hash.update(self._body)
         return f'W/"{b64encode(content_hash.digest()).decode("utf-8")}"'
 
     def set_header(self, key: str, value: str, overide: bool = False) -> "BaseResponse":
@@ -236,10 +252,30 @@ class BaseResponse:
         new_header = (key_bytes, value_bytes)
 
         if overide:
-            self._headers = [(k, v) for k, v in self._headers if k != key_bytes]
+            self.raw_headers = [(k, v) for k, v in self.raw_headers if k != key_bytes]
 
-        self._headers.append(new_header)
+        self.raw_headers.append(new_header)
         return self
+
+    def set_headers(self, headers: Dict[str, str], overide_all: bool = False):
+        if overide_all:
+            self.raw_headers = [
+                (k.lower().encode("latin-1"), v.encode("latin-1"))
+                for k, v in headers.items()
+            ]
+            return
+        """Set multiple headers at once."""
+        for key, value in headers.items():
+            self.set_header(key, value)
+
+    def remove_header(self, key: str):
+        """Remove a header from the response."""
+        del self.headers[key]
+
+    def remove_headers(self, keys: List[str]):
+        """Remove multiple headers from the response."""
+        for key in keys:
+            self.remove_header(key)
 
 
 class PlainTextResponse(BaseResponse):
@@ -326,7 +362,6 @@ class FileResponse(BaseResponse):
         self.content_disposition_type = content_disposition_type
         self.status_code = status_code
 
-        self.headers = headers or {}
         content_type, _ = mimetypes.guess_type(str(self.path))
         self.set_header("content-type", content_type or "application/octet-stream")
         self.set_header(
@@ -414,7 +449,7 @@ class FileResponse(BaseResponse):
             {
                 "type": "http.response.start",
                 "status": self.status_code,
-                "headers": self._headers,
+                "headers": self.raw_headers,
             }
         )
 
@@ -440,14 +475,14 @@ class FileResponse(BaseResponse):
                 )
             elif self._ranges:
                 start, end = self._ranges[0]
-                await self._send_range(file, start, end, send)  # type:ignore
+                await self._send_range(file, start, end, send)
             else:
-                await self._send_full_file(file, send)  # type:ignore
+                await self._send_full_file(file, send)
 
-    async def _send_full_file(self, file: AsyncIterator[bytes], send: Send) -> None:
+    async def _send_full_file(self, file: AsyncFile[bytes], send: Send) -> None:
         """Send the entire file in chunks using AnyIO."""
         while True:
-            chunk = await file.read(self.chunk_size)  # type:ignore
+            chunk = await file.read(self.chunk_size)
             if not chunk:
                 break
             await send(
@@ -503,9 +538,9 @@ class FileResponse(BaseResponse):
 
         boundary = f"--{self._multipart_boundary}\r\n"
         header = next(
-            (value for key, value in self._headers if key == b"content-type"), None
+            (value for key, value in self.raw_headers if key == b"content-type"), None
         )
-        headers = f"Content-Type: {header}\r\nContent-Range: bytes {start}-{end}/{self.path.stat().st_size}\r\n\r\n"  # type:ignore[str-bytes-safe]
+        headers = f"Content-Type: {header}\r\nContent-Range: bytes {start}-{end}/{self.path.stat().st_size}\r\n\r\n"
         await send(
             {
                 "type": "http.response.body",
@@ -554,8 +589,8 @@ class StreamingResponse(BaseResponse):
         self.content_type = content_type
         self.headers["content-type"] = self.content_type
 
-        self.headers.pop("content-length", None)
-        self._headers += [
+        del self.headers["content-length"]
+        self.raw_headers += [
             (k.lower().encode("latin-1"), v.encode("latin-1"))
             for k, v in self.headers.items()
         ]
@@ -576,7 +611,8 @@ class StreamingResponse(BaseResponse):
         )
         async for chunk in self.content_iterator:
             if not isinstance(chunk, (bytes, memoryview)):
-                chunk = chunk.encode(self.charset)  # type:ignore
+                chunk = chunk.encode(self.charset)
+
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
 
         await send({"type": "http.response.body", "body": b"", "more_body": False})
@@ -624,31 +660,151 @@ class RedirectResponse(BaseResponse):
 
 
 class NexiosResponse:
-    _instance = None
+    """
+    Fluent HTTP response builder for Nexios framework.
 
-    def __new__(cls, *args, **kwargs):  # type:ignore
-        if cls._instance is None:
-            cls._instance = super(NexiosResponse, cls).__new__(cls)
-            cls._instance._initialized = False  # type:ignore
-        return cls._instance
+    NexiosResponse provides a chainable, fluent interface for building HTTP responses
+    with support for various content types, headers, cookies, caching, and more.
+    It acts as a wrapper around the lower-level BaseResponse classes while providing
+    a more convenient and intuitive API.
+
+    Key Features:
+    - Fluent/chainable API for building responses
+    - Support for JSON, HTML, plain text, and file responses
+    - Cookie management with security options
+    - HTTP caching controls
+    - Custom headers and status codes
+    - File downloads and streaming responses
+    - Pagination support for large datasets
+    - Redirect responses
+
+    Examples:
+        1. JSON responses:
+        ```python
+        @app.get("/users")
+        async def get_users(request: Request, response: Response):
+            users = await get_all_users()
+            return response.json(users)
+
+        @app.post("/users")
+        async def create_user(request: Request, response: Response):
+            data = await request.json
+            user = await create_user(data)
+            return response.json(user, status=201)
+        ```
+
+        2. HTML responses:
+        ```python
+        @app.get("/")
+        async def home(request: Request, response: Response):
+            html_content = "<h1>Welcome to Nexios!</h1>"
+            return response.html(html_content)
+        ```
+
+        3. File responses:
+        ```python
+        @app.get("/download/{filename}")
+        async def download_file(request: Request, response: Response):
+            filename = request.path_params['filename']
+            return response.download(f"files/{filename}")
+
+        @app.get("/avatar/{user_id}")
+        async def get_avatar(request: Request, response: Response):
+            user_id = request.path_params['user_id']
+            return response.file(f"avatars/{user_id}.jpg")
+        ```
+
+        4. Responses with headers and cookies:
+        ```python
+        @app.post("/login")
+        async def login(request: Request, response: Response):
+            data = await request.json
+            user = await authenticate(data['username'], data['password'])
+
+            if user:
+                token = generate_jwt_token(user)
+                return (response
+                    .json({"message": "Login successful"})
+                    .set_cookie("auth_token", token, httponly=True, secure=True)
+                    .set_header("X-User-ID", str(user.id)))
+            else:
+                return response.json({"error": "Invalid credentials"}, status=401)
+        ```
+
+        5. Cached responses:
+        ```python
+        @app.get("/static-data")
+        async def get_static_data(request: Request, response: Response):
+            data = await get_expensive_computation()
+            return (response
+                .json(data)
+                .cache(max_age=3600, private=False))  # Cache for 1 hour
+        ```
+
+        6. Streaming responses:
+        ```python
+        @app.get("/stream")
+        async def stream_data(request: Request, response: Response):
+            async def generate_data():
+                for i in range(1000):
+                    yield f"data chunk {i}\n"
+                    await asyncio.sleep(0.1)
+
+            return response.stream(generate_data(), content_type="text/plain")
+        ```
+
+        7. Paginated responses:
+        ```python
+        @app.get("/users")
+        async def get_users(request: Request, response: Response):
+            users = await get_all_users()
+            return response.paginate(
+                users,
+                strategy="page_number",
+                page_size=20
+            )
+        ```
+    """
+
+    def __new__(cls, request: Request):
+        """
+        Create or retrieve request-scoped response instance.
+        Each request gets its own instance stored in request.state.
+        """
+        # Check if response already exists for this request
+        # Use _state dict directly to avoid State.__getattr__ returning None
+        existing = request.state._state.get("_response_instance")
+        if existing is not None:
+            return existing
+
+        # Create new instance and store in request state
+        instance = super(NexiosResponse, cls).__new__(cls)
+        request.state._response_instance = instance
+        instance._initialized = False
+        return instance
+
+    def get_response_manager_intance(self, request: Request) -> "NexiosResponse":
+        return request.state._response_instance
 
     def __init__(self, request: Request):
-        self._response: BaseResponse = BaseResponse()
-        self._cookies: List[Dict[str, Any]] = []
-        self._status_code = self._response.status_code
+        """
+        Initialize response instance. Only runs once per request.
+        """
+        # Only initialize once per request
+        if hasattr(self, "_initialized") and self._initialized:
+            return
+
+        self._response: BaseResponse | Any = None
         self._request = request
+        self._initialized = True
 
     @property
     def headers(self):
-        return MutableHeaders(raw=self._response._headers)  # type:ignore
-
-    @property
-    def cookies(self):
-        return self._cookies  # type:ignore
+        return MutableHeaders(raw=self._response.raw_headers)
 
     @property
     def body(self):
-        return self._response._body  # type:ignore
+        return self._response._body
 
     @property
     def content_type(self):
@@ -668,8 +824,8 @@ class NexiosResponse:
 
     def _preserve_headers_and_cookies(self, new_response: BaseResponse) -> BaseResponse:
         """Preserve headers and cookies when switching to a new response."""
-        for key, value in self.headers.items():
-            new_response.set_header(key, value)
+        # for key, value in self.headers.items():
+        #     new_response.set_header(key, value)
 
         return new_response
 
@@ -680,12 +836,12 @@ class NexiosResponse:
     def text(
         self,
         content: JSONType,
-        status_code: Optional[int] = None,
+        status_code: int = 200,
         headers: Dict[str, Any] = {},
     ):
         """Send plain text or HTML content."""
-        if status_code is None:
-            status_code = self._status_code
+        # if status_code is None:
+        # status_code = self._status_code
         new_response = PlainTextResponse(
             body=content, status_code=status_code, headers=headers
         )
@@ -694,23 +850,107 @@ class NexiosResponse:
 
     def json(
         self,
-        data: Union[str, List[Any], Dict[str, Any]],
-        status_code: Optional[int] = None,
-        headers: Dict[str, Any] = {},
-        indent: Optional[int] = None,
-        ensure_ascii: bool = True,
+        data: Annotated[
+            Union[str, List[Any], Dict[str, Any]],
+            Doc("""
+                Data to serialize as JSON response.
+                
+                Can be any JSON-serializable Python object including:
+                - Dictionaries and lists
+                - Strings, numbers, booleans
+                - Pydantic models (automatically serialized)
+                - Custom objects with __dict__ or to_dict() methods
+                
+                Examples:
+                - {"message": "Hello, World!"}
+                - [{"id": 1, "name": "John"}, {"id": 2, "name": "Jane"}]
+                - user_model.dict() for Pydantic models
+                """),
+        ],
+        status_code: Annotated[
+            int,
+            Doc("""
+                HTTP status code for the response.
+                
+                Common status codes:
+                - 200: OK (default)
+                - 201: Created (for successful POST requests)
+                - 400: Bad Request
+                - 404: Not Found
+                - 500: Internal Server Error
+                """),
+        ] = 200,
+        headers: Annotated[
+            Dict[str, Any],
+            Doc("""
+                Additional HTTP headers to include in the response.
+                
+                Example: {"X-Custom-Header": "value", "Cache-Control": "no-cache"}
+                """),
+        ] = {},
+        indent: Annotated[
+            Optional[int],
+            Doc("""
+                Number of spaces to use for JSON indentation.
+                
+                - None: Compact JSON (default)
+                - 2 or 4: Pretty-printed JSON for debugging
+                """),
+        ] = None,
+        ensure_ascii: Annotated[
+            bool,
+            Doc("""
+                Whether to escape non-ASCII characters in JSON output.
+                
+                - True: Escape non-ASCII characters (default)
+                - False: Allow Unicode characters in output
+                """),
+        ] = True,
     ):
-        """Send JSON response."""
-        if status_code is None:
-            status_code = self._status_code
+        """
+        Send a JSON response with the provided data.
+
+        This method serializes the provided data to JSON and sets the appropriate
+        Content-Type header. It supports pretty-printing for development and
+        handles various Python data types automatically.
+
+        Returns:
+            NexiosResponse: Self for method chaining
+
+        Examples:
+            1. Simple JSON response:
+            ```python
+            return response.json({"message": "Hello, World!"})
+            ```
+
+            2. JSON with custom status:
+            ```python
+            return response.json({"error": "Not found"}, status=404)
+            ```
+
+            3. Pretty-printed JSON for debugging:
+            ```python
+            return response.json(data, indent=2)
+            ```
+
+            4. JSON with custom headers:
+            ```python
+            return response.json(
+                data,
+                headers={"X-Total-Count": str(len(data))}
+            )
+            ```
+        """
+
         new_response = JSONResponse(
             content=data,
-            status_code=status_code,
             headers=headers,
+            status_code=status_code,
             indent=indent,
             ensure_ascii=ensure_ascii,
         )
-        self._response = self._preserve_headers_and_cookies(new_response)
+        # self._response = self._preserve_headers_and_cookies(new_response)
+        self._response = new_response
         return self
 
     def download(self, path: str, filename: Optional[str] = None) -> "NexiosResponse":
@@ -718,17 +958,16 @@ class NexiosResponse:
         return self.file(path, filename, content_disposition_type="attachment")
 
     def set_permanent_cookie(
-        self, key: str, value: str, **kwargs: Dict[str, Any]
+        self, key: str, value: str, **kwargs: Any
     ) -> "NexiosResponse":
         """Set a permanent cookie with a far-future expiration date."""
         expires = datetime.now(timezone.utc) + timedelta(days=365 * 10)
-        self.set_cookie(key, value, expires=expires, **kwargs)  # type:ignore
+        self.set_cookie(key, value, expires=expires, **kwargs)
         return self
 
-    def empty(self, status_code: Optional[int] = None, headers: Dict[str, Any] = {}):
+    def empty(self, status_code: int = 200, headers: Dict[str, Any] = {}):
         """Send an empty response."""
-        if status_code is None:
-            status_code = self._status_code
+
         new_response = BaseResponse(status_code=status_code, headers=headers)
         self._response = self._preserve_headers_and_cookies(new_response)
         return self
@@ -736,12 +975,11 @@ class NexiosResponse:
     def html(
         self,
         content: str,
-        status_code: Optional[int] = None,
+        status_code: int = 200,
         headers: Dict[str, Any] = {},
     ):
         """Send HTML response."""
-        if status_code is None:
-            status_code = self._status_code
+
         new_response = HTMLResponse(
             content=content, status_code=status_code, headers=headers
         )
@@ -753,47 +991,91 @@ class NexiosResponse:
         path: str,
         filename: Optional[str] = None,
         content_disposition_type: str = "inline",
+        status_code: int = 200,
+        headers: Dict[str, Any] = {},
     ):
         """Send file response."""
         new_response = FileResponse(
             path=path,
             filename=filename,
-            status_code=self._status_code,
-            headers=self._response.headers,
+            status_code=status_code,
+            headers=headers,
             content_disposition_type=content_disposition_type,
         )
         self._response = self._preserve_headers_and_cookies(new_response)
-        self._response.status_code = self._status_code
         return self
 
     def stream(
         self,
-        iterator: Generator[Union[str, bytes], Any, Any],
+        iterator: AsyncIterator[Union[str, bytes]],
         content_type: str = "text/plain",
-        status_code: Optional[int] = None,
+        status_code: int = 200,
+        headers: Dict[str, Any] = {},
     ):
         """Send streaming response."""
-        if status_code is None:
-            status_code = self._status_code
+
         new_response = StreamingResponse(
-            content=iterator,  # type: ignore
+            content=iterator,
             status_code=status_code or self._status_code,
-            headers=self._response.headers,
+            headers=headers,
             content_type=content_type,
         )
         self._response = self._preserve_headers_and_cookies(new_response)
         return self
 
-    def redirect(self, url: str, status_code: int = 302):
-        """Send redirect response."""
+    def redirect(
+        self,
+        url: typing.Optional[str] = None,
+        name: typing.Optional[str] = None,
+        status_code: int = 302,
+        headers: Dict[str, Any] = {},
+        **path_params: typing.Any,
+    ):
+        """
+        Send redirect response.
+
+        Can use either a URL or a route name. When using name, path_params
+        are passed to url_for() to generate the URL.
+
+        Args:
+            url: Direct URL to redirect to
+            name: Route name to redirect to (uses url_for to generate URL)
+            status_code: HTTP status code (default 302 Found)
+            headers: Additional headers to include
+            **path_params: Path parameters for URL generation when using name
+        """
+        request = self._request
+        if url is None and name is None:
+            raise ValueError("Either 'url' or 'name' must be provided")
+        if url is not None and name is not None:
+            raise ValueError("Cannot provide both 'url' and 'name'")
+
+        if name is not None:
+            app = self._get_base_app()
+            url_path = app.url_for(name, **path_params)
+            url = str(request.base_url) + str(url_path)
+
+        if url is None:
+            raise ValueError("URL is required for redirect")
+
         new_response = RedirectResponse(
-            url=url, status_code=status_code, headers=self._response.headers
+            url=url, status_code=status_code, headers=headers
         )
         self._response = self._preserve_headers_and_cookies(new_response)
         return self
 
+    def _get_base_app(self) -> typing.Any:
+        if hasattr(self, "_base_app"):
+            return self._base_app
+        if hasattr(self, "_request"):
+            self._base_app = self._request.scope.get("base_app")
+            return self._base_app
+        raise RuntimeError("Could not access base app for URL generation")
+
     def status(self, status_code: int):
         """Set response status code."""
+        if not self._response:
+            self.empty()
         self._response.status_code = status_code
         self._status_code = status_code
         return self
@@ -805,17 +1087,136 @@ class NexiosResponse:
 
     def set_cookie(
         self,
-        key: str,
-        value: str,
-        max_age: Optional[int] = None,
-        expires: Optional[Union[str, datetime, int]] = None,
-        path: str = "/",
-        domain: Optional[str] = None,
-        secure: bool = True,
-        httponly: bool = False,
-        samesite: typing.Optional[typing.Literal["lax", "strict", "none"]] = "lax",
+        key: Annotated[str, Doc("Name of the cookie to set")],
+        value: Annotated[str, Doc("Value to store in the cookie")],
+        max_age: Annotated[
+            Optional[int],
+            Doc("""
+                Maximum age of the cookie in seconds.
+                
+                If set, the cookie will expire after this many seconds.
+                Takes precedence over 'expires' if both are set.
+                
+                Examples:
+                - 3600: Cookie expires in 1 hour
+                - 86400: Cookie expires in 1 day
+                - 604800: Cookie expires in 1 week
+                """),
+        ] = None,
+        expires: Annotated[
+            Optional[Union[str, datetime, int]],
+            Doc("""
+                Expiration date/time for the cookie.
+                
+                Can be:
+                - datetime object: Specific expiration time
+                - int: Unix timestamp
+                - str: HTTP date string
+                
+                Example: datetime.now() + timedelta(days=7)
+                """),
+        ] = None,
+        path: Annotated[
+            str,
+            Doc("""
+                URL path where the cookie is valid.
+                
+                - "/" (default): Cookie valid for entire domain
+                - "/admin": Cookie only valid for admin section
+                """),
+        ] = "/",
+        domain: Annotated[
+            Optional[str],
+            Doc("""
+                Domain where the cookie is valid.
+                
+                - None (default): Cookie valid for current domain only
+                - ".example.com": Cookie valid for all subdomains
+                """),
+        ] = None,
+        secure: Annotated[
+            bool,
+            Doc("""
+                Whether cookie should only be sent over HTTPS.
+                
+                - True (default): Cookie only sent over secure connections
+                - False: Cookie sent over HTTP and HTTPS
+                
+                Recommended to keep True for production.
+                """),
+        ] = True,
+        httponly: Annotated[
+            bool,
+            Doc("""
+                Whether cookie should be inaccessible to JavaScript.
+                
+                - True: Cookie cannot be accessed via document.cookie
+                - False (default): Cookie accessible to JavaScript
+                
+                Set to True for authentication cookies to prevent XSS attacks.
+                """),
+        ] = False,
+        samesite: Annotated[
+            typing.Optional[typing.Literal["lax", "strict", "none"]],
+            Doc("""
+                SameSite attribute for CSRF protection.
+                
+                - "lax" (default): Cookie sent with same-site requests and top-level navigation
+                - "strict": Cookie only sent with same-site requests
+                - "none": Cookie sent with all requests (requires secure=True)
+                """),
+        ] = "lax",
     ):
-        """Set a response cookie."""
+        """
+        Set an HTTP cookie in the response.
+
+        Cookies are used to store small pieces of data in the client's browser
+        that are sent back with subsequent requests. This method provides full
+        control over cookie attributes for security and functionality.
+
+        Returns:
+            NexiosResponse: Self for method chaining
+
+        Examples:
+            1. Simple session cookie:
+            ```python
+            return response.set_cookie("session_id", session_token)
+            ```
+
+            2. Secure authentication cookie:
+            ```python
+            return response.set_cookie(
+                "auth_token",
+                jwt_token,
+                max_age=3600,  # 1 hour
+                httponly=True,  # Prevent XSS
+                secure=True,    # HTTPS only
+                samesite="strict"  # CSRF protection
+            )
+            ```
+
+            3. Remember me cookie:
+            ```python
+            return response.set_cookie(
+                "remember_token",
+                token,
+                max_age=30*24*3600,  # 30 days
+                httponly=True,
+                secure=True
+            )
+            ```
+
+            4. User preference cookie:
+            ```python
+            return response.set_cookie(
+                "theme",
+                "dark",
+                max_age=365*24*3600,  # 1 year
+                secure=False,  # Accessible to JavaScript
+                samesite="lax"
+            )
+            ```
+        """
         self._response.set_cookie(
             key=key,
             value=value,
@@ -880,19 +1281,19 @@ class NexiosResponse:
         return self
 
     def set_headers(self, headers: Dict[str, str], overide_all: bool = False):
-        if overide_all:
-            self._response._headers = [  # type:ignore
-                (bytes(str(k), "utf-8"), bytes(str(v), "utf-8"))
-                for k, v in self.headers.items()
-            ]  # type:ignore
-            return
         """Set multiple headers at once."""
+        if overide_all:
+            self._response.set_headers(headers)
+            return self
         for key, value in headers.items():
             self.set_header(key, value)
         return self
 
     def set_body(self, new_body: Any):
-        self._response._body = new_body  # type:ignore
+        if not self._response:
+            return self.resp(new_body)
+        self._response._body = new_body
+        return self
 
     def get_response(self) -> BaseResponse:
         """Make the response ASGI-compatible."""
@@ -921,41 +1322,52 @@ class NexiosResponse:
 
     def remove_header(self, key: str):
         """Remove a header from the response."""
-        self._response._headers = [  # type:ignore
-            (k, v)
-            for k, v in self._response._headers  # type:ignore
-            if k.decode("latin-1").lower() != key.lower()
-        ]  # type:ignore
+        self._response.remove_header(key)
 
     def paginate(
         self,
-        items: List[Any],
+        objects: List[Any],
         strategy: Union[str, BasePaginationStrategy] = "page_number",
         data_handler: type[SyncListDataHandler] = SyncListDataHandler,
-        **kwargs: Dict[str, Any],
+        **kwargs: Any,
     ) -> "NexiosResponse":
         """
         Paginate the response data.
 
         Args:
-            items: List of items to paginate
-            total_items: Total number of items (optional, defaults to len(items))
+            objects: List of items to paginate
             strategy: Either a string ('page_number', 'limit_offset', 'cursor') or
                     a custom pagination strategy instance
-            **kwargs: Additional arguments for the pagination strategy
+            **kwargs: Additional arguments for the pagination strategy or parameter overrides
         """
         if isinstance(strategy, str):
+            # Define known configuration keys for strategies to separate them from parameter overrides
+            config_keys = {
+                "page_param",
+                "page_size_param",
+                "default_page",
+                "default_page_size",
+                "max_page_size",
+                "limit_param",
+                "offset_param",
+                "default_limit",
+                "max_limit",
+                "cursor_param",
+                "sort_field",
+            }
+            strategy_kwargs = {k: v for k, v in kwargs.items() if k in config_keys}
+
             if strategy == "page_number":
-                strategy = PageNumberPagination(**kwargs)  # type:ignore
+                strategy = PageNumberPagination(**strategy_kwargs)
             elif strategy == "limit_offset":
-                strategy = LimitOffsetPagination(**kwargs)  # type:ignore
+                strategy = LimitOffsetPagination(**strategy_kwargs)
             elif strategy == "cursor":
-                strategy = CursorPagination(**kwargs)  # type:ignore
+                strategy = CursorPagination(**strategy_kwargs)
             else:
                 raise ValueError(f"Unknown pagination strategy: {strategy}")
 
-        _data_handler = data_handler(items)
-        request = self._request  # You'll need to store the request in the response
+        _data_handler = data_handler(objects)
+        request = self._request
 
         paginator = SyncPaginator(
             data_handler=_data_handler,
@@ -964,38 +1376,53 @@ class NexiosResponse:
             request_params=dict(request.query_params),
         )
 
-        result = paginator.paginate()
+        result = paginator.paginate(**kwargs)
         return self.json(result)
 
     async def apaginate(
         self,
-        items: List[Any],
+        objects: List[Any],
         strategy: Union[str, BasePaginationStrategy] = "page_number",
         data_handler: type[AsyncListDataHandler] = AsyncListDataHandler,
-        **kwargs: Dict[str, Any],
+        **kwargs: Any,
     ) -> "NexiosResponse":
         """
-        Paginate the response data.
+        Paginate the response data asynchronously.
 
         Args:
-            items: List of items to paginate
-            total_items: Total number of items (optional, defaults to len(items))
+            objects: List of items to paginate
             strategy: Either a string ('page_number', 'limit_offset', 'cursor') or
                     a custom pagination strategy instance
-            **kwargs: Additional arguments for the pagination strategy
+            **kwargs: Additional arguments for the pagination strategy or parameter overrides
         """
         if isinstance(strategy, str):
+            # Define known configuration keys for strategies to separate them from parameter overrides
+            config_keys = {
+                "page_param",
+                "page_size_param",
+                "default_page",
+                "default_page_size",
+                "max_page_size",
+                "limit_param",
+                "offset_param",
+                "default_limit",
+                "max_limit",
+                "cursor_param",
+                "sort_field",
+            }
+            strategy_kwargs = {k: v for k, v in kwargs.items() if k in config_keys}
+
             if strategy == "page_number":
-                strategy = PageNumberPagination(**kwargs)  # type:ignore
+                strategy = PageNumberPagination(**strategy_kwargs)
             elif strategy == "limit_offset":
-                strategy = LimitOffsetPagination(**kwargs)  # type:ignore
+                strategy = LimitOffsetPagination(**strategy_kwargs)
             elif strategy == "cursor":
-                strategy = CursorPagination(**kwargs)  # type:ignore
+                strategy = CursorPagination(**strategy_kwargs)
             else:
                 raise ValueError(f"Unknown pagination strategy: {strategy}")
 
-        _data_handler = data_handler(items)
-        request = self._request  # You'll need to store the request in the response
+        _data_handler = data_handler(objects)
+        request = self._request
 
         paginator = AsyncPaginator(
             data_handler=_data_handler,
@@ -1004,11 +1431,15 @@ class NexiosResponse:
             request_params=dict(request.query_params),
         )
 
-        result = await paginator.paginate()
+        result = await paginator.paginate(**kwargs)
         return self.json(result)
 
+    async def __call__(self, *args: Any, **kwargs: Any):
+
+        return await self._response(*args, **kwargs)
+
     def __str__(self):
-        return f"Response [{self._status_code} {self.body}]"
+        return f"Response [{self.status_code} {self.body}]"
 
 
 Response = BaseResponse

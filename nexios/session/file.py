@@ -7,23 +7,24 @@ from .base import BaseSessionInterface
 
 
 class FileSessionManager(BaseSessionInterface):
-    def __init__(self, session_key: str) -> None:
+    def __init__(self, session_key: Optional[str] = None) -> None:
         super().__init__(session_key)
-        self.session_key = session_key or self.get_session_key()
-        self.session_file_path = os.path.join(
-            self.session_config.session_file_name or "sessions",
+        self.session_key = session_key
+
+    def _get_storage_path(self):
+        path = os.path.join(
+            self.session_config.session_file_storage_path or "sessions",
             f"{self.session_key}.json",
         )
-
-        # Ensure the session storage directory exists
         os.makedirs(
             self.session_config.session_file_storage_path or "sessions", exist_ok=True
         )
+        return path
 
     def _load_session_data(self) -> Optional[Dict[str, Any]]:
         """Load session data from the file."""
-        if os.path.exists(self.session_file_path):
-            with open(self.session_file_path, "r") as file:
+        if os.path.exists(self._get_storage_path()):
+            with open(self._get_storage_path(), "r") as file:
                 try:
                     session_data = json.load(file)
                     return session_data
@@ -33,7 +34,7 @@ class FileSessionManager(BaseSessionInterface):
 
     def _save_session_data(self):
         """Save the session data to a file."""
-        with open(self.session_file_path, "w") as file:
+        with open(self._get_storage_path(), "w+") as file:
             json.dump(self._session_cache, file)
 
     def set_session(self, key: str, value: str):
@@ -61,8 +62,10 @@ class FileSessionManager(BaseSessionInterface):
         """Check if the session is empty."""
         return len(self._session_cache.items()) == 0
 
-    async def save(self):  # type: ignore
+    async def save(self):
         """Save the session data to the file."""
+        signed_session = self.get_session_key()
+        self.session_key = signed_session
         self._save_session_data()
 
     @property
@@ -76,7 +79,7 @@ class FileSessionManager(BaseSessionInterface):
     def has_expired(self) -> bool:
         """Returns True if the session has expired."""
         expiration_time = self.get_expiration_time()
-        if expiration_time and datetime.now(timezone.utc) > expiration_time:  # type:ignore
+        if expiration_time and datetime.now(timezone.utc) > expiration_time:
             return True
         return False
 
@@ -91,6 +94,7 @@ class FileSessionManager(BaseSessionInterface):
 
     def clear(self):
         """Clear the session data."""
+        self.modified = True
         self._session_cache.clear()
-        if os.path.exists(self.session_file_path):
-            os.remove(self.session_file_path)
+        if os.path.exists(self._get_storage_path()):
+            os.remove(self._get_storage_path())

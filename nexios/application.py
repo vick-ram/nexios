@@ -1,16 +1,19 @@
-import re
+from __future__ import annotations
+
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncContextManager,
     Awaitable,
     Callable,
     Dict,
     List,
+    Literal,
     Optional,
+    Sequence,
     Type,
     Union,
 )
-from typing import Literal
 
 from pydantic import BaseModel
 from typing_extensions import Annotated, Doc
@@ -19,21 +22,22 @@ from nexios._internals._middleware import (
     ASGIRequestResponseBridge,
 )
 from nexios._internals._middleware import DefineMiddleware as Middleware
-from nexios.config import DEFAULT_CONFIG, MakeConfig
-from nexios.events import AsyncEventEmitter
+from nexios.config import MakeConfig, get_config, set_config
+from nexios.dependencies import Depend
+from nexios.events import EventEmitter
 from nexios.exception_handler import ExceptionHandlerType, ExceptionMiddleware
 from nexios.logging import create_logger
 from nexios.middleware.errors.server_error_handler import (
     ServerErrHandlerType,
     ServerErrorMiddleware,
 )
+from nexios.objects import URLPath
 from nexios.openapi._builder import APIDocumentation
 from nexios.openapi.config import OpenAPIConfig
-from nexios.openapi.models import HTTPBearer, Parameter, Path, Schema
+from nexios.openapi.models import HTTPBearer, Parameter, Server
 from nexios.routing.base import BaseRoute
-from nexios.structs import URLPath
 
-from .routing import Router, Routes, WebsocketRoutes, WSRouter
+from .routing import Route, Router, WebsocketRoute
 from .types import (
     ASGIApp,
     HandlerType,
@@ -43,53 +47,46 @@ from .types import (
     Scope,
     Send,
     WsHandlerType,
-    WsMiddlewareType,
 )
 
+if TYPE_CHECKING:
+    from nexios.http import Request, Response
 allowed_methods_default = ["get", "post", "delete", "put", "patch", "options"]
 
 logger = create_logger("nexios")
-lifespan_manager = Callable[["NexiosApp"], AsyncContextManager[bool]]
+lifespan_manager = Callable[["NexiosApp"], AsyncContextManager[Any]]
 
 
-class NexiosApp(object):
+class NexiosApp:
     def __init__(
         self,
         config: Annotated[
             Optional[MakeConfig],
-            Doc(
-                """
+            Doc("""
                     This subclass is derived from the MakeConfig class and is responsible for managing configurations within the Nexios framework. It takes arguments in the form of dictionaries, allowing for structured and flexible configuration handling. By using dictionaries, this subclass makes it easy to pass multiple configuration values at once, reducing complexity and improving maintainability.
 
                     One of the key advantages of this approach is its ability to dynamically update and modify settings without requiring changes to the core codebase. This is particularly useful in environments where configurations need to be frequently adjusted, such as database settings, API credentials, or feature flags. The subclass can also validate the provided configuration data, ensuring that incorrect or missing values are handled properly.
 
                     Additionally, this design allows for merging and overriding configurations, making it adaptable for various use cases. Whether used for small projects or large-scale applications, this subclass ensures that configuration management remains efficient and scalable. By extending MakeConfig, it leverages existing functionality while adding new capabilities tailored to Nexios. This makes it an essential component for maintaining structured and well-organized application settings.
-                    """
-            ),
-        ] = DEFAULT_CONFIG,
+                    """),
+        ] = MakeConfig(),
         title: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                     The title of the API, used in the OpenAPI documentation.
-                    """
-            ),
+                    """),
         ] = None,
         version: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                     The version of the API, used in the OpenAPI documentation.
-                    """
-            ),
+                    """),
         ] = None,
         description: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                     A brief description of the API, used in the OpenAPI documentation.
-                    """
-            ),
+                    """),
         ] = None,
         server_error_handler: Annotated[
             Optional[ServerErrHandlerType],
@@ -98,69 +95,157 @@ class NexiosApp(object):
                         A function in Nexios responsible for handling server-side exceptions by logging errors, reporting issues, or initiating recovery mechanisms. It prevents crashes by intercepting unexpected failures, ensuring the application remains stable and operational. This function provides a structured approach to error management, allowing developers to define custom handling strategies such as retrying failed requests, sending alerts, or gracefully degrading functionality. By centralizing error processing, it improves maintainability and observability, making debugging and monitoring more efficient. Additionally, it ensures that critical failures do not disrupt the entire system, allowing services to continue running while appropriately managing faults and failures."""
             ),
         ] = None,
-        lifespan: Optional[lifespan_manager] = None,
-        routes: Optional[List[Routes]] = None,
-        dependencies: Optional[list] = None,
+        lifespan: Annotated[
+            Optional[lifespan_manager],
+            Doc("""
+                    A function in Nexios responsible for handling ASGI lifespan protocol events. It handles the startup and shutdown events emitted by the ASGI server. It allows you to perform actions such as initializing resources, opening connections, and tearing down resources during application startup and shutdown.
+
+                    This function is called when the application starts and when it shuts down. It receives a `Receive` function to receive lifespan events and a `Send` function to send lifespan events.
+
+                    The `lifespan_manager` function takes two arguments: `self` and `receive` and `send`. It returns an `AsyncContextManager` that can be used to manage the lifespan of the application.
+
+                    You can use this function to perform actions such as connecting to a database, initializing a cache, or registering a signal handler.
+                """),
+        ] = None,
+        routes: Annotated[
+            Sequence[BaseRoute],
+            Doc("""
+                    A list of routes for the application. These routes define the URLs that the application will handle and the handlers that will be called when those URLs are accessed.
+
+                    Each route is an instance of the `Route` class and defines the URL path, the handler function, and any additional middleware or dependencies that should be applied to that route.
+
+                    You can add routes to the application using the `add_route` method of the `Router` class.
+                """),
+        ] = [],
+        dependencies: Annotated[
+            Optional[list[Depend]],
+            Doc("""
+                    A list of dependencies for the application. These dependencies are used to resolve dependencies within the application.
+
+                    A dependency is a function that takes a `Request` object and returns the value that should be injected into the dependency.
+
+                    You can add dependencies to the application using the `add_dependency` method of the `Router` class.
+                """),
+        ] = None,
+        route_class: Annotated[
+            Type[Route],
+            Doc("""
+                    The class used to create routes. This can be a custom route class that inherits from `Route`.
+                """),
+        ] = Route,
     ):
-        self.config = config or DEFAULT_CONFIG
+        self.config = config
         self.dependencies = dependencies or []
-        try:
-            from nexios.cli.utils import get_config as get_nexios_config
-        except ImportError:
-
-            def get_nexios_config():
-                return {}
-
-        from nexios.config import get_config, set_config
-
         try:
             get_config()
         except RuntimeError:
             set_config(self.config)
-        self.config.update(
-            get_nexios_config(),
-        )
-        self.ws_router = WSRouter()
-        self.ws_routes: List[WebsocketRoutes] = []
+
         self.http_middleware: List[Middleware] = []
-        self.ws_middleware: List[ASGIApp] = []
         self.startup_handlers: List[Callable[[], Awaitable[None]]] = []
         self.shutdown_handlers: List[Callable[[], Awaitable[None]]] = []
-        self.exceptions_handler = ExceptionMiddleware()
         self.server_error_handler = server_error_handler
         self._background_tasks = set()
 
-        self.app = Router(routes=routes, dependencies=self.dependencies)  # type:ignore
+        self.route_class = route_class
+        self.app = Router(
+            routes=routes, dependencies=self.dependencies, route_class=self.route_class
+        )
+        self.exceptions_handler = ExceptionMiddleware()
         self.router = self.app
         self.route = self.router.route
         self.lifespan_context: Optional[lifespan_manager] = lifespan
-        self.state = {}
+        self.state: dict[str, Any] = {}
+        if not self.config:
+            return
+        openapi_config: Dict[str, Any] = self.config.to_dict().get("openapi", {})
 
-        openapi_config: Dict[str, Any] = self.config.to_dict().get("openapi", {})  # type:ignore
+        # Handle license - ensure it's a License model instance
+        license_data = openapi_config.get("license")
+        license_instance = None
+        if license_data:
+            if isinstance(license_data, dict):
+                from nexios.openapi.models import License
+
+                license_instance = License(**license_data)
+            else:
+                license_instance = license_data
+
+        # Handle contact - ensure it's a Contact model instance
+        contact_data = openapi_config.get("contact")
+        terms_of_service = openapi_config.get("termsOfService")
+        contact_instance = None
+        if contact_data:
+            if isinstance(contact_data, dict):
+                from nexios.openapi.models import Contact
+
+                contact_instance = Contact(**contact_data)
+            else:
+                contact_instance = contact_data
+
+        # Handle servers - ensure they are Server model instances
+        servers_data = openapi_config.get("servers")
+        servers_instances = None
+        if servers_data:
+            if isinstance(servers_data, list):
+                servers_instances = []
+                for server in servers_data:
+                    if isinstance(server, dict):
+                        servers_instances.append(Server(**server))
+                    else:
+                        servers_instances.append(server)
+            else:
+                servers_instances = servers_data
+
         self.openapi_config = OpenAPIConfig(
             title=openapi_config.get("title", title or "Nexios API"),
             version=openapi_config.get("version", version or "1.0.0"),
             description=openapi_config.get(
                 "description", description or "Nexios API Documentation"
             ),
-            license=openapi_config.get("license"),
-            contact=openapi_config.get("contact"),
+            license=license_instance,
+            contact=contact_instance,
+            servers=servers_instances,
+            termsOfService=terms_of_service,
         )
 
         self.openapi_config.add_security_scheme(
             "bearerAuth", HTTPBearer(type="http", scheme="bearer", bearerFormat="JWT")
         )
 
-        self.docs = APIDocumentation(
-            app=self,
+        self.openapi = APIDocumentation(
             config=self.openapi_config,
             swagger_url=openapi_config.get("swagger_url", "/docs"),
             redoc_url=openapi_config.get("redoc_url", "/redoc"),
             openapi_url=openapi_config.get("openapi_url", "/openapi.json"),
         )
 
-        self.events = AsyncEventEmitter()
+        self.events = EventEmitter()
         self.title = title or "Nexios API"
+        self.setup()
+
+    def setup(self):
+        @self.get(self.openapi.openapi_url, exclude_from_schema=True)
+        async def serve_openapi(request: "Request", response: "Response"):
+            root_path = request.scope.get("root_path", "")
+
+            return response.json(
+                self.openapi.get_openapi(self.router, current_prefix=root_path)
+            )
+
+        @self.get(self.openapi.swagger_url, exclude_from_schema=True)
+        async def swagger_ui(request: "Request", response: "Response"):
+            # Get the current mount path from the request scope
+            root_path = request.scope.get("root_path", "")
+            openapi_url = root_path + self.openapi.openapi_url
+            return response.html(self.openapi._generate_swagger_ui(openapi_url))
+
+        @self.get(self.openapi.redoc_url, exclude_from_schema=True)
+        async def redoc_ui(request: "Request", response: "Response"):
+            # Get the current mount path from the request scope
+            root_path = request.scope.get("root_path", "")
+            openapi_url = root_path + self.openapi.openapi_url
+            return response.html(self.openapi._generate_redoc_ui(openapi_url))
 
     def on_startup(self, handler: Callable[[], Awaitable[None]]) -> None:
         """
@@ -267,7 +352,7 @@ class NexiosApp(object):
 
     async def handle_lifespan(self, receive: Receive, send: Send) -> None:
         """Handle ASGI lifespan protocol events."""
-        self._setup_openapi()
+        # self._setup_openapi()
         try:
             while True:
                 message: Message = await receive()
@@ -307,38 +392,10 @@ class NexiosApp(object):
 
         except Exception as e:
             logger.debug(f"Error handling lifespan event: {e}")
-            if message["type"].startswith("lifespan.startup"):  # type: ignore
+            if message["type"].startswith("lifespan.startup"):
                 await send({"type": "lifespan.startup.failed", "message": str(e)})
             else:
                 await send({"type": "lifespan.shutdown.failed", "message": str(e)})
-
-    def _setup_openapi(self) -> None:
-        """Set up automatic OpenAPI documentation"""
-        docs = self.docs
-
-        for route in self.get_all_routes():
-            if getattr(route, "exclude_from_schema", False):
-                continue
-            for method in route.methods:
-                parameters = [
-                    Path(name=x, schema=Schema(type="string"), schema_=None)  # type: ignore
-                    for x in route.param_names
-                ]
-                parameters.extend(route.parameters)  # type: ignore
-                docs.document_endpoint(
-                    path=re.sub(r"\{(\w+):\w+\}", r"{\1}", route.raw_path),
-                    method=method,
-                    tags=route.tags,
-                    security=route.security,
-                    summary=route.summary or "",
-                    description=route.description,
-                    request_body=route.request_model,
-                    request_content_type=getattr(route, "request_content_type", "application/json"),
-                    parameters=parameters,  # type:ignore
-                    deprecated=route.deprecated,
-                    operation_id=route.operation_id,
-                    responses=route.responses,
-                )(route.handler)
 
     def add_middleware(
         self,
@@ -375,20 +432,19 @@ class NexiosApp(object):
 
         self.http_middleware.insert(
             0,
-            Middleware(ASGIRequestResponseBridge, dispatch=middleware),  # type:ignore
+            Middleware(ASGIRequestResponseBridge, dispatch=middleware),
         )
 
     def add_ws_route(
         self,
         route: Optional[
             Annotated[
-                WebsocketRoutes,
-                Doc("An instance of the Routes class representing a WebSocket route."),
+                WebsocketRoute,
+                Doc("An instance of the Route class representing a WebSocket route."),
             ]
         ] = None,
         path: Optional[str] = None,
         handler: Optional[WsHandlerType] = None,
-        middleware: List[WsMiddlewareType] = [],
     ) -> None:
         """
         Adds a WebSocket route to the application.
@@ -396,27 +452,35 @@ class NexiosApp(object):
         This method registers a WebSocket route, allowing the application to handle WebSocket connections.
 
         Args:
-            route (Routes): The WebSocket route configuration.
+            route (Route): The WebSocket route configuration.
 
         Returns:
             None
 
         Example:
             ```python
-            route = Routes("/ws/chat", chat_handler)
+            route = Route("/ws/chat", chat_handler)
             app.add_ws_route(route)
             ```
         """
+
         if route:
-            self.ws_router.add_ws_route(route)
-        else:
-            self.ws_router.add_ws_route(
-                WebsocketRoutes(path, handler, middleware=middleware)
+            if (not path or path == route.raw_path) and (
+                not handler or handler == route.handler
+            ):
+                self.router.add_ws_route(route)
+                return
+
+        if path is None or handler is None:
+            raise ValueError(
+                "path and handler are required when 'route' is not provided."
             )
 
-    def mount_router(self, router: Router, path: Optional[str] = None) -> None:
+        self.router.add_ws_route(WebsocketRoute(path, handler))
+
+    def mount_router(self, router: Router, name: Optional[str] = None) -> None:
         """
-        Mounts a router and all its routes to the application.
+        Mounts a router and all its routes to the application using the router's prefix.
 
         This method allows integrating another `Router` instance, registering all its
         defined routes into the current application. It is useful for modularizing routes
@@ -430,93 +494,18 @@ class NexiosApp(object):
 
         Example:
             ```python
-            user_router = Router()
+            user_router = Router(prefix="/users")
 
-            @user_router.route("/users", methods=["GET"])
+            @user_router.route("/list", methods=["GET"])
             def get_users(request, response):
                  response.json({"users": ["Alice", "Bob"]})
 
             app.mount_router(user_router)  # Mounts the user routes into the main app
             ```
         """
-        self.router.mount_router(router, path=path)
+        self.router.mount_router(router, name=name)
 
-    def mount_ws_router(
-        self,
-        router: Annotated[
-            WSRouter,
-            Doc("An instance of Router containing multiple routes to be mounted."),
-        ],
-    ) -> None:
-        """
-        Mounts a router and all its routes to the application.
-
-        This method allows integrating another `Router` instance, registering all its
-        defined routes into the current application. It is useful for modularizing routes
-        and organizing large applications.
-
-        Args:
-            router (Router): The `Router` instance whose routes will be added.
-
-        Returns:
-            None
-
-        Example:
-            ```python
-            chat_router = WSRouter()
-
-            @chat_router.ws("/users")
-            def get_users(ws):
-                ...
-
-            app.mount_ws_router(chat_router)  # Mounts the user routes into the main app
-            ```
-        """
-        self.ws_router.mount_router(router)
-
-    async def handle_websocket(
-        self, scope: Scope, receive: Receive, send: Send
-    ) -> None:
-        app = self.ws_router
-        for mdw in reversed(self.ws_middleware):
-            app = mdw(app)  # type:ignore
-        await app(scope, receive, send)
-
-    def add_ws_middleware(
-        self,
-        middleware: Annotated[
-            ASGIApp,
-            Doc(
-                "A callable function that intercepts and processes WebSocket connections."
-            ),
-        ],
-    ) -> None:
-        """
-        Adds a WebSocket middleware to the application.
-
-        WebSocket middleware functions allow pre-processing of WebSocket requests before they
-        reach their final handler. Middleware can be used for authentication, logging, or
-        modifying the WebSocket request/response.
-
-        Args:
-            middleware (Callable): A callable function that handles WebSocket connections.
-
-        Returns:
-            None
-
-        Example:
-            ```python
-            def ws_auth_middleware(ws, next_handler):
-                if not ws.headers.get("Authorization"):
-                    ...
-                return next_handler(ws)
-
-            app.add_ws_middleware(ws_auth_middleware)
-            ```
-        """
-        self.ws_middleware.append(middleware)
-
-    def handle_http_request(self, scope: Scope, receive: Receive, send: Send):
+    def handle_request(self, scope: Scope, receive: Receive, send: Send):
         app = self.app
         middleware = (
             [
@@ -526,9 +515,7 @@ class NexiosApp(object):
                 )
             ]
             + self.http_middleware
-            + [
-                Middleware(ASGIRequestResponseBridge, dispatch=self.exceptions_handler)  # type:ignore
-            ]
+            + [Middleware(ASGIRequestResponseBridge, dispatch=self.exceptions_handler)]
         )
         for cls, args, kwargs in reversed(middleware):
             app = cls(app, *args, **kwargs)
@@ -542,28 +529,22 @@ class NexiosApp(object):
 
         if scope["type"] == "lifespan":
             await self.handle_lifespan(receive, send)
-        elif scope["type"] == "http":
-            await self.handle_http_request(scope, receive, send)
-
-        else:
-            await self.handle_websocket(scope, receive, send)
+        elif scope["type"] in ["http", "websocket"]:
+            await self.handle_request(scope, receive, send)
 
     def get(
         self,
         path: Annotated[
             str,
-            Doc(
-                """
+            Doc("""
                 URL path pattern for the GET endpoint.
                 Supports path parameters using {param} syntax.
                 Example: '/users/{user_id}'
-            """
-            ),
+            """),
         ],
         handler: Annotated[
             Optional[HandlerType],
-            Doc(
-                """
+            Doc("""
                 Async handler function for GET requests.
                 Receives (request, response) and returns response or raw data.
                 
@@ -571,40 +552,32 @@ class NexiosApp(object):
                 async def get_user(request, response):
                     user = await get_user_from_db(request.path_params['user_id'])
                     return response.json(user)
-            """
-            ),
+            """),
         ] = None,
         name: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique route identifier for URL generation.
                 Example: 'get-user-by-id'
-            """
-            ),
+            """),
         ] = None,
         summary: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Brief summary for OpenAPI documentation.
                 Example: 'Retrieves a user by ID'
-            """
-            ),
+            """),
         ] = None,
         description: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Detailed description for OpenAPI documentation.
                 Example: 'Returns full user details including profile information'
-            """
-            ),
+            """),
         ] = None,
         responses: Annotated[
             Optional[Dict[int, Any]],
-            Doc(
-                """
+            Doc("""
                 Response models by status code.
                 Example: 
                 {
@@ -612,92 +585,73 @@ class NexiosApp(object):
                     404: {"description": "User not found"},
                     500: {"description": "Server error"}
                 }
-            """
-            ),
+            """),
         ] = None,
         request_model: Annotated[
             Optional[Type[BaseModel]],
-            Doc(
-                """
+            Doc("""
                 Pydantic model for request validation (query params).
                 Example:
                 class UserQuery(BaseModel):
                     active_only: bool = True
                     limit: int = 100
-            """
-            ),
+            """),
         ] = None,
         middleware: Annotated[
             List[Any],
-            Doc(
-                """
+            Doc("""
                 List of route-specific middleware functions.
                 Example: [auth_required, rate_limit]
-            """
-            ),
+            """),
         ] = [],
         tags: Annotated[
             Optional[List[str]],
-            Doc(
-                """
+            Doc("""
                 OpenAPI tags for grouping related endpoints.
                 Example: ["Users", "Public"]
-            """
-            ),
+            """),
         ] = None,
         security: Annotated[
             Optional[List[Dict[str, List[str]]]],
-            Doc(
-                """
+            Doc("""
                 Security requirements for OpenAPI docs.
                 Example: [{"BearerAuth": []}]
-            """
-            ),
+            """),
         ] = None,
         operation_id: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique operation identifier for OpenAPI.
                 Example: 'users.get_by_id'
-            """
-            ),
+            """),
         ] = None,
         deprecated: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Mark endpoint as deprecated in docs.
                 Example: True
-            """
-            ),
+            """),
         ] = False,
         parameters: Annotated[
             List[Parameter],
-            Doc(
-                """
+            Doc("""
                 Additional OpenAPI parameter definitions.
                 Example: [Parameter(name="fields", in_="query", description="Fields to include")]
-            """
-            ),
+            """),
         ] = [],
         exclude_from_schema: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Exclude this route from OpenAPI docs.
                 Example: True for internal endpoints
-            """
-            ),
+            """),
         ] = False,
         **kwargs: Annotated[
             Dict[str, Any],
-            Doc(
-                """
+            Doc("""
                 Additional route metadata.
                 Example: {"x-internal": True}
-            """
-            ),
+            """),
         ],
     ) -> Callable[..., Any]:
         """
@@ -749,6 +703,7 @@ class NexiosApp(object):
             description=description,
             responses=responses,
             request_model=request_model,
+            request_content_type="application/json",
             middleware=middleware,
             tags=tags,
             security=security,
@@ -763,153 +718,129 @@ class NexiosApp(object):
         self,
         path: Annotated[
             str,
-            Doc(
-                """
+            Doc("""
                 URL path pattern for the POST endpoint.
                 Example: '/api/v1/users'
-            """
-            ),
+            """),
         ],
         handler: Annotated[
             Optional[HandlerType],
-            Doc(
-                """
+            Doc("""
                 Async handler function for POST requests.
                 Example:
                 async def create_user(request, response):
                     user_data = request.json
                     return response.json(user_data, status=201)
-            """
-            ),
+            """),
         ] = None,
         name: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique route name for URL generation.
                 Example: 'api-v1-create-user'
-            """
-            ),
+            """),
         ] = None,
         summary: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Brief endpoint summary.
                 Example: 'Create new user'
-            """
-            ),
+            """),
         ] = None,
         description: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Detailed endpoint description.
                 Example: 'Creates new user with provided data'
-            """
-            ),
+            """),
         ] = None,
         responses: Annotated[
             Optional[Dict[int, Any]],
-            Doc(
-                """
+            Doc("""
                 Response schemas by status code.
                 Example: {
                     201: UserSchema,
                     400: {"description": "Invalid input"},
                     409: {"description": "User already exists"}
                 }
-            """
-            ),
+            """),
         ] = None,
         request_model: Annotated[
             Optional[Type[BaseModel]],
-            Doc(
-                """
+            Doc("""
                 Model for request body validation.
                 Example:
                 class UserCreate(BaseModel):
                     username: str
                     email: EmailStr
                     password: str
-            """
-            ),
+            """),
         ] = None,
         request_content_type: Annotated[
-            Literal["application/json", "multipart/form-data", "application/x-www-form-urlencoded"],
-            Doc("Content type for the request body in OpenAPI docs. Defaults to 'application/json'."),
+            Literal[
+                "application/json",
+                "multipart/form-data",
+                "application/x-www-form-urlencoded",
+            ],
+            Doc(
+                "Content type for the request body in OpenAPI docs. Defaults to 'application/json'."
+            ),
         ] = "application/json",
         middleware: Annotated[
             List[Any],
-            Doc(
-                """
+            Doc("""
                 Route-specific middleware.
                 Example: [rate_limit(10), validate_content_type('json')]
-            """
-            ),
+            """),
         ] = [],
         tags: Annotated[
             Optional[List[str]],
-            Doc(
-                """
+            Doc("""
                 OpenAPI tags for grouping.
                 Example: ["User Management"]
-            """
-            ),
+            """),
         ] = None,
         security: Annotated[
             Optional[List[Dict[str, List[str]]]],
-            Doc(
-                """
+            Doc("""
                 Security requirements.
                 Example: [{"BearerAuth": []}]
-            """
-            ),
+            """),
         ] = None,
         operation_id: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique operation ID.
                 Example: 'createUser'
-            """
-            ),
+            """),
         ] = None,
         deprecated: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Mark as deprecated.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         parameters: Annotated[
             List[Parameter],
-            Doc(
-                """
+            Doc("""
                 Additional parameters.
                 Example: [Parameter(name="X-Request-ID", in_="header")]
-            """
-            ),
+            """),
         ] = [],
         exclude_from_schema: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Hide from OpenAPI docs.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         **kwargs: Annotated[
             Dict[str, Any],
-            Doc(
-                """
+            Doc("""
                 Additional metadata.
                 Example: {"x-audit-log": True}
-            """
-            ),
+            """),
         ],
     ) -> Callable[..., Any]:
         """
@@ -968,147 +899,117 @@ class NexiosApp(object):
         self,
         path: Annotated[
             str,
-            Doc(
-                """
+            Doc("""
                 URL path pattern for the DELETE endpoint.
                 Example: '/api/v1/users/{id}'
-            """
-            ),
+            """),
         ],
         handler: Annotated[
             Optional[HandlerType],
-            Doc(
-                """
+            Doc("""
                 Async handler function for DELETE requests.
                 Example:
                 async def delete_user(request, response):
                     user_id = request.path_params['id']
                     return response.json({"deleted": user_id})
-            """
-            ),
+            """),
         ] = None,
         name: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique route name for URL generation.
                 Example: 'api-v1-delete-user'
-            """
-            ),
+            """),
         ] = None,
         summary: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Brief endpoint summary.
                 Example: 'Delete user account'
-            """
-            ),
+            """),
         ] = None,
         description: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Detailed endpoint description.
                 Example: 'Permanently deletes user account and all associated data'
-            """
-            ),
+            """),
         ] = None,
         responses: Annotated[
             Optional[Dict[int, Any]],
-            Doc(
-                """
+            Doc("""
                 Response schemas by status code.
                 Example: {
                     204: None,
                     404: {"description": "User not found"},
                     403: {"description": "Forbidden"}
                 }
-            """
-            ),
+            """),
         ] = None,
         request_model: Annotated[
             Optional[Type[BaseModel]],
-            Doc(
-                """
+            Doc("""
                 Model for request validation.
                 Example:
                 class DeleteConfirmation(BaseModel):
                     confirm: bool
-            """
-            ),
+            """),
         ] = None,
         middleware: Annotated[
             List[Any],
-            Doc(
-                """
+            Doc("""
                 Route-specific middleware.
                 Example: [admin_required, confirm_action]
-            """
-            ),
+            """),
         ] = [],
         tags: Annotated[
             Optional[List[str]],
-            Doc(
-                """
+            Doc("""
                 OpenAPI tags for grouping.
                 Example: ["User Management"]
-            """
-            ),
+            """),
         ] = None,
         security: Annotated[
             Optional[List[Dict[str, List[str]]]],
-            Doc(
-                """
+            Doc("""
                 Security requirements.
                 Example: [{"BearerAuth": []}]
-            """
-            ),
+            """),
         ] = None,
         operation_id: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique operation ID.
                 Example: 'deleteUser'
-            """
-            ),
+            """),
         ] = None,
         deprecated: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Mark as deprecated.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         parameters: Annotated[
             List[Parameter],
-            Doc(
-                """
+            Doc("""
                 Additional parameters.
                 Example: [Parameter(name="confirm", in_="query")]
-            """
-            ),
+            """),
         ] = [],
         exclude_from_schema: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Hide from OpenAPI docs.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         **kwargs: Annotated[
             Dict[str, Any],
-            Doc(
-                """
+            Doc("""
                 Additional metadata.
                 Example: {"x-destructive": True}
-            """
-            ),
+            """),
         ],
     ) -> Callable[..., Any]:
         """
@@ -1157,6 +1058,7 @@ class NexiosApp(object):
             deprecated=deprecated,
             parameters=parameters,
             exclude_from_schema=exclude_from_schema,
+            request_content_type="application/json",
             **kwargs,
         )
 
@@ -1164,157 +1066,129 @@ class NexiosApp(object):
         self,
         path: Annotated[
             str,
-            Doc(
-                """
+            Doc("""
                 URL path pattern for the PUT endpoint.
                 Example: '/api/v1/users/{id}'
-            """
-            ),
+            """),
         ],
         handler: Annotated[
             Optional[HandlerType],
-            Doc(
-                """
+            Doc("""
                 Async handler function for PUT requests.
                 Example:
                 async def update_user(request, response):
                     user_id = request.path_params['id']
                     return response.json({"updated": user_id})
-            """
-            ),
+            """),
         ] = None,
         name: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique route name for URL generation.
                 Example: 'api-v1-update-user'
-            """
-            ),
+            """),
         ] = None,
         summary: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Brief endpoint summary.
                 Example: 'Update user details'
-            """
-            ),
+            """),
         ] = None,
         description: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Detailed endpoint description.
                 Example: 'Full update of user resource'
-            """
-            ),
+            """),
         ] = None,
         responses: Annotated[
             Optional[Dict[int, Any]],
-            Doc(
-                """
+            Doc("""
                 Response schemas by status code.
                 Example: {
                     200: UserSchema,
                     400: {"description": "Invalid input"},
                     404: {"description": "User not found"}
                 }
-            """
-            ),
+            """),
         ] = None,
         request_model: Annotated[
             Optional[Type[BaseModel]],
-            Doc(
-                """
+            Doc("""
                 Model for request body validation.
                 Example:
                 class UserUpdate(BaseModel):
                     email: Optional[EmailStr]
                     password: Optional[str]
-            """
-            ),
+            """),
         ] = None,
         middleware: Annotated[
             List[Any],
-            Doc(
-                """
+            Doc("""
                 Route-specific middleware.
                 Example: [owner_required, validate_etag]
-            """
-            ),
+            """),
         ] = [],
         tags: Annotated[
             Optional[List[str]],
-            Doc(
-                """
+            Doc("""
                 OpenAPI tags for grouping.
                 Example: ["User Management"]
-            """
-            ),
+            """),
         ] = None,
         security: Annotated[
             Optional[List[Dict[str, List[str]]]],
-            Doc(
-                """
+            Doc("""
                 Security requirements.
                 Example: [{"BearerAuth": []}]
-            """
-            ),
+            """),
         ] = None,
         operation_id: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique operation ID.
                 Example: 'updateUser'
-            """
-            ),
+            """),
         ] = None,
         deprecated: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Mark as deprecated.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         parameters: Annotated[
             List[Parameter],
-            Doc(
-                """
+            Doc("""
                 Additional parameters.
                 Example: [Parameter(name="If-Match", in_="header")]
-            """
-            ),
+            """),
         ] = [],
         exclude_from_schema: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Hide from OpenAPI docs.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         request_content_type: Annotated[
-            Optional[Literal["application/json", "application/x-www-form-urlencoded", "multipart/form-data"]],
-            Doc(
-                """
+            Literal[
+                "application/json",
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ],
+            Doc("""
                 Request content type.
                 Example: 'application/json'
-            """
-            ),
+            """),
         ] = "application/json",
         **kwargs: Annotated[
             Dict[str, Any],
-            Doc(
-                """
+            Doc("""
                 Additional metadata.
                 Example: {"x-idempotent": True}
-            """
-            ),
+            """),
         ],
     ) -> Callable[..., Any]:
         """
@@ -1376,157 +1250,129 @@ class NexiosApp(object):
         self,
         path: Annotated[
             str,
-            Doc(
-                """
+            Doc("""
                 URL path pattern for the PATCH endpoint.
                 Example: '/api/v1/users/{id}'
-            """
-            ),
+            """),
         ],
         handler: Annotated[
             Optional[HandlerType],
-            Doc(
-                """
+            Doc("""
                 Async handler function for PATCH requests.
                 Example:
                 async def partial_update_user(request, response):
                     user_id = request.path_params['id']
                     return response.json({"updated": user_id})
-            """
-            ),
+            """),
         ] = None,
         name: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique route name for URL generation.
                 Example: 'api-v1-partial-update-user'
-            """
-            ),
+            """),
         ] = None,
         summary: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Brief endpoint summary.
                 Example: 'Partially update user details'
-            """
-            ),
+            """),
         ] = None,
         description: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Detailed endpoint description.
                 Example: 'Partial update of user resource'
-            """
-            ),
+            """),
         ] = None,
         responses: Annotated[
             Optional[Dict[int, Any]],
-            Doc(
-                """
+            Doc("""
                 Response schemas by status code.
                 Example: {
                     200: UserSchema,
                     400: {"description": "Invalid input"},
                     404: {"description": "User not found"}
                 }
-            """
-            ),
+            """),
         ] = None,
         request_model: Annotated[
             Optional[Type[BaseModel]],
-            Doc(
-                """
+            Doc("""
                 Model for request body validation.
                 Example:
                 class UserPatch(BaseModel):
                     email: Optional[EmailStr] = None
                     password: Optional[str] = None
-            """
-            ),
+            """),
         ] = None,
         middleware: Annotated[
             List[Any],
-            Doc(
-                """
+            Doc("""
                 Route-specific middleware.
                 Example: [owner_required, validate_patch]
-            """
-            ),
+            """),
         ] = [],
         tags: Annotated[
             Optional[List[str]],
-            Doc(
-                """
+            Doc("""
                 OpenAPI tags for grouping.
                 Example: ["User Management"]
-            """
-            ),
+            """),
         ] = None,
         security: Annotated[
             Optional[List[Dict[str, List[str]]]],
-            Doc(
-                """
+            Doc("""
                 Security requirements.
                 Example: [{"BearerAuth": []}]
-            """
-            ),
+            """),
         ] = None,
         operation_id: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique operation ID.
                 Example: 'partialUpdateUser'
-            """
-            ),
+            """),
         ] = None,
         deprecated: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Mark as deprecated.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         parameters: Annotated[
             List[Parameter],
-            Doc(
-                """
+            Doc("""
                 Additional parameters.
                 Example: [Parameter(name="fields", in_="query")]
-            """
-            ),
+            """),
         ] = [],
         exclude_from_schema: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Hide from OpenAPI docs.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
-         request_content_type: Annotated[
-            Optional[Literal["application/json", "application/x-www-form-urlencoded", "multipart/form-data"]],
-            Doc(
-                """
+        request_content_type: Annotated[
+            Literal[
+                "application/json",
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ],
+            Doc("""
                 Request content type.
                 Example: 'application/json'
-            """
-            ),
+            """),
         ] = "application/json",
         **kwargs: Annotated[
             Dict[str, Any],
-            Doc(
-                """
+            Doc("""
                 Additional metadata.
                 Example: {"x-partial-update": True}
-            """
-            ),
+            """),
         ],
     ) -> Callable[..., Any]:
         """
@@ -1587,146 +1433,116 @@ class NexiosApp(object):
         self,
         path: Annotated[
             str,
-            Doc(
-                """
+            Doc("""
                 URL path pattern for the OPTIONS endpoint.
                 Example: '/api/v1/users'
-            """
-            ),
+            """),
         ],
         handler: Annotated[
             Optional[HandlerType],
-            Doc(
-                """
+            Doc("""
                 Async handler function for OPTIONS requests.
                 Example:
                 async def user_options(request, response):
                     response.headers['Allow'] = 'GET, POST, OPTIONS'
                     return response
-            """
-            ),
+            """),
         ] = None,
         name: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique route name for URL generation.
                 Example: 'api-v1-user-options'
-            """
-            ),
+            """),
         ] = None,
         summary: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Brief endpoint summary.
                 Example: 'Get supported operations'
-            """
-            ),
+            """),
         ] = None,
         description: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Detailed endpoint description.
                 Example: 'Returns supported HTTP methods and CORS headers'
-            """
-            ),
+            """),
         ] = None,
         responses: Annotated[
             Optional[Dict[int, Any]],
-            Doc(
-                """
+            Doc("""
                 Response schemas by status code.
                 Example: {
                     200: None,
                     204: None
                 }
-            """
-            ),
+            """),
         ] = None,
         request_model: Annotated[
             Optional[Type[BaseModel]],
-            Doc(
-                """
+            Doc("""
                 Model for request validation.
                 Example:
                 class OptionsQuery(BaseModel):
                     detailed: bool = False
-            """
-            ),
+            """),
         ] = None,
         middleware: Annotated[
             List[Any],
-            Doc(
-                """
+            Doc("""
                 Route-specific middleware.
                 Example: [cors_middleware]
-            """
-            ),
+            """),
         ] = [],
         tags: Annotated[
             Optional[List[str]],
-            Doc(
-                """
+            Doc("""
                 OpenAPI tags for grouping.
                 Example: ["CORS"]
-            """
-            ),
+            """),
         ] = None,
         security: Annotated[
             Optional[List[Dict[str, List[str]]]],
-            Doc(
-                """
+            Doc("""
                 Security requirements.
                 Example: []
-            """
-            ),
+            """),
         ] = None,
         operation_id: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique operation ID.
                 Example: 'userOptions'
-            """
-            ),
+            """),
         ] = None,
         deprecated: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Mark as deprecated.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         parameters: Annotated[
             List[Parameter],
-            Doc(
-                """
+            Doc("""
                 Additional parameters.
                 Example: [Parameter(name="Origin", in_="header")]
-            """
-            ),
+            """),
         ] = [],
         exclude_from_schema: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Hide from OpenAPI docs.
                 Example: True
-            """
-            ),
+            """),
         ] = False,
         **kwargs: Annotated[
             Dict[str, Any],
-            Doc(
-                """
+            Doc("""
                 Additional metadata.
                 Example: {"x-cors": True}
-            """
-            ),
+            """),
         ],
     ) -> Callable[..., Any]:
         """
@@ -1774,6 +1590,7 @@ class NexiosApp(object):
             deprecated=deprecated,
             parameters=parameters,
             exclude_from_schema=exclude_from_schema,
+            request_content_type="application/json",
             **kwargs,
         )
 
@@ -1781,146 +1598,116 @@ class NexiosApp(object):
         self,
         path: Annotated[
             str,
-            Doc(
-                """
+            Doc("""
                 URL path pattern for the HEAD endpoint.
                 Example: '/api/v1/resources/{id}'
-            """
-            ),
+            """),
         ],
         handler: Annotated[
             Optional[HandlerType],
-            Doc(
-                """
+            Doc("""
                 Async handler function for HEAD requests.
                 Example:
                 async def check_resource(request, response):
                     exists = await Resource.exists(request.path_params['id'])
                     return response.status(200 if exists else 404)
-            """
-            ),
+            """),
         ] = None,
         name: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique route name for URL generation.
                 Example: 'api-v1-check-resource'
-            """
-            ),
+            """),
         ] = None,
         summary: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Brief endpoint summary.
                 Example: 'Check resource existence'
-            """
-            ),
+            """),
         ] = None,
         description: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Detailed endpoint description.
                 Example: 'Returns headers only to check if resource exists'
-            """
-            ),
+            """),
         ] = None,
         responses: Annotated[
             Optional[Dict[int, Any]],
-            Doc(
-                """
+            Doc("""
                 Response schemas by status code.
                 Example: {
                     200: None,
                     404: None
                 }
-            """
-            ),
+            """),
         ] = None,
         request_model: Annotated[
             Optional[Type[BaseModel]],
-            Doc(
-                """
+            Doc("""
                 Model for request validation.
                 Example:
                 class ResourceCheck(BaseModel):
                     check_children: bool = False
-            """
-            ),
+            """),
         ] = None,
         middleware: Annotated[
             List[Any],
-            Doc(
-                """
+            Doc("""
                 Route-specific middleware.
                 Example: [cache_control('public')]
-            """
-            ),
+            """),
         ] = [],
         tags: Annotated[
             Optional[List[str]],
-            Doc(
-                """
+            Doc("""
                 OpenAPI tags for grouping.
                 Example: ["Resource Management"]
-            """
-            ),
+            """),
         ] = None,
         security: Annotated[
             Optional[List[Dict[str, List[str]]]],
-            Doc(
-                """
+            Doc("""
                 Security requirements.
                 Example: [{"ApiKeyAuth": []}]
-            """
-            ),
+            """),
         ] = None,
         operation_id: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique operation ID.
                 Example: 'checkResource'
-            """
-            ),
+            """),
         ] = None,
         deprecated: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Mark as deprecated.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         parameters: Annotated[
             List[Parameter],
-            Doc(
-                """
+            Doc("""
                 Additional parameters.
                 Example: [Parameter(name="X-Check-Type", in_="header")]
-            """
-            ),
+            """),
         ] = [],
         exclude_from_schema: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Hide from OpenAPI docs.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         **kwargs: Annotated[
             Dict[str, Any],
-            Doc(
-                """
+            Doc("""
                 Additional metadata.
                 Example: {"x-head-only": True}
-            """
-            ),
+            """),
         ],
     ) -> Callable[..., Any]:
         """
@@ -1960,6 +1747,7 @@ class NexiosApp(object):
             description=description,
             responses=responses,
             request_model=request_model,
+            request_content_type="application/json",
             middleware=middleware,
             tags=tags,
             security=security,
@@ -1973,161 +1761,140 @@ class NexiosApp(object):
     def add_route(
         self,
         route: Annotated[
-            Optional[Union[Routes, type[BaseRoute]]],
-            Doc("An instance of the Routes class representing an HTTP route."),
+            Optional[BaseRoute],
+            Doc("An instance of the Route class representing an HTTP route."),
         ] = None,
         path: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 URL path pattern for the HEAD endpoint.
                 Example: '/api/v1/resources/{id}'
-            """
-            ),
+            """),
         ] = None,
         methods: Annotated[
             List[str],
-            Doc(
-                """
+            Doc("""
                 List of HTTP methods this route should handle.
                 Common methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']
                 Defaults to all standard methods if not specified.
-            """
-            ),
+            """),
         ] = allowed_methods_default,
         handler: Annotated[
             Optional[HandlerType],
-            Doc(
-                """
+            Doc("""
                 Async handler function for HEAD requests.
                 Example:
                 async def check_resource(request, response):
                     exists = await Resource.exists(request.path_params['id'])
                     return response.status(200 if exists else 404)
-            """
-            ),
+            """),
         ] = None,
         name: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique route name for URL generation.
                 Example: 'api-v1-check-resource'
-            """
-            ),
+            """),
         ] = None,
         summary: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Brief endpoint summary.
                 Example: 'Check resource existence'
-            """
-            ),
+            """),
         ] = None,
         description: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Detailed endpoint description.
                 Example: 'Returns headers only to check if resource exists'
-            """
-            ),
+            """),
         ] = None,
         responses: Annotated[
             Optional[Dict[int, Any]],
-            Doc(
-                """
+            Doc("""
                 Response schemas by status code.
                 Example: {
                     200: None,
                     404: None
                 }
-            """
-            ),
+            """),
         ] = None,
         request_model: Annotated[
             Optional[Type[BaseModel]],
-            Doc(
-                """
+            Doc("""
                 Model for request validation.
                 Example:
                 class ResourceCheck(BaseModel):
                     check_children: bool = False
-            """
-            ),
+            """),
         ] = None,
+        request_content_type: Annotated[
+            Literal[
+                "application/json",
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ],
+            Doc("""
+                Request content type.
+                Example: 'application/json'
+            """),
+        ] = "application/json",
         middleware: Annotated[
             List[Any],
-            Doc(
-                """
+            Doc("""
                 Route-specific middleware.
                 Example: [cache_control('public')]
-            """
-            ),
+            """),
         ] = [],
         tags: Annotated[
             Optional[List[str]],
-            Doc(
-                """
+            Doc("""
                 OpenAPI tags for grouping.
                 Example: ["Resource Management"]
-            """
-            ),
+            """),
         ] = None,
         security: Annotated[
             Optional[List[Dict[str, List[str]]]],
-            Doc(
-                """
+            Doc("""
                 Security requirements.
                 Example: [{"ApiKeyAuth": []}]
-            """
-            ),
+            """),
         ] = None,
         operation_id: Annotated[
             Optional[str],
-            Doc(
-                """
+            Doc("""
                 Unique operation ID.
                 Example: 'checkResource'
-            """
-            ),
+            """),
         ] = None,
         deprecated: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Mark as deprecated.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         parameters: Annotated[
             List[Parameter],
-            Doc(
-                """
+            Doc("""
                 Additional parameters.
                 Example: [Parameter(name="X-Check-Type", in_="header")]
-            """
-            ),
+            """),
         ] = [],
         exclude_from_schema: Annotated[
             bool,
-            Doc(
-                """
+            Doc("""
                 Hide from OpenAPI docs.
                 Example: False
-            """
-            ),
+            """),
         ] = False,
         **kwargs: Annotated[
             Dict[str, Any],
-            Doc(
-                """
+            Doc("""
                 Additional metadata.
                 Example: {"x-head-only": True}
-            """
-            ),
+            """),
         ],
     ) -> None:
         """
@@ -2136,14 +1903,14 @@ class NexiosApp(object):
         This method registers an HTTP route, allowing the application to handle requests for a specific URL path.
 
         Args:
-            route (Routes): The HTTP route configuration.
+            route (Route): The HTTP route configuration.
 
         Returns:
             None
 
         Example:
             ```python
-            route = Routes("/home", home_handler, methods=["GET", "POST"])
+            route = Route("/home", home_handler, methods=["GET", "POST"])
             app.add_route(route)
             ```
         """
@@ -2152,7 +1919,7 @@ class NexiosApp(object):
                 raise ValueError(
                     "path and handler are required if route is not provided"
                 )
-            route = Routes(
+            route = Route(
                 path=path,
                 handler=handler,
                 methods=methods,
@@ -2161,6 +1928,7 @@ class NexiosApp(object):
                 description=description,
                 responses=responses,
                 request_model=request_model,
+                request_content_type=request_content_type,
                 middleware=middleware,
                 tags=tags,
                 security=security,
@@ -2192,7 +1960,7 @@ class NexiosApp(object):
                 exc_class_or_status_code, handler
             )
 
-    def url_for(self, _name: str, **path_params: Dict[str, Any]) -> URLPath:
+    def url_for(self, _name: str, **path_params: Any) -> URLPath:
         return self.router.url_for(_name, **path_params)
 
     def wrap_asgi(
@@ -2222,16 +1990,16 @@ class NexiosApp(object):
 
         """
         self.app = middleware_cls(self.app, **kwargs)
-        return None
+        return
 
-    def get_all_routes(self) -> List[Routes]:
+    def get_all_routes(self) -> List[Route]:
         """
         Returns all routes registered in the application.
 
         This method retrieves a list of all HTTP and WebSocket routes defined in the application.
 
         Returns:
-            List[Routes]: A list of all registered routes.
+            List[Route]: A list of all registered routes.
 
         Example:
             ```python
@@ -2246,23 +2014,19 @@ class NexiosApp(object):
         self,
         path: Annotated[
             str,
-            Doc(
-                """
+            Doc("""
                 URL path pattern for the WebSocket route.
                 Example: '/ws/chat/{room_id}'
-            """
-            ),
+            """),
         ],
         handler: Annotated[
             Optional[WsHandlerType],
-            Doc(
-                """
+            Doc("""
                 Async handler function for WebSocket connections.
                 Example:
                 async def chat_handler(websocket, path):
                     await websocket.send("Welcome to the chat!")
-            """
-            ),
+            """),
         ] = None,
     ):
         """
@@ -2276,7 +2040,7 @@ class NexiosApp(object):
         Returns:
             Callable: A decorator to register the WebSocket route.
         """
-        return self.ws_router.ws_route(
+        return self.router.ws_route(
             path=path,
             handler=handler,
         )
@@ -2296,7 +2060,6 @@ class NexiosApp(object):
         host: str = "127.0.0.1",
         port: int = 8000,
         reload: bool = False,
-        **kwargs,
     ):
         """
         Run the application using uvicorn.
@@ -2327,7 +2090,7 @@ class NexiosApp(object):
             import uvicorn
 
             print(f"Starting server with uvicorn: {host}:{port}")
-            uvicorn.run(self, host=host, port=port, reload=reload, **kwargs)
+            uvicorn.run(self, host=host, port=port, reload=reload)
         except ImportError:
             raise RuntimeError(
                 "uvicorn not found. Install it with: pip install uvicorn\n"

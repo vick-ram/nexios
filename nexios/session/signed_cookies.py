@@ -1,6 +1,6 @@
 import typing
 
-from itsdangerous import BadSignature, URLSafeTimedSerializer  # type:ignore
+from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from nexios.config import get_config
 
@@ -8,24 +8,23 @@ from .base import BaseSessionInterface
 
 
 class SignedSessionManager(BaseSessionInterface):
-    def __init__(self, session_key: str):
+    def __init__(self, session_key: typing.Optional[str] = None):
         super().__init__(session_key)
         config = get_config()
         self.secret_key = config.secret_key
         self.serializer = URLSafeTimedSerializer(
-            secret_key=config.secret_key,  # type:ignore
+            secret_key=config.secret_key,
             salt="nexio.session.signed_cookie",
         )
-        session_key = session_key
 
     def sign_session_data(self, session_data: typing.Dict[str, typing.Any]) -> str:
         """
         Sign the session data and return a signed token (cookie value).
         """
-        return self.serializer.dumps(session_data)  # type:ignore
+        return self.serializer.dumps(session_data)
 
     def verify_session_data(
-        self, token: str
+        self, token: str | None
     ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """
         Verify and deserialize the signed session token.
@@ -34,9 +33,9 @@ class SignedSessionManager(BaseSessionInterface):
         if not token:
             return {}
         try:
-            session_data = self.serializer.loads(token)  # type:ignore
+            session_data = self.serializer.loads(token)
 
-            return session_data  # type:ignore
+            return session_data
         except BadSignature:
             return {}
 
@@ -47,16 +46,14 @@ class SignedSessionManager(BaseSessionInterface):
         return self.sign_session_data(self._session_cache)
 
     def load_session_from_cookie(
-        self, cookie: str
+        self, cookie: str | None
     ) -> typing.Optional[typing.Dict[str, typing.Any]]:
-        cookie = self.session_key
-
         """
         Load the session data from a signed cookie, and verify it.
         """
         return self.verify_session_data(cookie)
 
-    async def save(self):  # type:ignore
+    async def save(self):
         """
         Save the current session state as a signed cookie.
         """
@@ -65,10 +62,10 @@ class SignedSessionManager(BaseSessionInterface):
         return signed_session
 
     async def load(self):
-        cookie = self.session_key
         """
         Load the session data from a signed cookie.
         """
+        cookie = self.session_key
         session_data = self.load_session_from_cookie(cookie)
 
         if session_data:
@@ -78,3 +75,4 @@ class SignedSessionManager(BaseSessionInterface):
 
     def clear(self):
         self._session_cache.clear()
+        self.modified = True

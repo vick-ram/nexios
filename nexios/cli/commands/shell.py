@@ -4,6 +4,7 @@ Nexios CLI - Interactive shell command.
 """
 
 import sys
+from typing import Any
 
 import click
 
@@ -12,7 +13,6 @@ from nexios.cli.utils import (
     _echo_info,
     _echo_warning,
     _load_app_from_path,
-    load_config_module,
 )
 
 
@@ -20,20 +20,15 @@ from nexios.cli.utils import (
 @click.option(
     "--app",
     "app_path",
-    # required=True,
+    required=True,
     help="App module path in format 'module:app_variable' (e.g., 'myapp.main:app').",
-)
-@click.option(
-    "--config",
-    "config_path",
-    help="Path to a Python config file that sets up the app instance.",
 )
 @click.option(
     "--ipython",
     is_flag=True,
     help="Force use of IPython shell (default: auto-detect)",
 )
-def shell(app_path: str, config_path: str = None, ipython: bool = False):
+def shell(app_path: str, ipython: bool = False):
     """
     Start an interactive shell with the Nexios app context loaded.
 
@@ -48,19 +43,10 @@ def shell(app_path: str, config_path: str = None, ipython: bool = False):
       nexios shell --app myapp.main:app --ipython
     """
     try:
-        # Load config if provided (will return empty dict if file doesn't exist)
-        app, config = load_config_module(config_path)
-
-        # If app_path was provided in config, use it (CLI arg takes precedence)
-        if "app_path" in config and not app_path:
-            app_path = config["app_path"]
-
-        # Load app instance using the provided path
-        app = _load_app_from_path(app_path, config_path)
+        # Load app instance
+        app = _load_app_from_path(app_path)
         if app is None:
-            _echo_error(
-                "Could not load the app instance. Please check your app_path or config."
-            )
+            _echo_error("Could not load the app instance. Please check your app_path.")
             sys.exit(1)
 
         _echo_info(f"Loaded app: {app}")
@@ -114,7 +100,7 @@ def shell(app_path: str, config_path: str = None, ipython: bool = False):
         sys.exit(1)
 
 
-def _try_start_ipython_shell(shell_vars: dict) -> bool:
+def _try_start_ipython_shell(shell_vars: dict[str, Any]) -> bool:
     """Try to start IPython shell."""
     try:
         import IPython  # noqa: F401
@@ -156,7 +142,7 @@ Examples:
         return False
 
 
-def _try_start_regular_shell(shell_vars: dict) -> bool:
+def _try_start_regular_shell(shell_vars: dict[str, Any]) -> bool:
     """Try to start regular Python shell."""
     try:
         import code

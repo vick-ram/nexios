@@ -1,25 +1,26 @@
 import re
 import typing
+from typing import Any
 
 from nexios._internals._middleware import DefineMiddleware as Middleware
 from nexios._internals._route_builder import RouteBuilder
 from nexios.exceptions import NotFoundException
-from nexios.structs import URLPath
+from nexios.objects import URLPath
 from nexios.types import ASGIApp, Receive, Scope, Send
 
+from ._utils import MatchStatus, get_route_path
 from .base import BaseRoute
-from .http import Router
 
 
 class Group(BaseRoute):
     def __init__(
         self,
         path: str = "",
-        app: ASGIApp | None = None,
-        routes: typing.List[BaseRoute] | None = None,
-        name: str | None = None,
+        app: typing.Optional[ASGIApp] = None,
+        routes: typing.List[BaseRoute] = [],
+        name: typing.Optional[str] = None,
         *,
-        middleware: typing.List[Middleware] | None = None,
+        middleware: typing.List[Middleware] = [],
     ) -> None:
         assert path == "" or path.startswith("/"), "Routed paths must start with '/'"
         assert app is not None or routes is not None, (
@@ -33,12 +34,13 @@ class Group(BaseRoute):
         if app is not None:
             self._base_app = app
         else:
-            self._base_app = Router(routes=routes)  # type:ignore
+            from .router import Router
 
-        self.app = self._base_app  # type:ignore
-        if middleware is not None:
-            for cls, args, kwargs in reversed(middleware):
-                self.app = cls(self.app, *args, **kwargs)
+            self._base_app = Router(routes=routes)
+
+        self.app = self._base_app
+        for cls, args, kwargs in reversed(middleware):
+            self.app = cls(self.app, *args, **kwargs)
 
         self.route_info = RouteBuilder.create_pattern(
             self.path.rstrip("/") + "{path:path}"
@@ -51,13 +53,11 @@ class Group(BaseRoute):
     def routes(self) -> list[BaseRoute]:
         return getattr(self._base_app, "routes", [])
 
-    def match(
-        self, path: str, method: str
-    ) -> typing.Tuple[typing.Any, typing.Any, typing.Any]:
+    def match(self, scope: Scope) -> typing.Tuple[MatchStatus, dict[str, Any]]:
         """
         Match a path against this mounted route's pattern.
         """
-        match = self.pattern.match(path)
+        match = self.pattern.match(get_route_path(scope))
         if match:
             matched_params = match.groupdict()
             path_remainder = matched_params.pop("path", "")
@@ -71,8 +71,8 @@ class Group(BaseRoute):
                 if value is not None:
                     matched_params[key] = self.route_info.convertor[key].convert(value)
 
-            return match, {"path": path_remainder, **matched_params}, True
-        return None, None, False
+            return MatchStatus.FULL, matched_params
+        return MatchStatus.NONE, {}
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         original_path = scope["path"]
@@ -91,13 +91,13 @@ class Group(BaseRoute):
                 scope["root_path"] = scope["root_path"][: -len(matched_path)]
             raise
 
-    def url_path_for(self, _name: str, **path_params: typing.Any) -> URLPath:
+    def url_path_for(self, name: str, **path_params: typing.Any) -> URLPath:
         """
         Generate a URL path for the mounted route.
         """
-        if _name != self.name:
+        if name != self.name:
             raise ValueError(
-                f"Route name '{_name}' does not match the mounted route name '{self.name}'."
+                f"Route name '{name}' does not match the mounted route name '{self.name}'."
             )
 
         path = self.path.rstrip("/")

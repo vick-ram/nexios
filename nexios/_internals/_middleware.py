@@ -1,44 +1,35 @@
 from __future__ import annotations
 
-import sys
 import typing
 from collections.abc import Iterator
-from typing import Any, Protocol
+from typing import Any, AsyncIterable, Callable, Mapping, MutableMapping
 
 import anyio
 
 from nexios.http.request import ClientDisconnect, Request
+from nexios.http.response import (
+    BaseResponse,
+)
 from nexios.http.response import NexiosResponse as Response
-from nexios.types import ASGIApp, Message, Receive, Scope, Send
+from nexios.types import ASGIApp, Message, MiddlewareType, Receive, Scope, Send
 from nexios.utils.async_helpers import collapse_excgroups
 from nexios.websockets import WebSocket
 
-if sys.version_info >= (3, 10):  # pragma: no cover
-    from typing import ParamSpec
-else:  # pragma: no cover
-    from typing_extensions import ParamSpec
-
 RequestResponseEndpoint = typing.Callable[[Request], typing.Awaitable[Response]]
-DispatchFunction = typing.Callable[
-    [Request, Response, typing.Callable[[], typing.Awaitable[Response]]],
-    typing.Awaitable[Response],
-]
+
 T = typing.TypeVar("T")
-P = ParamSpec("P")
 
+AsyncContentStream = AsyncIterable[str | bytes | memoryview | MutableMapping[str, Any]]
 
-class _MiddlewareFactory(Protocol[P]):
-    def __call__(
-        self, app: ASGIApp, /, *args: P.args, **kwargs: P.kwargs
-    ) -> ASGIApp: ...  # pragma: no cover
+MiddlewareFactory = Callable[..., ASGIApp]
 
 
 class DefineMiddleware:
     def __init__(
         self,
-        cls: _MiddlewareFactory[P],
-        *args: P.args,
-        **kwargs: P.kwargs,
+        cls: MiddlewareFactory,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         self.cls = cls
         self.args = args
@@ -134,13 +125,13 @@ class _CachedRequest(Request):
 
 
 class ASGIRequestResponseBridge:
-    def __init__(self, app: ASGIApp, dispatch: DispatchFunction) -> None:
+    def __init__(self, app: ASGIApp, dispatch: MiddlewareType) -> None:
         self.app = app
         self.dispatch_func = dispatch
 
     def __str__(self) -> str:
         return f"ASGIRequestResponseBridge({self.app!r}, {self.dispatch_func!r})"
-    
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
@@ -148,13 +139,10 @@ class ASGIRequestResponseBridge:
 
         request = _CachedRequest(scope, receive)
         response = Response(request=request)
-
         wrapped_receive = request.wrapped_receive
         response_sent = anyio.Event()
 
-        async def call_next(
-            *_,
-        ) -> Response:  # Why cant this be flexible , i mean ☺️🤷‍♀️
+        async def call_next(*_):
             app_exc: Exception | None = None
 
             async def receive_or_disconnect() -> Message:
@@ -212,22 +200,64 @@ class ASGIRequestResponseBridge:
                 if app_exc is not None:
                     raise app_exc
 
-            response_ = response.stream(
-                iterator=body_stream(), status_code=message["status"]
-            )  # type: ignore
-            response_._response._headers = message["headers"]  # type: ignore
-            return response
+            response_object = _StreamingResponse(
+                content=body_stream(),
+                status_code=message["status"],
+            )
+            response_object.raw_headers = message["headers"]
+            response._response = response_object
+            return response_object
 
-        streams: anyio.create_memory_object_stream[Message] = (
-            anyio.create_memory_object_stream()
-        )  # type: ignore
+        streams = anyio.create_memory_object_stream()
         send_stream, recv_stream = streams
         with recv_stream, send_stream, collapse_excgroups():
             async with anyio.create_task_group() as task_group:
-                await self.dispatch_func(request, response, call_next)  # type: ignore
-                await response.get_response()(scope, wrapped_receive, send)
+                returned_response = await self.dispatch_func(
+                    request, response, call_next
+                )
+                await returned_response(scope, wrapped_receive, send)
                 response_sent.set()
                 recv_stream.close()
+
+
+class _StreamingResponse(BaseResponse):
+    def __init__(
+        self,
+        content: AsyncContentStream,
+        status_code: int = 200,
+        headers: Mapping[str, str] | None = None,
+        media_type: str | None = None,
+        info: Mapping[str, Any] | None = None,
+    ) -> None:
+        self.info = info
+        self.content_iterator = content
+        self.status_code = status_code
+        self.media_type = media_type
+
+        super().__init__(headers=dict(headers or {}), status_code=status_code)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if self.info is not None:
+            await send({"type": "http.response.debug", "info": self.info})
+        await send(
+            {
+                "type": "http.response.start",
+                "status": self.status_code,
+                "headers": self.raw_headers,
+            }
+        )
+
+        should_close_body = True
+        async for chunk in self.content_iterator:
+            if isinstance(chunk, dict):
+                # We got an ASGI message which is not response body (eg: pathsend)
+                should_close_body = False
+                await send(chunk)
+                continue
+            await send({"type": "http.response.body", "body": chunk, "more_body": True})
+
+        if should_close_body:
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
 
 
 WebSocketDispatchFunction = typing.Callable[
@@ -235,11 +265,5 @@ WebSocketDispatchFunction = typing.Callable[
 ]
 
 
-MiddlewareType = typing.Callable[
-    [Request, Response, typing.Awaitable[None]],
-    typing.Callable[[], typing.Awaitable[None]],
-]
-
-
-def wrap_middleware(middleware_function: DispatchFunction) -> DefineMiddleware:
+def wrap_middleware(middleware_function: MiddlewareType) -> DefineMiddleware:
     return DefineMiddleware(ASGIRequestResponseBridge, dispatch=middleware_function)
